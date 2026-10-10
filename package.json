@@ -48,14 +48,6 @@
         "title": "RestCraft: Create Request File"
       }
     ],
-    "menus": {
-      "explorer/context": [
-        {
-          "command": "restcraft.createRequestFile",
-          "group": "navigation"
-        }
-      ]
-    },
     "customEditors": [
       {
         "viewType": "restcraft.requestEditor",
