@@ -59,7 +59,7 @@
     "customEditors": [
       {
         "viewType": "restcraft.requestEditor",
-        "displayName": "RestCraft Request",
+        "displayName": "API Workbench",
         "selector": [
           {
             "filenamePattern": "*.api.json"
