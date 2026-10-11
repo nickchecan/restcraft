@@ -8,11 +8,14 @@ import { getWebviewHtml } from './getWebviewHtml';
 
 export interface SendRequestMessage {
 	type: 'sendRequest';
+	requestId: number;
 	method: string;
 	url: string;
 	headers?: Record<string, string>;
 	body?: string;
 }
+
+interface CancelRequestMessage { type: 'cancelRequest'; requestId: number; }
 
 interface WebviewReadyMessage {
 	type: 'webviewReady';
@@ -57,7 +60,7 @@ export interface RequestWebviewHandlers {
 	extensionVersion?: string;
 	onReady?: () => void;
 	onRequestChanged?: (message: RequestChangedMessage) => void;
-	onSendRequest?: (message: SendRequestMessage) => Promise<ApiResponse>;
+	onSendRequest?: (message: SendRequestMessage, signal: AbortSignal) => Promise<ApiResponse>;
 	onResolveEnvironmentVariable?: (name: string) => Promise<string | undefined>;
 	onCheckEnvironmentVariables?: (names: string[]) => Promise<string[]>;
 }
@@ -76,6 +79,7 @@ export function initializeRequestWebview(
 	const handlers = typeof handlersOrOnReady === 'function'
 		? { onReady: handlersOrOnReady }
 		: handlersOrOnReady ?? {};
+	const activeRequests = new Map<number, AbortController>();
 
 	webview.html = getWebviewHtml(webview, handlers.extensionVersion ?? '0.0.0');
 
@@ -92,6 +96,10 @@ export function initializeRequestWebview(
 
 		if (isRequestChangedMessage(message)) {
 			handlers.onRequestChanged?.(message);
+			return;
+		}
+		if (isCancelRequestMessage(message)) {
+			activeRequests.get(message.requestId)?.abort();
 			return;
 		}
 
@@ -120,7 +128,7 @@ export function initializeRequestWebview(
 			return;
 		}
 
-		void handleMessage(webview, message, handlers);
+		void handleMessage(webview, message, handlers, activeRequests);
 	});
 	const trustSubscription = vscode.workspace.onDidGrantWorkspaceTrust(() => {
 		void webview.postMessage({
@@ -134,7 +142,10 @@ export function initializeRequestWebview(
 		}
 	});
 
-	return vscode.Disposable.from(messageSubscription, trustSubscription, settingsSubscription);
+	return vscode.Disposable.from(messageSubscription, trustSubscription, settingsSubscription, new vscode.Disposable(() => {
+		for (const controller of activeRequests.values()) { controller.abort(); }
+		activeRequests.clear();
+	}));
 }
 
 /** Sends the current environment-value tooltip preference into the webview. */
@@ -238,22 +249,26 @@ async function handleMessage(
 	webview: vscode.Webview,
 	message: unknown,
 	handlers: RequestWebviewHandlers,
+	activeRequests: Map<number, AbortController>,
 ): Promise<void> {
 	if (!isSendRequestMessage(message)) {
 		return;
 	}
 
+	let controller: AbortController | undefined;
 	try {
 		if (!vscode.workspace.isTrusted) {
 			throw new Error('Sending requests and resolving .env variables requires a trusted workspace.');
 		}
 
-		const response = handlers.onSendRequest ? await handlers.onSendRequest(message) : await executeRequest({
+		controller = new AbortController();
+		activeRequests.set(message.requestId, controller);
+		const response = handlers.onSendRequest ? await handlers.onSendRequest(message, controller.signal) : await executeRequest({
 			method: message.method,
 			url: message.url,
 			headers: message.headers,
 			body: message.body,
-		}, getRequestTimeout());
+		}, getRequestTimeout(), controller.signal);
 
 		await webview.postMessage({
 			type: 'requestComplete',
@@ -263,7 +278,10 @@ async function handleMessage(
 		await webview.postMessage({
 			type: 'requestError',
 			message: error instanceof Error ? error.message : 'Request failed.',
+			cancelled: controller?.signal.aborted === true,
 		});
+	} finally {
+		activeRequests.delete(message.requestId);
 	}
 }
 
@@ -276,6 +294,7 @@ async function handleMessage(
 export async function executeRequestWithEnvironment(
 	message: SendRequestMessage,
 	requestUri: vscode.Uri | undefined,
+	signal?: AbortSignal,
 ): Promise<ApiResponse> {
 	if (!vscode.workspace.isTrusted) {
 		throw new Error('Sending requests and resolving .env variables requires a trusted workspace.');
@@ -290,7 +309,7 @@ export async function executeRequestWithEnvironment(
 	}, variables);
 	await confirmInsecureCredentialRequest(request.url, request.headers);
 
-	return executeRequest(request, getRequestTimeout());
+	return executeRequest(request, getRequestTimeout(), signal);
 }
 
 /** Reads one environment value for an explicit hover lookup. */
@@ -495,10 +514,20 @@ function isSendRequestMessage(message: unknown): message is SendRequestMessage {
 	const candidate = message as Partial<SendRequestMessage>;
 
 	return candidate.type === 'sendRequest'
+		&& typeof candidate.requestId === 'number'
+		&& Number.isSafeInteger(candidate.requestId)
 		&& typeof candidate.method === 'string'
 		&& typeof candidate.url === 'string'
 		&& (candidate.body === undefined || typeof candidate.body === 'string')
 		&& (candidate.headers === undefined || isStringRecord(candidate.headers));
+}
+
+function isCancelRequestMessage(message: unknown): message is CancelRequestMessage {
+	if (!isRecord(message)) { return false; }
+	const candidate = message as Partial<CancelRequestMessage>;
+	return candidate.type === 'cancelRequest'
+		&& typeof candidate.requestId === 'number'
+		&& Number.isSafeInteger(candidate.requestId);
 }
 
 /**

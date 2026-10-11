@@ -111,7 +111,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 		.request-bar {
 			display: grid;
-			grid-template-columns: minmax(110px, 140px) minmax(180px, 1fr) auto;
+			grid-template-columns: minmax(110px, 140px) minmax(180px, 1fr) auto auto;
 			gap: 8px;
 			align-items: center;
 		}
@@ -779,6 +779,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			<input id="url" name="url" type="text" placeholder="https://api.example.com/resource" aria-label="Request URL">
 		</label>
 		<button id="send" type="submit" disabled title="Checking workspace trust...">Send</button>
+		<button id="cancel-request" type="button" class="hidden">Cancel</button>
 		</form>
 		<section class="request-panel" aria-label="Request configuration area">
 			<div class="request-tabs" role="tablist" aria-label="Request sections">
@@ -942,6 +943,13 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				const method = document.getElementById('method');
 				const url = document.getElementById('url');
 				const send = document.getElementById('send');
+				const cancelRequest = document.getElementById('cancel-request');
+				let activeRequestId = 0;
+				cancelRequest.addEventListener('click', () => {
+					if (!activeRequestId) { return; }
+					cancelRequest.disabled = true;
+					vscode.postMessage({ type: 'cancelRequest', requestId: activeRequestId });
+				});
 			const environmentVariableTooltip = document.getElementById('environment-variable-tooltip');
 				const requestParamsTab = document.getElementById('request-params-tab');
 				const requestAuthorizationTab = document.getElementById('request-authorization-tab');
@@ -1205,7 +1213,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			form.addEventListener('submit', (event) => {
 				event.preventDefault();
 				latestRequestUrl = readEnabledRequestUrl();
+				activeRequestId += 1;
 				send.disabled = true;
+				cancelRequest.classList.remove('hidden');
+				cancelRequest.disabled = false;
 				startRequestTimer();
 				setResponseStatus('Sending...');
 				responseSize.textContent = '';
@@ -1216,6 +1227,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 			vscode.postMessage({
 						type: 'sendRequest',
+					requestId: activeRequestId,
 						method: method.value,
 						url: latestRequestUrl,
 						headers: readEnabledRequestHeaders(),
@@ -1228,6 +1240,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 				if (message.type === 'requestComplete') {
 				send.disabled = false;
+				cancelRequest.classList.add('hidden');
 				stopRequestTimer();
 				renderResponse(message.response);
 				updateResponseAreaBounds();
@@ -1236,8 +1249,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 				if (message.type === 'requestError') {
 					send.disabled = false;
+				cancelRequest.classList.add('hidden');
 					stopRequestTimer();
-					setResponseStatus('Request failed', 'error');
+				setResponseStatus(message.cancelled ? 'Request cancelled' : 'Request failed', message.cancelled ? '' : 'error');
 					responseSize.textContent = '';
 					responseHeaders.textContent = '(none)';
 					setRawContent(message.message);

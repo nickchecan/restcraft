@@ -23,7 +23,7 @@ export class ApiWorkbenchPanel {
 		this.panel = panel;
 		initializeRequestWebview(this.panel.webview, {
 			extensionVersion,
-			onSendRequest: (message) => executeRequestWithEnvironment(message, this.requestUri),
+			onSendRequest: (message, signal) => executeRequestWithEnvironment(message, this.requestUri, signal),
 			onResolveEnvironmentVariable: (name) => resolveEnvironmentVariable(name, this.requestUri),
 			onCheckEnvironmentVariables: (names) => findDefinedEnvironmentVariables(names, this.requestUri),
 		});

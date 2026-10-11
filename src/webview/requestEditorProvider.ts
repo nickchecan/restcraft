@@ -83,7 +83,7 @@ export class RequestEditorProvider implements vscode.CustomTextEditorProvider {
 					void this.updateDocument(document, nextText);
 				}
 			},
-			onSendRequest: (message) => executeRequestWithEnvironment(message, document.uri),
+			onSendRequest: (message, signal) => executeRequestWithEnvironment(message, document.uri, signal),
 			onResolveEnvironmentVariable: (name) => resolveEnvironmentVariable(name, document.uri),
 			onCheckEnvironmentVariables: (names) => findDefinedEnvironmentVariables(names, document.uri),
 		});
