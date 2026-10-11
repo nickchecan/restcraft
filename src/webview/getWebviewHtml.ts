@@ -995,6 +995,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				let latestRequestUrl = '';
 				let hoveredEnvironmentVariable = '';
 				let environmentVariableRequestId = 0;
+				let environmentValueTooltipEnabled = false;
 				let textMeasureContext;
 				let activeAuthorizationType = 'none';
 				let activeRequestBodyType = 'raw';
@@ -1241,6 +1242,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					return;
 				}
 
+				if (message.type === 'environmentTooltipSetting') {
+					environmentValueTooltipEnabled = message.isEnabled === true;
+					if (!environmentValueTooltipEnabled) {
+						clearHoveredEnvironmentVariable();
+					}
+					return;
+				}
+
 				if (message.type === 'environmentVariableResolved') {
 					if (message.requestId !== environmentVariableRequestId || message.name !== hoveredEnvironmentVariable) {
 						return;
@@ -1283,6 +1292,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			});
 
 		function showHoveredEnvironmentVariable(event) {
+			if (!environmentValueTooltipEnabled) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+
 			const target = event.target;
 			if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
 				|| target.type === 'checkbox' || target.type === 'submit'

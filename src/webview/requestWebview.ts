@@ -78,6 +78,7 @@ export function initializeRequestWebview(
 				type: 'workspaceTrust',
 				isTrusted: vscode.workspace.isTrusted,
 			});
+			void postEnvironmentTooltipSetting(webview);
 			handlers.onReady?.();
 			return;
 		}
@@ -115,8 +116,22 @@ export function initializeRequestWebview(
 			isTrusted: true,
 		});
 	});
+	const settingsSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
+		if (event.affectsConfiguration('restcraft.showEnvironmentVariableValues')) {
+			void postEnvironmentTooltipSetting(webview);
+		}
+	});
 
-	return vscode.Disposable.from(messageSubscription, trustSubscription);
+	return vscode.Disposable.from(messageSubscription, trustSubscription, settingsSubscription);
+}
+
+/** Sends the current environment-value tooltip preference into the webview. */
+async function postEnvironmentTooltipSetting(webview: vscode.Webview): Promise<void> {
+	const isEnabled = vscode.workspace.getConfiguration('restcraft').get<boolean>('showEnvironmentVariableValues', true);
+	await webview.postMessage({
+		type: 'environmentTooltipSetting',
+		isEnabled,
+	});
 }
 
 /** Resolves only the single environment variable the user is hovering over. */
@@ -128,6 +143,9 @@ async function handleResolveEnvironmentVariable(
 	try {
 		if (!vscode.workspace.isTrusted) {
 			throw new Error('Environment values are only available in a trusted workspace.');
+		}
+		if (!vscode.workspace.getConfiguration('restcraft').get<boolean>('showEnvironmentVariableValues', true)) {
+			return;
 		}
 
 		const value = await handlers.onResolveEnvironmentVariable?.(message.name);
