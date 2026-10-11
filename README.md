@@ -102,7 +102,9 @@ When `headerState` is omitted, RestCraft backfills enabled header rows from `hea
 
 ## Environment Variables
 
-RestCraft resolves `{{VARIABLE_NAME}}` placeholders from a `.env` file in the same folder as the `.api.json` request file.
+RestCraft resolves `{{VARIABLE_NAME}}` placeholders from the nearest `.env` file. It checks the request file's folder first, then each parent folder up to the containing VS Code workspace folder. The first `.env` found is used; files are not merged. This lets a root `.env` provide defaults for requests in child folders while a closer `.env` overrides it for requests in its folder and descendants.
+
+For example, requests in `folder1` use the root `.env` when `folder1` has none, while requests in `folder3` use `folder3/.env` when it exists. RestCraft does not search above the workspace folder. Sending requests and reading `.env` values requires a trusted workspace.
 
 Example `.env` file:
 
