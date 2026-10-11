@@ -7,6 +7,7 @@ import {
 	executeRequestWithEnvironment,
 	initializeRequestWebview,
 	loadRequestInWebview,
+	resolveEnvironmentVariable,
 	RequestChangedMessage,
 } from './requestWebview';
 
@@ -82,6 +83,7 @@ export class RequestEditorProvider implements vscode.CustomTextEditorProvider {
 				}
 			},
 			onSendRequest: (message) => executeRequestWithEnvironment(message, document.uri),
+			onResolveEnvironmentVariable: (name) => resolveEnvironmentVariable(name, document.uri),
 		});
 		const documentSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
 			// Dirty-state notifications have no text edits. Reloading for those

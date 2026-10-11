@@ -702,6 +702,22 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				font-weight: 600;
 			}
 
+			.environment-variable-tooltip {
+				position: fixed;
+				z-index: 20;
+				max-width: min(480px, calc(100vw - 24px));
+				padding: 6px 9px;
+				color: var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground));
+				background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+				border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+				border-radius: 4px;
+				box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+				font: 12px/1.4 var(--vscode-font-family);
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				pointer-events: none;
+			}
+
 			.hidden {
 				display: none;
 			}
@@ -880,6 +896,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				<pre class="response-content" id="response-preview-empty">HTML preview is available for HTML responses.</pre>
 			</div>
 		</section>
+		<div class="environment-variable-tooltip hidden" id="environment-variable-tooltip" role="tooltip"></div>
 		<footer class="editor-footer" aria-label="Editor summary">
 			<button class="editor-footer-icon" id="footer-settings-button" type="button" aria-label="Settings" title="Settings">
 				<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -920,6 +937,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				const method = document.getElementById('method');
 				const url = document.getElementById('url');
 				const send = document.getElementById('send');
+			const environmentVariableTooltip = document.getElementById('environment-variable-tooltip');
 				const requestParamsTab = document.getElementById('request-params-tab');
 				const requestAuthorizationTab = document.getElementById('request-authorization-tab');
 				const requestHeadersTab = document.getElementById('request-headers-tab');
@@ -975,12 +993,19 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				let requestStartedAt = 0;
 				let requestTimer = undefined;
 				let latestRequestUrl = '';
+				let hoveredEnvironmentVariable = '';
+				let environmentVariableRequestId = 0;
+				let textMeasureContext;
 				let activeAuthorizationType = 'none';
 				let activeRequestBodyType = 'raw';
 				renderRequestParamsFromUrl();
 				renderRequestHeaders({});
 				updateResponseAreaBounds();
 				window.addEventListener('resize', updateResponseAreaBounds);
+
+				document.addEventListener('pointermove', showHoveredEnvironmentVariable);
+				window.addEventListener('blur', clearHoveredEnvironmentVariable);
+				window.addEventListener('pointerleave', clearHoveredEnvironmentVariable);
 
 				footerRepositoryLink.addEventListener('click', () => {
 					vscode.postMessage({
@@ -1216,6 +1241,21 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					return;
 				}
 
+				if (message.type === 'environmentVariableResolved') {
+					if (message.requestId !== environmentVariableRequestId || message.name !== hoveredEnvironmentVariable) {
+						return;
+					}
+
+					if (typeof message.error === 'string') {
+						environmentVariableTooltip.textContent = message.error;
+					} else if (typeof message.value === 'string') {
+						environmentVariableTooltip.textContent = '{{' + message.name + '}} = ' + message.value;
+					} else {
+						environmentVariableTooltip.textContent = '{{' + message.name + '}} is not defined in the sibling .env file.';
+					}
+					return;
+				}
+
 				if (message.type === 'loadRequest') {
 						setRequestTitle(message.request.name);
 						method.value = message.request.method;
@@ -1241,6 +1281,111 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						updateResponseAreaBounds();
 				}
 			});
+
+		function showHoveredEnvironmentVariable(event) {
+			const target = event.target;
+			if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+				|| target.type === 'checkbox' || target.type === 'submit'
+				|| !target.closest('.request-bar, .request-panel')) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+
+			const value = target.value;
+			const rect = target.getBoundingClientRect();
+			const style = window.getComputedStyle(target);
+			const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+			const paddingTop = Number.parseFloat(style.paddingTop) || 0;
+			if (!value) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+
+			textMeasureContext ??= document.createElement('canvas').getContext('2d');
+			if (!textMeasureContext) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+			textMeasureContext.font = style.font;
+			const pointerX = event.clientX - rect.left - paddingLeft + target.scrollLeft;
+			let sourceLine = value;
+			let sourceLineStart = 0;
+			if (target instanceof HTMLTextAreaElement) {
+				const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) || 16;
+				const paddingRight = Number.parseFloat(style.paddingRight) || 0;
+				const lineWidth = Math.max(1, target.clientWidth - paddingLeft - paddingRight);
+				const visualLines = [];
+				let sourceOffset = 0;
+				for (const hardLine of value.split('\\n')) {
+					if (!hardLine) {
+						visualLines.push({ text: '', start: sourceOffset });
+					} else {
+						let rowStart = 0;
+						for (let index = 1; index <= hardLine.length; index += 1) {
+							if (textMeasureContext.measureText(hardLine.slice(rowStart, index)).width > lineWidth && index - 1 > rowStart) {
+								visualLines.push({ text: hardLine.slice(rowStart, index - 1), start: sourceOffset + rowStart });
+								rowStart = index - 1;
+							}
+						}
+						visualLines.push({ text: hardLine.slice(rowStart), start: sourceOffset + rowStart });
+					}
+					sourceOffset += hardLine.length + 1;
+				}
+
+				const visualLineIndex = Math.max(0, Math.floor((event.clientY - rect.top - paddingTop + target.scrollTop) / lineHeight));
+			const visualLine = visualLines[visualLineIndex];
+			if (!visualLine) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+			sourceLine = visualLine.text;
+			sourceLineStart = visualLine.start;
+		}
+
+			let characterIndex = 0;
+				while (characterIndex < sourceLine.length
+				&& textMeasureContext.measureText(sourceLine.slice(0, characterIndex + 1)).width < pointerX) {
+				characterIndex += 1;
+			}
+
+			const tokenPattern = /\\{\\{([A-Za-z_][A-Za-z0-9_]*)\\}\\}/g;
+			let match;
+			let variableName = '';
+			const sourceCharacterIndex = sourceLineStart + characterIndex;
+			while ((match = tokenPattern.exec(value)) !== null) {
+				if (sourceCharacterIndex >= match.index && sourceCharacterIndex <= match.index + match[0].length) {
+					variableName = match[1];
+					break;
+				}
+			}
+
+			if (!variableName) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+
+			environmentVariableTooltip.style.left = Math.max(8, Math.min(event.clientX + 12, window.innerWidth - 488)) + 'px';
+			environmentVariableTooltip.style.top = Math.max(8, Math.min(event.clientY + 16, window.innerHeight - 80)) + 'px';
+			environmentVariableTooltip.classList.remove('hidden');
+			if (variableName !== hoveredEnvironmentVariable) {
+				hoveredEnvironmentVariable = variableName;
+				environmentVariableRequestId += 1;
+				environmentVariableTooltip.textContent = 'Looking up {{' + variableName + '}}…';
+				vscode.postMessage({
+					type: 'resolveEnvironmentVariable',
+					requestId: environmentVariableRequestId,
+					name: variableName,
+				});
+			}
+		}
+
+		function clearHoveredEnvironmentVariable() {
+			if (hoveredEnvironmentVariable) {
+				hoveredEnvironmentVariable = '';
+				environmentVariableRequestId += 1;
+			}
+			environmentVariableTooltip.classList.add('hidden');
+		}
 
 		vscode.postMessage({
 			type: 'webviewReady',

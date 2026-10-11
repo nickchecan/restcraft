@@ -30,6 +30,12 @@ interface OpenSettingsMessage {
 	type: 'openSettings';
 }
 
+interface ResolveEnvironmentVariableMessage {
+	type: 'resolveEnvironmentVariable';
+	requestId: number;
+	name: string;
+}
+
 export interface RequestChangedMessage {
 	type: 'requestChanged';
 	name: string;
@@ -46,6 +52,7 @@ export interface RequestWebviewHandlers {
 	onReady?: () => void;
 	onRequestChanged?: (message: RequestChangedMessage) => void;
 	onSendRequest?: (message: SendRequestMessage) => Promise<ApiResponse>;
+	onResolveEnvironmentVariable?: (name: string) => Promise<string | undefined>;
 }
 
 /**
@@ -95,6 +102,11 @@ export function initializeRequestWebview(
 			return;
 		}
 
+		if (isResolveEnvironmentVariableMessage(message)) {
+			void handleResolveEnvironmentVariable(webview, message, handlers);
+			return;
+		}
+
 		void handleMessage(webview, message, handlers);
 	});
 	const trustSubscription = vscode.workspace.onDidGrantWorkspaceTrust(() => {
@@ -105,6 +117,34 @@ export function initializeRequestWebview(
 	});
 
 	return vscode.Disposable.from(messageSubscription, trustSubscription);
+}
+
+/** Resolves only the single environment variable the user is hovering over. */
+async function handleResolveEnvironmentVariable(
+	webview: vscode.Webview,
+	message: ResolveEnvironmentVariableMessage,
+	handlers: RequestWebviewHandlers,
+): Promise<void> {
+	try {
+		if (!vscode.workspace.isTrusted) {
+			throw new Error('Environment values are only available in a trusted workspace.');
+		}
+
+		const value = await handlers.onResolveEnvironmentVariable?.(message.name);
+		await webview.postMessage({
+			type: 'environmentVariableResolved',
+			requestId: message.requestId,
+			name: message.name,
+			value,
+		});
+	} catch (error) {
+		await webview.postMessage({
+			type: 'environmentVariableResolved',
+			requestId: message.requestId,
+			name: message.name,
+			error: error instanceof Error ? error.message : 'Unable to resolve environment variable.',
+		});
+	}
 }
 
 /**
@@ -190,6 +230,23 @@ export async function executeRequestWithEnvironment(
 	await confirmInsecureCredentialRequest(request.url, request.headers);
 
 	return executeRequest(request, getRequestTimeout());
+}
+
+/** Reads one environment value for an explicit hover lookup. */
+export async function resolveEnvironmentVariable(
+	name: string,
+	requestUri: vscode.Uri | undefined,
+): Promise<string | undefined> {
+	if (!vscode.workspace.isTrusted) {
+		throw new Error('Environment values are only available in a trusted workspace.');
+	}
+
+	if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+		return undefined;
+	}
+
+	const variables = requestUri ? await readEnvironmentVariables(requestUri) : {};
+	return variables[name];
 }
 
 /** Warns before credentials are sent to a remote host over plain HTTP. */
@@ -371,6 +428,20 @@ function isOpenSettingsMessage(message: unknown): message is OpenSettingsMessage
 	const candidate = message as Partial<OpenSettingsMessage>;
 
 	return candidate.type === 'openSettings';
+}
+
+/** Validates a targeted environment-variable hover lookup from the webview. */
+function isResolveEnvironmentVariableMessage(message: unknown): message is ResolveEnvironmentVariableMessage {
+	if (!isRecord(message)) {
+		return false;
+	}
+
+	const candidate = message as Partial<ResolveEnvironmentVariableMessage>;
+	return candidate.type === 'resolveEnvironmentVariable'
+		&& typeof candidate.requestId === 'number'
+		&& Number.isSafeInteger(candidate.requestId)
+		&& typeof candidate.name === 'string'
+		&& /^[A-Za-z_][A-Za-z0-9_]*$/.test(candidate.name);
 }
 
 /**
