@@ -627,6 +627,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				background: var(--vscode-editor-inactiveSelectionBackground);
 			}
 
+			.response-header-name {
+				color: var(--vscode-symbolIcon-propertyForeground, var(--vscode-textLink-foreground));
+				font-weight: 600;
+			}
+
 			#preview-panel {
 				min-height: 0;
 			}
@@ -1526,7 +1531,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						isSuccessStatus(result.status) ? 'success' : 'error',
 					);
 					responseSize.textContent = formatResponseSize(result.body || '');
-					responseHeaders.textContent = formatHeaders(result.headers);
+					renderResponseHeaders(result.headers);
 					setRawContent(result.body || '(empty)');
 					setFormattedBodyContent(result.body || '(empty)', result.headers);
 					setPreviewContent(result.body || '', hasHtmlContentType(result.headers));
@@ -2806,13 +2811,26 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				return Array.from({ length: lineCount }, (_item, index) => String(index + 1)).join('\\n');
 			}
 
-		// Formats response headers for display.
-		function formatHeaders(headers) {
-			const lines = Object.entries(headers)
-				.map(([name, value]) => name + ': ' + value)
-				.join('\\n');
+		// Renders response headers with theme-aware emphasis on each header name.
+		function renderResponseHeaders(headers) {
+			const entries = Object.entries(headers);
+			responseHeaders.replaceChildren();
 
-			return lines || '(none)';
+			if (entries.length === 0) {
+				responseHeaders.textContent = '(none)';
+				return;
+			}
+
+			entries.forEach(([name, value], index) => {
+				const nameElement = document.createElement('span');
+				nameElement.className = 'response-header-name';
+				nameElement.textContent = name;
+				responseHeaders.append(nameElement, document.createTextNode(': ' + value));
+
+				if (index < entries.length - 1) {
+					responseHeaders.append(document.createTextNode('\\n'));
+				}
+			});
 		}
 
 		// Formats request duration for the response metadata row.
