@@ -65,8 +65,12 @@ export function initializeRequestWebview(
 
 	webview.html = getWebviewHtml(webview, handlers.extensionVersion ?? '0.0.0');
 
-	return webview.onDidReceiveMessage((message: unknown) => {
+	const messageSubscription = webview.onDidReceiveMessage((message: unknown) => {
 		if (isWebviewReadyMessage(message)) {
+			void webview.postMessage({
+				type: 'workspaceTrust',
+				isTrusted: vscode.workspace.isTrusted,
+			});
 			handlers.onReady?.();
 			return;
 		}
@@ -93,6 +97,14 @@ export function initializeRequestWebview(
 
 		void handleMessage(webview, message, handlers);
 	});
+	const trustSubscription = vscode.workspace.onDidGrantWorkspaceTrust(() => {
+		void webview.postMessage({
+			type: 'workspaceTrust',
+			isTrusted: true,
+		});
+	});
+
+	return vscode.Disposable.from(messageSubscription, trustSubscription);
 }
 
 /**
@@ -131,6 +143,10 @@ async function handleMessage(
 	}
 
 	try {
+		if (!vscode.workspace.isTrusted) {
+			throw new Error('Sending requests and resolving .env variables requires a trusted workspace.');
+		}
+
 		const response = handlers.onSendRequest ? await handlers.onSendRequest(message) : await executeRequest({
 			method: message.method,
 			url: message.url,
@@ -160,6 +176,10 @@ export async function executeRequestWithEnvironment(
 	message: SendRequestMessage,
 	requestUri: vscode.Uri | undefined,
 ): Promise<ApiResponse> {
+	if (!vscode.workspace.isTrusted) {
+		throw new Error('Sending requests and resolving .env variables requires a trusted workspace.');
+	}
+
 	const variables = requestUri ? await readEnvironmentVariables(requestUri) : {};
 	const request = resolveRequestVariables({
 		method: message.method,

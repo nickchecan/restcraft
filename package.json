@@ -32,6 +32,12 @@
     "onCustomEditor:restcraft.requestEditor",
     "onCommand:restcraft.createRequestFile"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "%capabilities.untrustedWorkspaces.description%"
+    }
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [

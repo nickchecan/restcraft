@@ -757,7 +757,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			<span class="sr-only">Request URL</span>
 			<input id="url" name="url" type="text" placeholder="https://api.example.com/resource" aria-label="Request URL">
 		</label>
-		<button id="send" type="submit">Send</button>
+		<button id="send" type="submit" disabled title="Checking workspace trust...">Send</button>
 		</form>
 		<section class="request-panel" aria-label="Request configuration area">
 			<div class="request-tabs" role="tablist" aria-label="Request sections">
@@ -1207,6 +1207,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					setBodyContent(message.message);
 					setPreviewContent('', false);
 					updateResponseAreaBounds();
+					return;
+				}
+
+				if (message.type === 'workspaceTrust') {
+					send.disabled = !message.isTrusted;
+					send.title = message.isTrusted ? '' : 'Sending requests requires a trusted workspace.';
 					return;
 				}
 
