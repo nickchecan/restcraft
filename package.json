@@ -59,7 +59,18 @@
         ],
         "priority": "default"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "RestCraft",
+      "properties": {
+        "restcraft.requestTimeout": {
+          "type": "number",
+          "default": 30000,
+          "minimum": 0,
+          "description": "Maximum time in milliseconds to wait for an API request. Set to 0 to disable the timeout."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

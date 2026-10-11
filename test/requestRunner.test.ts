@@ -36,13 +36,12 @@ suite('Request runner', () => {
 		});
 
 		assert.strictEqual(capturedInput, 'https://example.com/users');
-		assert.deepStrictEqual(capturedInit, {
-			method: 'POST',
-			headers: {
-				Accept: 'application/json',
-			},
-			body: '{"name":"Ada"}',
+		assert.strictEqual(capturedInit?.method, 'POST');
+		assert.deepStrictEqual(capturedInit?.headers, {
+			Accept: 'application/json',
 		});
+		assert.strictEqual(capturedInit?.body, '{"name":"Ada"}');
+		assert.ok(capturedInit?.signal instanceof AbortSignal);
 		assert.deepStrictEqual(response, {
 			status: 201,
 			statusText: 'Created',

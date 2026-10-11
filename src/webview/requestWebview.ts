@@ -136,7 +136,7 @@ async function handleMessage(
 			url: message.url,
 			headers: message.headers,
 			body: message.body,
-		});
+		}, getRequestTimeout());
 
 		await webview.postMessage({
 			type: 'requestComplete',
@@ -168,7 +168,13 @@ export async function executeRequestWithEnvironment(
 		body: message.body,
 	}, variables);
 
-	return executeRequest(request);
+	return executeRequest(request, getRequestTimeout());
+}
+
+/** Reads the user's configured request timeout, in milliseconds. */
+function getRequestTimeout(): number {
+	const timeout = vscode.workspace.getConfiguration('restcraft').get<number>('requestTimeout', 30000);
+	return Number.isFinite(timeout) && timeout >= 0 ? timeout : 30000;
 }
 
 /**
