@@ -398,21 +398,37 @@ function getRequestTimeout(): number {
 }
 
 /**
- * Reads the optional sibling `.env` file for a request document.
+ * Reads the closest `.env` file at or above a request document's directory,
+ * stopping at the containing VS Code workspace folder.
  */
 async function readEnvironmentVariables(requestUri: vscode.Uri): Promise<Record<string, string>> {
-	const envUri = vscode.Uri.joinPath(readRequestDirectory(requestUri), '.env');
+	const workspaceFolder = vscode.workspace.getWorkspaceFolder(requestUri);
+	const workspaceRoot = workspaceFolder?.uri ?? readRequestDirectory(requestUri);
+	let directory = readRequestDirectory(requestUri);
 
-	try {
-		const content = await vscode.workspace.fs.readFile(envUri);
-		return parseEnvFile(new TextDecoder().decode(content));
-	} catch (error) {
-		if (isFileNotFoundError(error)) {
-			return {};
+	while (isDirectoryWithinWorkspace(directory, workspaceRoot)) {
+		const envUri = vscode.Uri.joinPath(directory, '.env');
+		try {
+			const content = await vscode.workspace.fs.readFile(envUri);
+			return parseEnvFile(new TextDecoder().decode(content));
+		} catch (error) {
+			if (!isFileNotFoundError(error)) {
+				throw error;
+			}
 		}
 
-		throw error;
+		if (sameDirectory(directory, workspaceRoot)) {
+			break;
+		}
+
+		const parentDirectory = readParentDirectory(directory);
+		if (sameDirectory(directory, parentDirectory)) {
+			break;
+		}
+		directory = parentDirectory;
 	}
+
+	return {};
 }
 
 /**
@@ -422,6 +438,39 @@ function readRequestDirectory(requestUri: vscode.Uri): vscode.Uri {
 	const directoryPath = requestUri.path.replace(/\/[^/]*$/, '') || '/';
 
 	return requestUri.with({ path: directoryPath });
+}
+
+/** Returns the parent directory URI without crossing URI authorities. */
+function readParentDirectory(directory: vscode.Uri): vscode.Uri {
+	const normalizedPath = normalizeDirectoryPath(directory.path);
+	const parentPath = normalizedPath === '/'
+		? '/'
+		: normalizedPath.slice(0, normalizedPath.lastIndexOf('/')) || '/';
+
+	return directory.with({ path: parentPath });
+}
+
+/** Checks whether a candidate directory is inside the workspace root. */
+function isDirectoryWithinWorkspace(directory: vscode.Uri, workspaceRoot: vscode.Uri): boolean {
+	if (directory.scheme !== workspaceRoot.scheme || directory.authority !== workspaceRoot.authority) {
+		return false;
+	}
+
+	const directoryPath = normalizeDirectoryPath(directory.path);
+	const rootPath = normalizeDirectoryPath(workspaceRoot.path);
+	return directoryPath === rootPath || directoryPath.startsWith(rootPath === '/' ? '/' : rootPath + '/');
+}
+
+/** Compares two directory URIs after removing trailing path separators. */
+function sameDirectory(left: vscode.Uri, right: vscode.Uri): boolean {
+	return left.scheme === right.scheme
+		&& left.authority === right.authority
+		&& normalizeDirectoryPath(left.path) === normalizeDirectoryPath(right.path);
+}
+
+function normalizeDirectoryPath(path: string): string {
+	const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
+	return normalized || '/';
 }
 
 /**
