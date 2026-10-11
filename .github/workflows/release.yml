@@ -32,6 +32,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify Marketplace publishing access
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::error::Missing VSCE_PAT repository secret. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          ./node_modules/.bin/vsce verify-pat nickchecan
+
       - name: Install virtual display support
         run: sudo apt-get update && sudo apt-get install -y xvfb
 

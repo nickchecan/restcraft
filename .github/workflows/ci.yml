@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - main
+      - '**'
 
 permissions:
   contents: read
@@ -39,3 +39,14 @@ jobs:
 
       - name: Build the production bundle
         run: npm run package
+
+      - name: Verify Marketplace publishing access
+        if: github.event_name == 'push'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::error::Missing VSCE_PAT repository secret. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          ./node_modules/.bin/vsce verify-pat nickchecan
