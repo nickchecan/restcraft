@@ -311,6 +311,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				background: transparent;
 			}
 
+			.secret-reference.is-missing,
+			.environment-variable-tooltip.is-missing {
+				color: var(--vscode-errorForeground, var(--vscode-editorError-foreground, #f14c4c));
+			}
+
 			.authorization-divider {
 				grid-column: 1 / -1;
 				height: 1px;
@@ -995,7 +1000,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				let latestRequestUrl = '';
 				let hoveredEnvironmentVariable = '';
 				let environmentVariableRequestId = 0;
+				let environmentCheckRequestId = 0;
+				let environmentCheckTimer;
+				let environmentCheckNames = [];
 				let environmentValueTooltipEnabled = false;
+				let workspaceTrusted = false;
+				const missingEnvironmentVariables = new Set();
 				let textMeasureContext;
 				let activeAuthorizationType = 'none';
 				let activeRequestBodyType = 'raw';
@@ -1005,6 +1015,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				window.addEventListener('resize', updateResponseAreaBounds);
 
 				document.addEventListener('pointermove', showHoveredEnvironmentVariable);
+				document.addEventListener('input', scheduleEnvironmentVariableCheck);
 				window.addEventListener('blur', clearHoveredEnvironmentVariable);
 				window.addEventListener('pointerleave', clearHoveredEnvironmentVariable);
 
@@ -1237,8 +1248,15 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				}
 
 				if (message.type === 'workspaceTrust') {
+					workspaceTrusted = message.isTrusted === true;
 					send.disabled = !message.isTrusted;
 					send.title = message.isTrusted ? '' : 'Sending requests requires a trusted workspace.';
+					if (message.isTrusted) {
+						scheduleEnvironmentVariableCheck();
+					} else {
+						missingEnvironmentVariables.clear();
+						refreshVariableHighlights();
+					}
 					return;
 				}
 
@@ -1246,7 +1264,29 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					environmentValueTooltipEnabled = message.isEnabled === true;
 					if (!environmentValueTooltipEnabled) {
 						clearHoveredEnvironmentVariable();
+						missingEnvironmentVariables.clear();
+						refreshVariableHighlights();
+					} else {
+						scheduleEnvironmentVariableCheck();
 					}
+					return;
+				}
+
+				if (message.type === 'environmentVariablesChecked') {
+					if (message.requestId !== environmentCheckRequestId || !Array.isArray(message.definedNames)) {
+						return;
+					}
+					if (typeof message.error === 'string') {
+						return;
+					}
+					const definedNames = new Set(message.definedNames);
+					missingEnvironmentVariables.clear();
+					for (const name of environmentCheckNames) {
+						if (!definedNames.has(name)) {
+							missingEnvironmentVariables.add(name);
+						}
+					}
+					refreshVariableHighlights();
 					return;
 				}
 
@@ -1256,12 +1296,18 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					}
 
 					if (typeof message.error === 'string') {
+						environmentVariableTooltip.classList.remove('is-missing');
 						environmentVariableTooltip.textContent = message.error;
 					} else if (typeof message.value === 'string') {
+						missingEnvironmentVariables.delete(message.name);
+						environmentVariableTooltip.classList.remove('is-missing');
 						environmentVariableTooltip.textContent = message.value;
 					} else {
+						missingEnvironmentVariables.add(message.name);
+						environmentVariableTooltip.classList.add('is-missing');
 						environmentVariableTooltip.textContent = '{{' + message.name + '}} is not defined in the sibling .env file.';
 					}
+					refreshVariableHighlights();
 					return;
 				}
 
@@ -1287,6 +1333,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 							: formatBody(message.request.body));
 						renderRequestBodyFormRows(requestBody.value);
 						setRequestBodyType(inferRequestBodyType(message.request.headers || {}, requestBody.value, activeRequestBodyType));
+						scheduleEnvironmentVariableCheck();
 						updateResponseAreaBounds();
 				}
 			});
@@ -1384,6 +1431,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			if (variableName !== hoveredEnvironmentVariable) {
 				hoveredEnvironmentVariable = variableName;
 				environmentVariableRequestId += 1;
+					environmentVariableTooltip.classList.remove('is-missing');
 				environmentVariableTooltip.textContent = 'Looking up {{' + variableName + '}}…';
 				vscode.postMessage({
 					type: 'resolveEnvironmentVariable',
@@ -1399,6 +1447,44 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				environmentVariableRequestId += 1;
 			}
 			environmentVariableTooltip.classList.add('hidden');
+			environmentVariableTooltip.classList.remove('is-missing');
+		}
+
+		function scheduleEnvironmentVariableCheck() {
+			if (!environmentValueTooltipEnabled || !workspaceTrusted) {
+				return;
+			}
+			window.clearTimeout(environmentCheckTimer);
+			environmentCheckTimer = window.setTimeout(() => {
+				const variableNames = new Set();
+				for (const field of document.querySelectorAll('.request-bar input, .request-panel input, .request-panel textarea')) {
+					const pattern = /\\{\\{\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\}\\}/g;
+					let match;
+					while ((match = pattern.exec(field.value)) !== null) {
+						variableNames.add(match[1]);
+					}
+				}
+
+				environmentCheckNames = Array.from(variableNames);
+				environmentCheckRequestId += 1;
+				if (environmentCheckNames.length === 0) {
+					missingEnvironmentVariables.clear();
+					refreshVariableHighlights();
+					return;
+				}
+				vscode.postMessage({
+					type: 'checkEnvironmentVariables',
+					requestId: environmentCheckRequestId,
+					names: environmentCheckNames,
+				});
+			}, 120);
+		}
+
+		function refreshVariableHighlights() {
+			for (const input of document.querySelectorAll('.variable-input-wrapper input')) {
+				updateSecretReferenceState(input);
+			}
+			updateRequestBodyHighlight();
 		}
 
 		vscode.postMessage({
@@ -2111,7 +2197,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				function formatSecretHighlight(content) {
 					return escapeHtml(content).replace(
 						/\{\{\s*[A-Za-z_][A-Za-z0-9_]*\s*\}\}/g,
-						(match) => '<span class="secret-reference">' + match + '</span>',
+					(match) => {
+						const variableName = match.match(/[A-Za-z_][A-Za-z0-9_]*/)?.[0];
+						const missingClass = variableName && missingEnvironmentVariables.has(variableName) ? ' is-missing' : '';
+						return '<span class="secret-reference' + missingClass + '">' + match + '</span>';
+					},
 					);
 				}
 

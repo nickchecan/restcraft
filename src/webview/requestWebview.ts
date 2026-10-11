@@ -36,6 +36,12 @@ interface ResolveEnvironmentVariableMessage {
 	name: string;
 }
 
+interface CheckEnvironmentVariablesMessage {
+	type: 'checkEnvironmentVariables';
+	requestId: number;
+	names: string[];
+}
+
 export interface RequestChangedMessage {
 	type: 'requestChanged';
 	name: string;
@@ -53,6 +59,7 @@ export interface RequestWebviewHandlers {
 	onRequestChanged?: (message: RequestChangedMessage) => void;
 	onSendRequest?: (message: SendRequestMessage) => Promise<ApiResponse>;
 	onResolveEnvironmentVariable?: (name: string) => Promise<string | undefined>;
+	onCheckEnvironmentVariables?: (names: string[]) => Promise<string[]>;
 }
 
 /**
@@ -105,6 +112,11 @@ export function initializeRequestWebview(
 
 		if (isResolveEnvironmentVariableMessage(message)) {
 			void handleResolveEnvironmentVariable(webview, message, handlers);
+			return;
+		}
+
+		if (isCheckEnvironmentVariablesMessage(message)) {
+			void handleCheckEnvironmentVariables(webview, message, handlers);
 			return;
 		}
 
@@ -161,6 +173,37 @@ async function handleResolveEnvironmentVariable(
 			requestId: message.requestId,
 			name: message.name,
 			error: error instanceof Error ? error.message : 'Unable to resolve environment variable.',
+		});
+	}
+}
+
+/** Checks which referenced variable names exist without sending their values. */
+async function handleCheckEnvironmentVariables(
+	webview: vscode.Webview,
+	message: CheckEnvironmentVariablesMessage,
+	handlers: RequestWebviewHandlers,
+): Promise<void> {
+	try {
+		if (!vscode.workspace.isTrusted) {
+			throw new Error('Environment values are only available in a trusted workspace.');
+		}
+		if (!vscode.workspace.getConfiguration('restcraft').get<boolean>('showEnvironmentVariableValues', true)) {
+			await webview.postMessage({ type: 'environmentVariablesChecked', requestId: message.requestId, definedNames: [] });
+			return;
+		}
+
+		const definedNames = await handlers.onCheckEnvironmentVariables?.(message.names) ?? [];
+		await webview.postMessage({
+			type: 'environmentVariablesChecked',
+			requestId: message.requestId,
+			definedNames,
+		});
+	} catch (error) {
+		await webview.postMessage({
+			type: 'environmentVariablesChecked',
+			requestId: message.requestId,
+			definedNames: [],
+			error: error instanceof Error ? error.message : 'Unable to check environment variables.',
 		});
 	}
 }
@@ -265,6 +308,19 @@ export async function resolveEnvironmentVariable(
 
 	const variables = requestUri ? await readEnvironmentVariables(requestUri) : {};
 	return variables[name];
+}
+
+/** Returns which requested variable names are defined in the sibling .env. */
+export async function findDefinedEnvironmentVariables(
+	names: string[],
+	requestUri: vscode.Uri | undefined,
+): Promise<string[]> {
+	if (!vscode.workspace.isTrusted || !requestUri || names.length === 0) {
+		return [];
+	}
+
+	const variables = await readEnvironmentVariables(requestUri);
+	return names.filter((name) => Object.prototype.hasOwnProperty.call(variables, name));
 }
 
 /** Warns before credentials are sent to a remote host over plain HTTP. */
@@ -460,6 +516,21 @@ function isResolveEnvironmentVariableMessage(message: unknown): message is Resol
 		&& Number.isSafeInteger(candidate.requestId)
 		&& typeof candidate.name === 'string'
 		&& /^[A-Za-z_][A-Za-z0-9_]*$/.test(candidate.name);
+}
+
+/** Validates environment-variable presence checks sent from the webview. */
+function isCheckEnvironmentVariablesMessage(message: unknown): message is CheckEnvironmentVariablesMessage {
+	if (!isRecord(message)) {
+		return false;
+	}
+
+	const candidate = message as Partial<CheckEnvironmentVariablesMessage>;
+	return candidate.type === 'checkEnvironmentVariables'
+		&& typeof candidate.requestId === 'number'
+		&& Number.isSafeInteger(candidate.requestId)
+		&& Array.isArray(candidate.names)
+		&& candidate.names.length <= 100
+		&& candidate.names.every((name) => typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name));
 }
 
 /**
