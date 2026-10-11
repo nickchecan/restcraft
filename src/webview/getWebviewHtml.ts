@@ -1249,7 +1249,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					if (typeof message.error === 'string') {
 						environmentVariableTooltip.textContent = message.error;
 					} else if (typeof message.value === 'string') {
-						environmentVariableTooltip.textContent = '{{' + message.name + '}} = ' + message.value;
+						environmentVariableTooltip.textContent = message.value;
 					} else {
 						environmentVariableTooltip.textContent = '{{' + message.name + '}} is not defined in the sibling .env file.';
 					}
