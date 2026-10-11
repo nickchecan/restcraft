@@ -1175,7 +1175,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				responseHeaders.textContent = '(none)';
 				setRawContent('(empty)');
 				setBodyContent('(empty)');
-				setPreviewContent('', false, latestRequestUrl);
+				setPreviewContent('', false);
 
 			vscode.postMessage({
 						type: 'sendRequest',
@@ -1205,7 +1205,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					responseHeaders.textContent = '(none)';
 					setRawContent(message.message);
 					setBodyContent(message.message);
-					setPreviewContent('', false, latestRequestUrl);
+					setPreviewContent('', false);
 					updateResponseAreaBounds();
 					return;
 				}
@@ -1250,7 +1250,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					responseHeaders.textContent = formatHeaders(result.headers);
 					setRawContent(result.body || '(empty)');
 					setFormattedBodyContent(result.body || '(empty)', result.headers);
-					setPreviewContent(result.body || '', hasHtmlContentType(result.headers), latestRequestUrl);
+					setPreviewContent(result.body || '', hasHtmlContentType(result.headers));
 					updateResponseAreaBounds();
 				}
 
@@ -2490,12 +2490,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			// Shows or clears the sandboxed HTML response preview.
-			function setPreviewContent(content, canPreview, baseUrl) {
+			function setPreviewContent(content, canPreview) {
 				responsePreview.classList.toggle('hidden', !canPreview);
 				responsePreviewEmpty.classList.toggle('hidden', canPreview);
 
 				if (canPreview) {
-					responsePreview.srcdoc = createPreviewDocument(content, baseUrl);
+					responsePreview.srcdoc = createPreviewDocument(content);
 					responsePreviewEmpty.textContent = '';
 					return;
 				}
@@ -2504,24 +2504,16 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				responsePreviewEmpty.textContent = 'HTML preview is available for HTML responses.';
 			}
 
-			// Builds an inert preview document with a base URL for relative assets.
-			function createPreviewDocument(content, baseUrl) {
-				const previewHead = '<base href="' + escapeHtmlAttribute(baseUrl) + '"><style>a, button, input, select, textarea, label, summary, [role="button"], [onclick] { pointer-events: none !important; } form { pointer-events: none !important; }</style>';
+			// Builds an inert preview document that cannot load external resources or run scripts.
+			function createPreviewDocument(content) {
+				const previewPolicy = "default-src 'none'; script-src 'none'; form-action 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; img-src data:; style-src 'unsafe-inline';";
+				const previewHead = '<meta http-equiv="Content-Security-Policy" content="' + previewPolicy + '"><style>a, button, input, select, textarea, label, summary, [role="button"], [onclick] { pointer-events: none !important; } form { pointer-events: none !important; }</style>';
 
 				if (/<head[\\s>]/i.test(content)) {
 					return content.replace(/<head([^>]*)>/i, '<head$1>' + previewHead);
 				}
 
-				return previewHead + content;
-			}
-
-			// Escapes text before inserting it into an HTML attribute.
-			function escapeHtmlAttribute(content) {
-				return content
-					.replace(/&/g, '&amp;')
-					.replace(/"/g, '&quot;')
-					.replace(/</g, '&lt;')
-					.replace(/>/g, '&gt;');
+				return '<!DOCTYPE html><html><head>' + previewHead + '</head><body>' + content + '</body></html>';
 			}
 
 			// Returns line numbers matching the provided text content.
