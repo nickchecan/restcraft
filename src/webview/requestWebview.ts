@@ -26,6 +26,10 @@ interface OpenIssuesMessage {
 	type: 'openIssues';
 }
 
+interface OpenSettingsMessage {
+	type: 'openSettings';
+}
+
 export interface RequestChangedMessage {
 	type: 'requestChanged';
 	name: string;
@@ -79,6 +83,11 @@ export function initializeRequestWebview(
 
 		if (isOpenIssuesMessage(message)) {
 			void vscode.env.openExternal(vscode.Uri.parse('https://github.com/nickchecan/restcraft/issues'));
+			return;
+		}
+
+		if (isOpenSettingsMessage(message)) {
+			void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:nickchecan.restcraft');
 			return;
 		}
 
@@ -254,6 +263,19 @@ function isOpenIssuesMessage(message: unknown): message is OpenIssuesMessage {
 	const candidate = message as Partial<OpenIssuesMessage>;
 
 	return candidate.type === 'openIssues';
+}
+
+/**
+ * Validates the footer settings button message.
+ */
+function isOpenSettingsMessage(message: unknown): message is OpenSettingsMessage {
+	if (!isRecord(message)) {
+		return false;
+	}
+
+	const candidate = message as Partial<OpenSettingsMessage>;
+
+	return candidate.type === 'openSettings';
 }
 
 /**
