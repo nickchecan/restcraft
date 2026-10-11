@@ -68,6 +68,12 @@
           "default": 30000,
           "minimum": 0,
           "description": "Maximum time in milliseconds to wait for an API request. Set to 0 to disable the timeout."
+        },
+        "restcraft.suppressInsecureCredentialWarning": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Do not warn before sending authentication credentials to remote servers over unencrypted HTTP."
         }
       }
     }
