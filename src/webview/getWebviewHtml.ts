@@ -26,11 +26,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 		html,
 		body {
-			height: 100%;
-			overflow: hidden;
+			min-height: 100%;
+			overflow-x: hidden;
+			overflow-y: auto;
 		}
 
 		body {
+			box-sizing: border-box;
+			min-height: 100vh;
 			margin: 0;
 			padding: 20px 20px 72px;
 			color: var(--vscode-foreground);
@@ -571,8 +574,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			.response-body-content {
 				display: grid;
 				grid-template-columns: auto minmax(0, 1fr);
-				min-height: min(72px, var(--response-area-max-height, 72px));
-				max-height: var(--response-area-max-height, calc(100vh - 320px));
+				min-height: 160px;
+				max-height: max(160px, var(--response-area-max-height, calc(100vh - 320px)));
 				overflow: auto;
 				position: relative;
 				--hover-line-height: 0px;
@@ -604,7 +607,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			.response-headers-content {
-				max-height: var(--response-area-max-height, calc(100vh - 320px));
+				min-height: 160px;
+				max-height: max(160px, var(--response-area-max-height, calc(100vh - 320px)));
 				overflow: auto;
 				background: var(--vscode-editor-inactiveSelectionBackground);
 			}
@@ -616,14 +620,16 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			.response-preview {
 				display: block;
 				width: 100%;
-				height: var(--response-area-max-height, max(360px, calc(100vh - 260px)));
-				max-height: var(--response-area-max-height, max(360px, calc(100vh - 260px)));
+				min-height: 160px;
+				height: max(160px, var(--response-area-max-height, max(360px, calc(100vh - 260px))));
+				max-height: max(160px, var(--response-area-max-height, max(360px, calc(100vh - 260px))));
 				border: 0;
 				background: #ffffff;
 			}
 
 			#response-preview-empty {
-				max-height: var(--response-area-max-height, 360px);
+				min-height: 160px;
+				max-height: max(160px, var(--response-area-max-height, 360px));
 				overflow: auto;
 			}
 

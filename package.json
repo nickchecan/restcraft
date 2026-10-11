@@ -48,18 +48,10 @@
         "title": "RestCraft: Create Request File"
       }
     ],
-    "menus": {
-      "explorer/context": [
-        {
-          "command": "restcraft.createRequestFile",
-          "group": "navigation"
-        }
-      ]
-    },
     "customEditors": [
       {
         "viewType": "restcraft.requestEditor",
-        "displayName": "RestCraft Request",
+        "displayName": "API Workbench",
         "selector": [
           {
             "filenamePattern": "*.api.json"

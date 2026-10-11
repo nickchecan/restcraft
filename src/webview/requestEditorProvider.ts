@@ -84,24 +84,26 @@ export class RequestEditorProvider implements vscode.CustomTextEditorProvider {
 			onSendRequest: (message) => executeRequestWithEnvironment(message, document.uri),
 		});
 		const documentSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
-			if (event.document.uri.toString() === document.uri.toString()) {
-				if (event.document.getText() === pendingDocumentText) {
-					pendingDocumentText = undefined;
-					return;
-				}
+			// Dirty-state notifications have no text edits. Reloading for those
+			// would discard unfinished rows on the first edit or when saving.
+			if (event.document.uri.toString() !== document.uri.toString() || event.contentChanges.length === 0) {
+				return;
+			}
 
-					draftParams = undefined;
-					draftHeaderState = undefined;
-					void this.loadDocument(webviewPanel, event.document);
-				}
-			});
+			if (event.document.getText() === pendingDocumentText) {
+				pendingDocumentText = undefined;
+				return;
+			}
+
+			draftParams = undefined;
+			draftHeaderState = undefined;
+			void this.loadDocument(webviewPanel, event.document);
+		});
 
 		webviewPanel.onDidDispose(() => {
 			messageSubscription.dispose();
 			documentSubscription.dispose();
 		});
-
-		void this.loadDocument(webviewPanel, document, draftParams, draftHeaderState);
 	}
 
 	/**
@@ -150,7 +152,10 @@ export class RequestEditorProvider implements vscode.CustomTextEditorProvider {
 		parsed.headers = message.headers;
 		parsed.body = message.body.trim() ? readBodyValue(message.body) : null;
 
-		return `${JSON.stringify(parsed, null, 2)}\n`;
+		const serialized = `${JSON.stringify(parsed, null, 2)}\n`;
+		// applyEdit uses the document's line endings; the pending-text check
+		// must compare against the same representation for CRLF files too.
+		return document.eol === vscode.EndOfLine.CRLF ? serialized.replace(/\n/g, '\r\n') : serialized;
 	}
 }
 
