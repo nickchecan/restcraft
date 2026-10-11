@@ -6,6 +6,7 @@ import {
 	RequestParamDefinition,
 	supportedMethods,
 } from './types';
+import { isOAuthAuthorization, readOAuthAuthorization } from './oauth';
 import { isRecord } from '../shared/object';
 
 /**
@@ -31,6 +32,9 @@ export function parseRequestFile(content: string): RequestFileDefinition {
 	}
 
 	const url = readUrl(parsed);
+	if (parsed.authorization !== undefined && !isOAuthAuthorization(parsed.authorization)) {
+		throw new Error('Request file property "authorization" must contain valid OAuth 2.0 settings.');
+	}
 
 	return {
 		name: readRequiredString(parsed, 'name'),
@@ -40,6 +44,7 @@ export function parseRequestFile(content: string): RequestFileDefinition {
 		headerState: readHeaderState(parsed),
 		headers: readHeaders(parsed),
 		body: parsed.body ?? null,
+		...(isOAuthAuthorization(parsed.authorization) ? { authorization: readOAuthAuthorization(parsed.authorization) } : {}),
 	};
 }
 

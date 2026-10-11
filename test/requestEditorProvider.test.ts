@@ -52,10 +52,14 @@ suite('Request editor document synchronization', () => {
 				change.params = [{ name: 'page', value: '1', enabled: false }];
 				change.headerState = [{ name: 'Accept', value: 'application/json', enabled: false }];
 				change.headers = { Accept: 'application/json' };
+                change.authorization = { type: 'oauth2', grantType: 'client_credentials',
+                    accessTokenUrl: 'https://demo.duendesoftware.com/connect/token',
+                    clientId: 'm2m', clientSecret: '{{CLIENT_SECRET}}', scope: 'api' };
 				await waitForContentChange(document, () => messages.fire(change));
 				const saved = JSON.parse(document.getText());
 				assert.deepStrictEqual(saved.params, change.params);
 				assert.deepStrictEqual(saved.headerState, change.headerState);
+				assert.deepStrictEqual(saved.authorization, change.authorization);
 				assert.strictEqual(loads.length, 1, 'Local edits must not reload the webview');
 
 				await document.save();
@@ -69,6 +73,13 @@ suite('Request editor document synchronization', () => {
 				await vscode.workspace.applyEdit(externalEdit);
 				await new Promise(resolve => setTimeout(resolve, 50));
 				assert.strictEqual(loads.length, 2, 'External content edits must reload the webview once');
+                assert.deepStrictEqual((loads[1] as { request: { authorization: unknown } }).request.authorization, change.authorization);
+                // A fresh webview initializes from the persisted document settings.
+                messages.fire({ type: 'webviewReady' });
+                assert.deepStrictEqual((loads[2] as { request: { authorization: unknown } }).request.authorization, change.authorization);
+                delete change.authorization;
+                await waitForContentChange(document, () => messages.fire(change));
+                assert.strictEqual(JSON.parse(document.getText()).authorization, undefined);
 			} finally {
 				disposal.fire();
 				messages.dispose();

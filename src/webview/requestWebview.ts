@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 
 import { parseEnvFile, resolveRequestVariables } from '../request/environment';
+import { buildOAuthTokenRequest, readOAuthAccessToken, OAuthTokenFields, isOAuthAuthorization } from '../request/oauth';
 import { executeRequest } from '../request/requestRunner';
-import { ApiResponse, RequestFileDefinition, RequestHeaderDefinition, RequestParamDefinition } from '../request/types';
+import { ApiResponse, OAuthAuthorizationDefinition, RequestFileDefinition, RequestHeaderDefinition, RequestParamDefinition } from '../request/types';
 import { isRecord, isStringRecord } from '../shared/object';
 import { getWebviewHtml } from './getWebviewHtml';
 
@@ -47,6 +48,7 @@ interface CheckEnvironmentVariablesMessage {
 
 export interface RequestChangedMessage {
 	type: 'requestChanged';
+	authorization?: OAuthAuthorizationDefinition;
 	name: string;
 	method: string;
 	url: string;
@@ -128,6 +130,13 @@ export function initializeRequestWebview(
 			return;
 		}
 
+        if (isRecord(message) && message.type === 'getOAuthToken') {
+            if (!Number.isSafeInteger(message.requestId) || typeof message.requestId !== 'number'
+                || typeof message.url !== 'string' || typeof message.clientId !== 'string'
+                || typeof message.clientSecret !== 'string' || typeof message.scope !== 'string') { return; }
+            void handleOAuthToken(webview, { url: message.url, clientId: message.clientId, clientSecret: message.clientSecret, scope: message.scope }, message.requestId, handlers, activeRequests);
+            return;
+        }
 		void handleMessage(webview, message, handlers, activeRequests);
 	});
 	const trustSubscription = vscode.workspace.onDidGrantWorkspaceTrust(() => {
@@ -621,7 +630,8 @@ function isRequestChangedMessage(message: unknown): message is RequestChangedMes
 
 	const candidate = message as Partial<RequestChangedMessage>;
 
-	return candidate.type === 'requestChanged'
+	return (candidate.authorization === undefined || isOAuthAuthorization(candidate.authorization))
+		&& candidate.type === 'requestChanged'
 		&& typeof candidate.name === 'string'
 		&& typeof candidate.method === 'string'
 		&& typeof candidate.url === 'string'
@@ -661,4 +671,35 @@ function isRequestHeaderState(value: unknown): value is RequestHeaderDefinition 
 	return typeof candidate.name === 'string'
 		&& typeof candidate.value === 'string'
 		&& typeof candidate.enabled === 'boolean';
+}
+
+/** Retrieves a token only in response to the explicit webview button action. */
+async function handleOAuthToken(
+    webview: vscode.Webview, fields: OAuthTokenFields, requestId: number,
+    handlers: RequestWebviewHandlers, activeRequests: Map<number, AbortController>,
+): Promise<void> {
+    // Negative IDs keep token retrieval separate from normal request cancellation IDs.
+    const key = -requestId - 1;
+    if (activeRequests.has(key)) { return; }
+    const controller = new AbortController();
+    activeRequests.set(key, controller);
+    try {
+        if (!vscode.workspace.isTrusted) { throw new Error('Getting an access token requires a trusted workspace.'); }
+        const variables: Record<string, string> = {};
+        for (const value of Object.values(fields)) {
+            for (const match of value.matchAll(/\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}/g)) {
+                const resolved = await handlers.onResolveEnvironmentVariable?.(match[1]);
+                if (resolved !== undefined) { variables[match[1]] = resolved; }
+            }
+        }
+        const resolved = resolveRequestVariables({ method: 'POST', url: fields.url,
+            headers: { clientId: fields.clientId, clientSecret: fields.clientSecret, scope: fields.scope } }, variables);
+        const request = buildOAuthTokenRequest({ url: resolved.url, clientId: resolved.headers!.clientId,
+            clientSecret: resolved.headers!.clientSecret, scope: resolved.headers!.scope });
+        const response = await executeRequest(request, getRequestTimeout(), controller.signal, 'error');
+        await webview.postMessage({ type: 'oauthTokenResult', requestId, token: readOAuthAccessToken(response) });
+    } catch (error) {
+        await webview.postMessage({ type: 'oauthTokenResult', requestId,
+            error: error instanceof Error ? error.message : 'Unable to get an access token.' });
+    } finally { activeRequests.delete(key); }
 }

@@ -26,6 +26,15 @@ export interface RequestHeaderDefinition {
 	enabled: boolean;
 }
 
+export interface OAuthAuthorizationDefinition {
+	type: 'oauth2';
+	grantType: 'client_credentials' | 'authorization_code';
+	accessTokenUrl: string;
+	clientId: string;
+	clientSecret: string;
+	scope: string;
+}
+
 export interface RequestFileDefinition {
 	name: string;
 	method: HttpMethod;
@@ -34,6 +43,7 @@ export interface RequestFileDefinition {
 	headerState: RequestHeaderDefinition[];
 	headers: Record<string, string>;
 	body: unknown;
+	authorization?: OAuthAuthorizationDefinition;
 }
 
 /**

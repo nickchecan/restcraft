@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 
+import { isOAuthAuthorization, readOAuthAuthorization } from '../request/oauth';
 import { parseRequestFile } from '../request/requestFile';
 import { HttpMethod, isHttpMethod, RequestFileDefinition } from '../request/types';
 import { isRecord } from '../shared/object';
@@ -154,6 +155,11 @@ export class RequestEditorProvider implements vscode.CustomTextEditorProvider {
 		parsed.params = message.params;
 		parsed.headerState = message.headerState;
 		parsed.headers = message.headers;
+		if (message.authorization) {
+			parsed.authorization = readOAuthAuthorization(message.authorization);
+		} else {
+			delete parsed.authorization;
+		}
 		parsed.body = message.body.trim() ? readBodyValue(message.body) : null;
 
 		const serialized = `${JSON.stringify(parsed, null, 2)}\n`;
@@ -194,6 +200,7 @@ function readDraftRequestDocument(content: string): RequestFileDefinition {
 		headerState: readDraftHeaderState(parsed.headerState, parsed.headers),
 		headers: readDraftHeaders(parsed.headers),
 		body: parsed.body ?? null,
+		...(isOAuthAuthorization(parsed.authorization) ? { authorization: readOAuthAuthorization(parsed.authorization) } : {}),
 	};
 }
 

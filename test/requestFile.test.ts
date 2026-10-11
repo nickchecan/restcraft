@@ -4,6 +4,27 @@ import { createDefaultRequestFileContent, createRequestFileName } from '../src/r
 import { isRequestFileName, parseRequestFile } from '../src/request/requestFile';
 
 suite('Request file parser', () => {
+	for (const grantType of ['client_credentials', 'authorization_code']) {
+		test(`round-trips OAuth settings for ${grantType}`, () => {
+			const authorization = { type: 'oauth2', grantType, accessTokenUrl: '',
+				clientId: 'm2m', clientSecret: '{{CLIENT_SECRET}}', scope: 'api' };
+			const content = { name: 'OAuth', method: 'GET', url: 'https://example.com/', authorization };
+			const request = parseRequestFile(JSON.stringify(content));
+			assert.deepStrictEqual(request.authorization, authorization);
+			assert.deepStrictEqual(parseRequestFile(JSON.stringify(request)).authorization, authorization);
+		});
+	}
+
+	test('rejects malformed OAuth settings', () => {
+		const authorization = { type: 'oauth2', grantType: 'client_credentials', accessTokenUrl: '',
+			clientId: '', clientSecret: '', scope: '' };
+		for (const invalid of [null, {}, { ...authorization, grantType: 'password' },
+			{ ...authorization, clientSecret: 123 }, { ...authorization, scope: null }]) {
+			assert.throws(() => parseRequestFile(JSON.stringify({ name: 'OAuth', method: 'GET',
+				url: 'https://example.com/', authorization: invalid })), /authorization/);
+		}
+	});
+
 	test('parses a valid request file', () => {
 		const request = parseRequestFile(JSON.stringify({
 			name: 'Get Users',

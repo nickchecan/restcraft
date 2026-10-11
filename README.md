@@ -157,3 +157,40 @@ RestCraft contributes these commands to VS Code:
 ## Feedback
 
 Found a bug or have an idea for improving RestCraft? Open an issue in the project repository.
+
+### OAuth 2.0 (Client Credentials)
+
+In the **Authorization** tab, choose **OAuth 2.0**, then **Client Credentials**.
+Enter an HTTPS **Access Token URL**, **Client ID**, **Client Secret**, and optional
+space-separated **Scope**. Click **Get new access token** to retrieve a token
+and apply it as the request's `Authorization: Bearer …` header.
+
+Token requests use HTTP Basic client authentication and a form-encoded
+`grant_type=client_credentials` body. The fields support `{{VARIABLE_NAME}}`
+references from the request's environment. Token retrieval requires a trusted
+workspace and uses the configured request timeout.
+
+OAuth settings are saved in the optional `authorization` object in `.api.json`.
+Save the request file to keep the selected grant type and all OAuth fields when
+reopening it. Empty fields are supported while configuring the request. Older
+files without this object continue to infer authentication from their headers.
+The resulting Bearer header is saved through the existing request editor.
+Literal client secrets are stored as plain text in the request file; use
+`{{CLIENT_SECRET}}` with your `.env` file to keep the secret out of the request.
+
+Example OAuth configuration (alongside the existing request properties):
+
+```json
+"authorization": {
+  "type": "oauth2",
+  "grantType": "client_credentials",
+  "accessTokenUrl": "https://demo.duendesoftware.com/connect/token",
+  "clientId": "m2m",
+  "clientSecret": "{{CLIENT_SECRET}}",
+  "scope": "api"
+}
+```
+
+`grantType` accepts `client_credentials` or `authorization_code`. Tokens are not
+refreshed automatically. **Authorization Code** is a placeholder for future work;
+selecting it hides the token fields and retrieval button.
