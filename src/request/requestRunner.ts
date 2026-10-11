@@ -7,22 +7,45 @@ import { ApiRequest, ApiResponse, isHttpMethod } from './types';
  * bridge, then normalizes method and URL before any network activity. Bodies are
  * omitted for GET and HEAD to match fetch/HTTP expectations.
  */
-export async function executeRequest(request: ApiRequest): Promise<ApiResponse> {
+export async function executeRequest(request: ApiRequest, timeoutMs = 30000, signal?: AbortSignal): Promise<ApiResponse> {
 	const method = normalizeMethod(request.method);
 	const url = normalizeUrl(request.url);
+	const controller = new AbortController();
+	let didTimeout = false;
+	const abortFromCaller = () => controller.abort();
+	if (signal?.aborted) {
+		controller.abort();
+	} else {
+		signal?.addEventListener('abort', abortFromCaller, { once: true });
+	}
+	const timeout = timeoutMs > 0 ? setTimeout(() => { didTimeout = true; controller.abort(); }, timeoutMs) : undefined;
 
-	const response = await fetch(url, {
-		method,
-		headers: request.headers,
-		body: shouldSendBody(method, request.body) ? request.body : undefined,
-	});
+	try {
+		const response = await fetch(url, {
+			method,
+			headers: request.headers,
+			body: shouldSendBody(method, request.body) ? request.body : undefined,
+			signal: controller.signal,
+		});
 
-	return {
-		status: response.status,
-		statusText: response.statusText,
-		headers: Object.fromEntries(response.headers.entries()),
-		body: method === 'HEAD' ? '' : await response.text(),
-	};
+		return {
+			status: response.status,
+			statusText: response.statusText,
+			headers: Object.fromEntries(response.headers.entries()),
+			body: method === 'HEAD' ? '' : await response.text(),
+		};
+	} catch (error) {
+		if (controller.signal.aborted) {
+			throw new Error(didTimeout ? `Request timed out after ${timeoutMs} ms.` : 'Request cancelled.');
+		}
+
+		throw error;
+	} finally {
+		if (timeout !== undefined) {
+			clearTimeout(timeout);
+		}
+		signal?.removeEventListener('abort', abortFromCaller);
+	}
 }
 
 /**

@@ -1,0 +1,3 @@
+{
+	"capabilities.untrustedWorkspaces.description": "Request files remain viewable and editable in Restricted Mode. Sending requests and resolving sibling .env variables requires a trusted workspace."
+}

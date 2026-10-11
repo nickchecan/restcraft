@@ -1,9 +1,0 @@
-{
-	"name": "request",
-	"method": "GET",
-	"url": "https://example.com/",
-	"params": [],
-	"headerState": [],
-	"headers": {},
-	"body": null
-}

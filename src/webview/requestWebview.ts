@@ -8,11 +8,14 @@ import { getWebviewHtml } from './getWebviewHtml';
 
 export interface SendRequestMessage {
 	type: 'sendRequest';
+	requestId: number;
 	method: string;
 	url: string;
 	headers?: Record<string, string>;
 	body?: string;
 }
+
+interface CancelRequestMessage { type: 'cancelRequest'; requestId: number; }
 
 interface WebviewReadyMessage {
 	type: 'webviewReady';
@@ -24,6 +27,22 @@ interface OpenRepositoryMessage {
 
 interface OpenIssuesMessage {
 	type: 'openIssues';
+}
+
+interface OpenSettingsMessage {
+	type: 'openSettings';
+}
+
+interface ResolveEnvironmentVariableMessage {
+	type: 'resolveEnvironmentVariable';
+	requestId: number;
+	name: string;
+}
+
+interface CheckEnvironmentVariablesMessage {
+	type: 'checkEnvironmentVariables';
+	requestId: number;
+	names: string[];
 }
 
 export interface RequestChangedMessage {
@@ -41,7 +60,9 @@ export interface RequestWebviewHandlers {
 	extensionVersion?: string;
 	onReady?: () => void;
 	onRequestChanged?: (message: RequestChangedMessage) => void;
-	onSendRequest?: (message: SendRequestMessage) => Promise<ApiResponse>;
+	onSendRequest?: (message: SendRequestMessage, signal: AbortSignal) => Promise<ApiResponse>;
+	onResolveEnvironmentVariable?: (name: string) => Promise<string | undefined>;
+	onCheckEnvironmentVariables?: (names: string[]) => Promise<string[]>;
 }
 
 /**
@@ -58,17 +79,27 @@ export function initializeRequestWebview(
 	const handlers = typeof handlersOrOnReady === 'function'
 		? { onReady: handlersOrOnReady }
 		: handlersOrOnReady ?? {};
+	const activeRequests = new Map<number, AbortController>();
 
 	webview.html = getWebviewHtml(webview, handlers.extensionVersion ?? '0.0.0');
 
-	return webview.onDidReceiveMessage((message: unknown) => {
+	const messageSubscription = webview.onDidReceiveMessage((message: unknown) => {
 		if (isWebviewReadyMessage(message)) {
+			void webview.postMessage({
+				type: 'workspaceTrust',
+				isTrusted: vscode.workspace.isTrusted,
+			});
+			void postEnvironmentTooltipSetting(webview);
 			handlers.onReady?.();
 			return;
 		}
 
 		if (isRequestChangedMessage(message)) {
 			handlers.onRequestChanged?.(message);
+			return;
+		}
+		if (isCancelRequestMessage(message)) {
+			activeRequests.get(message.requestId)?.abort();
 			return;
 		}
 
@@ -82,8 +113,110 @@ export function initializeRequestWebview(
 			return;
 		}
 
-		void handleMessage(webview, message, handlers);
+		if (isOpenSettingsMessage(message)) {
+			void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:nickchecan.restcraft');
+			return;
+		}
+
+		if (isResolveEnvironmentVariableMessage(message)) {
+			void handleResolveEnvironmentVariable(webview, message, handlers);
+			return;
+		}
+
+		if (isCheckEnvironmentVariablesMessage(message)) {
+			void handleCheckEnvironmentVariables(webview, message, handlers);
+			return;
+		}
+
+		void handleMessage(webview, message, handlers, activeRequests);
 	});
+	const trustSubscription = vscode.workspace.onDidGrantWorkspaceTrust(() => {
+		void webview.postMessage({
+			type: 'workspaceTrust',
+			isTrusted: true,
+		});
+	});
+	const settingsSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
+		if (event.affectsConfiguration('restcraft.showEnvironmentVariableValues')) {
+			void postEnvironmentTooltipSetting(webview);
+		}
+	});
+
+	return vscode.Disposable.from(messageSubscription, trustSubscription, settingsSubscription, new vscode.Disposable(() => {
+		for (const controller of activeRequests.values()) { controller.abort(); }
+		activeRequests.clear();
+	}));
+}
+
+/** Sends the current environment-value tooltip preference into the webview. */
+async function postEnvironmentTooltipSetting(webview: vscode.Webview): Promise<void> {
+	const isEnabled = vscode.workspace.getConfiguration('restcraft').get<boolean>('showEnvironmentVariableValues', true);
+	await webview.postMessage({
+		type: 'environmentTooltipSetting',
+		isEnabled,
+	});
+}
+
+/** Resolves only the single environment variable the user is hovering over. */
+async function handleResolveEnvironmentVariable(
+	webview: vscode.Webview,
+	message: ResolveEnvironmentVariableMessage,
+	handlers: RequestWebviewHandlers,
+): Promise<void> {
+	try {
+		if (!vscode.workspace.isTrusted) {
+			throw new Error('Environment values are only available in a trusted workspace.');
+		}
+		if (!vscode.workspace.getConfiguration('restcraft').get<boolean>('showEnvironmentVariableValues', true)) {
+			return;
+		}
+
+		const value = await handlers.onResolveEnvironmentVariable?.(message.name);
+		await webview.postMessage({
+			type: 'environmentVariableResolved',
+			requestId: message.requestId,
+			name: message.name,
+			value,
+		});
+	} catch (error) {
+		await webview.postMessage({
+			type: 'environmentVariableResolved',
+			requestId: message.requestId,
+			name: message.name,
+			error: error instanceof Error ? error.message : 'Unable to resolve environment variable.',
+		});
+	}
+}
+
+/** Checks which referenced variable names exist without sending their values. */
+async function handleCheckEnvironmentVariables(
+	webview: vscode.Webview,
+	message: CheckEnvironmentVariablesMessage,
+	handlers: RequestWebviewHandlers,
+): Promise<void> {
+	try {
+		if (!vscode.workspace.isTrusted) {
+			throw new Error('Environment values are only available in a trusted workspace.');
+		}
+		if (!vscode.workspace.getConfiguration('restcraft').get<boolean>('showEnvironmentVariableValues', true)) {
+			await webview.postMessage({ type: 'environmentVariablesChecked', requestId: message.requestId, definedNames: [] });
+			return;
+		}
+
+		const definedNames = await handlers.onCheckEnvironmentVariables?.(message.names) ?? [];
+		await webview.postMessage({
+			type: 'environmentVariablesChecked',
+			requestId: message.requestId,
+			definedNames,
+		});
+	} catch (error) {
+		await webview.postMessage({
+			type: 'environmentVariablesChecked',
+			requestId: message.requestId,
+			definedNames: [],
+			error: error instanceof Error ? error.message : 'Unable to check environment variables.',
+		});
+	}
 }
 
 /**
@@ -116,18 +249,26 @@ async function handleMessage(
 	webview: vscode.Webview,
 	message: unknown,
 	handlers: RequestWebviewHandlers,
+	activeRequests: Map<number, AbortController>,
 ): Promise<void> {
 	if (!isSendRequestMessage(message)) {
 		return;
 	}
 
+	let controller: AbortController | undefined;
 	try {
-		const response = handlers.onSendRequest ? await handlers.onSendRequest(message) : await executeRequest({
+		if (!vscode.workspace.isTrusted) {
+			throw new Error('Sending requests and resolving .env variables requires a trusted workspace.');
+		}
+
+		controller = new AbortController();
+		activeRequests.set(message.requestId, controller);
+		const response = handlers.onSendRequest ? await handlers.onSendRequest(message, controller.signal) : await executeRequest({
 			method: message.method,
 			url: message.url,
 			headers: message.headers,
 			body: message.body,
-		});
+		}, getRequestTimeout(), controller.signal);
 
 		await webview.postMessage({
 			type: 'requestComplete',
@@ -137,7 +278,10 @@ async function handleMessage(
 		await webview.postMessage({
 			type: 'requestError',
 			message: error instanceof Error ? error.message : 'Request failed.',
+			cancelled: controller?.signal.aborted === true,
 		});
+	} finally {
+		activeRequests.delete(message.requestId);
 	}
 }
 
@@ -150,7 +294,12 @@ async function handleMessage(
 export async function executeRequestWithEnvironment(
 	message: SendRequestMessage,
 	requestUri: vscode.Uri | undefined,
+	signal?: AbortSignal,
 ): Promise<ApiResponse> {
+	if (!vscode.workspace.isTrusted) {
+		throw new Error('Sending requests and resolving .env variables requires a trusted workspace.');
+	}
+
 	const variables = requestUri ? await readEnvironmentVariables(requestUri) : {};
 	const request = resolveRequestVariables({
 		method: message.method,
@@ -158,26 +307,147 @@ export async function executeRequestWithEnvironment(
 		headers: message.headers,
 		body: message.body,
 	}, variables);
+	await confirmInsecureCredentialRequest(request.url, request.headers);
 
-	return executeRequest(request);
+	return executeRequest(request, getRequestTimeout(), signal);
+}
+
+/** Reads one environment value for an explicit hover lookup. */
+export async function resolveEnvironmentVariable(
+	name: string,
+	requestUri: vscode.Uri | undefined,
+): Promise<string | undefined> {
+	if (!vscode.workspace.isTrusted) {
+		throw new Error('Environment values are only available in a trusted workspace.');
+	}
+
+	if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+		return undefined;
+	}
+
+	const variables = requestUri ? await readEnvironmentVariables(requestUri) : {};
+	return variables[name];
+}
+
+/** Returns which requested variable names are defined in the sibling .env. */
+export async function findDefinedEnvironmentVariables(
+	names: string[],
+	requestUri: vscode.Uri | undefined,
+): Promise<string[]> {
+	if (!vscode.workspace.isTrusted || !requestUri || names.length === 0) {
+		return [];
+	}
+
+	const variables = await readEnvironmentVariables(requestUri);
+	return names.filter((name) => Object.prototype.hasOwnProperty.call(variables, name));
+}
+
+/** Warns before credentials are sent to a remote host over plain HTTP. */
+async function confirmInsecureCredentialRequest(url: string, headers: Record<string, string> | undefined): Promise<void> {
+	if (vscode.workspace.getConfiguration('restcraft').get<boolean>('suppressInsecureCredentialWarning', false)) {
+		return;
+	}
+
+	let parsedUrl: URL;
+	try {
+		parsedUrl = new URL(url);
+	} catch {
+		return;
+	}
+
+	if (parsedUrl.protocol !== 'http:' || isLocalHost(parsedUrl.hostname) || !hasAuthenticationCredentials(headers, parsedUrl)) {
+		return;
+	}
+
+	const sendOnce = 'Send once';
+	const dontShowAgain = "Don't show this again";
+	const choice = await vscode.window.showWarningMessage(
+		`This request sends authentication credentials to ${parsedUrl.hostname} over unencrypted HTTP. The credentials could be read by others on the network.`,
+		{ modal: true },
+		sendOnce,
+		dontShowAgain,
+	);
+
+	if (choice === dontShowAgain) {
+		await vscode.workspace.getConfiguration('restcraft').update(
+			'suppressInsecureCredentialWarning',
+			true,
+			vscode.ConfigurationTarget.Global,
+		);
+		return;
+	}
+
+	if (choice !== sendOnce) {
+		throw new Error('Request cancelled.');
+	}
+}
+
+/** Recognizes common authentication and API-key request headers. */
+function hasAuthenticationCredentials(headers: Record<string, string> | undefined, url: URL): boolean {
+	if (url.username.length > 0 || url.password.length > 0) {
+		return true;
+	}
+
+	return Object.entries(headers ?? {}).some(([name, value]) => {
+		const normalizedName = name.toLowerCase();
+		return value.length > 0 && (
+			normalizedName === 'authorization'
+			|| normalizedName === 'proxy-authorization'
+			|| normalizedName === 'cookie'
+			|| normalizedName === 'x-api-key'
+			|| normalizedName === 'api-key'
+			|| normalizedName === 'x-auth-token'
+		);
+	});
+}
+
+/** Keeps loopback and local development hosts warning-free. */
+function isLocalHost(hostname: string): boolean {
+	const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+	return host === 'localhost'
+		|| host.endsWith('.localhost')
+		|| host === '::1'
+		|| /^127(?:\.\d{1,3}){3}$/.test(host);
+}
+
+/** Reads the user's configured request timeout, in milliseconds. */
+function getRequestTimeout(): number {
+	const timeout = vscode.workspace.getConfiguration('restcraft').get<number>('requestTimeout', 30000);
+	return Number.isFinite(timeout) && timeout >= 0 ? timeout : 30000;
 }
 
 /**
- * Reads the optional sibling `.env` file for a request document.
+ * Reads the closest `.env` file at or above a request document's directory,
+ * stopping at the containing VS Code workspace folder.
  */
 async function readEnvironmentVariables(requestUri: vscode.Uri): Promise<Record<string, string>> {
-	const envUri = vscode.Uri.joinPath(readRequestDirectory(requestUri), '.env');
+	const workspaceFolder = vscode.workspace.getWorkspaceFolder(requestUri);
+	const workspaceRoot = workspaceFolder?.uri ?? readRequestDirectory(requestUri);
+	let directory = readRequestDirectory(requestUri);
 
-	try {
-		const content = await vscode.workspace.fs.readFile(envUri);
-		return parseEnvFile(new TextDecoder().decode(content));
-	} catch (error) {
-		if (isFileNotFoundError(error)) {
-			return {};
+	while (isDirectoryWithinWorkspace(directory, workspaceRoot)) {
+		const envUri = vscode.Uri.joinPath(directory, '.env');
+		try {
+			const content = await vscode.workspace.fs.readFile(envUri);
+			return parseEnvFile(new TextDecoder().decode(content));
+		} catch (error) {
+			if (!isFileNotFoundError(error)) {
+				throw error;
+			}
 		}
 
-		throw error;
+		if (sameDirectory(directory, workspaceRoot)) {
+			break;
+		}
+
+		const parentDirectory = readParentDirectory(directory);
+		if (sameDirectory(directory, parentDirectory)) {
+			break;
+		}
+		directory = parentDirectory;
 	}
+
+	return {};
 }
 
 /**
@@ -187,6 +457,39 @@ function readRequestDirectory(requestUri: vscode.Uri): vscode.Uri {
 	const directoryPath = requestUri.path.replace(/\/[^/]*$/, '') || '/';
 
 	return requestUri.with({ path: directoryPath });
+}
+
+/** Returns the parent directory URI without crossing URI authorities. */
+function readParentDirectory(directory: vscode.Uri): vscode.Uri {
+	const normalizedPath = normalizeDirectoryPath(directory.path);
+	const parentPath = normalizedPath === '/'
+		? '/'
+		: normalizedPath.slice(0, normalizedPath.lastIndexOf('/')) || '/';
+
+	return directory.with({ path: parentPath });
+}
+
+/** Checks whether a candidate directory is inside the workspace root. */
+function isDirectoryWithinWorkspace(directory: vscode.Uri, workspaceRoot: vscode.Uri): boolean {
+	if (directory.scheme !== workspaceRoot.scheme || directory.authority !== workspaceRoot.authority) {
+		return false;
+	}
+
+	const directoryPath = normalizeDirectoryPath(directory.path);
+	const rootPath = normalizeDirectoryPath(workspaceRoot.path);
+	return directoryPath === rootPath || directoryPath.startsWith(rootPath === '/' ? '/' : rootPath + '/');
+}
+
+/** Compares two directory URIs after removing trailing path separators. */
+function sameDirectory(left: vscode.Uri, right: vscode.Uri): boolean {
+	return left.scheme === right.scheme
+		&& left.authority === right.authority
+		&& normalizeDirectoryPath(left.path) === normalizeDirectoryPath(right.path);
+}
+
+function normalizeDirectoryPath(path: string): string {
+	const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
+	return normalized || '/';
 }
 
 /**
@@ -211,10 +514,20 @@ function isSendRequestMessage(message: unknown): message is SendRequestMessage {
 	const candidate = message as Partial<SendRequestMessage>;
 
 	return candidate.type === 'sendRequest'
+		&& typeof candidate.requestId === 'number'
+		&& Number.isSafeInteger(candidate.requestId)
 		&& typeof candidate.method === 'string'
 		&& typeof candidate.url === 'string'
 		&& (candidate.body === undefined || typeof candidate.body === 'string')
 		&& (candidate.headers === undefined || isStringRecord(candidate.headers));
+}
+
+function isCancelRequestMessage(message: unknown): message is CancelRequestMessage {
+	if (!isRecord(message)) { return false; }
+	const candidate = message as Partial<CancelRequestMessage>;
+	return candidate.type === 'cancelRequest'
+		&& typeof candidate.requestId === 'number'
+		&& Number.isSafeInteger(candidate.requestId);
 }
 
 /**
@@ -254,6 +567,48 @@ function isOpenIssuesMessage(message: unknown): message is OpenIssuesMessage {
 	const candidate = message as Partial<OpenIssuesMessage>;
 
 	return candidate.type === 'openIssues';
+}
+
+/**
+ * Validates the footer settings button message.
+ */
+function isOpenSettingsMessage(message: unknown): message is OpenSettingsMessage {
+	if (!isRecord(message)) {
+		return false;
+	}
+
+	const candidate = message as Partial<OpenSettingsMessage>;
+
+	return candidate.type === 'openSettings';
+}
+
+/** Validates a targeted environment-variable hover lookup from the webview. */
+function isResolveEnvironmentVariableMessage(message: unknown): message is ResolveEnvironmentVariableMessage {
+	if (!isRecord(message)) {
+		return false;
+	}
+
+	const candidate = message as Partial<ResolveEnvironmentVariableMessage>;
+	return candidate.type === 'resolveEnvironmentVariable'
+		&& typeof candidate.requestId === 'number'
+		&& Number.isSafeInteger(candidate.requestId)
+		&& typeof candidate.name === 'string'
+		&& /^[A-Za-z_][A-Za-z0-9_]*$/.test(candidate.name);
+}
+
+/** Validates environment-variable presence checks sent from the webview. */
+function isCheckEnvironmentVariablesMessage(message: unknown): message is CheckEnvironmentVariablesMessage {
+	if (!isRecord(message)) {
+		return false;
+	}
+
+	const candidate = message as Partial<CheckEnvironmentVariablesMessage>;
+	return candidate.type === 'checkEnvironmentVariables'
+		&& typeof candidate.requestId === 'number'
+		&& Number.isSafeInteger(candidate.requestId)
+		&& Array.isArray(candidate.names)
+		&& candidate.names.length <= 100
+		&& candidate.names.every((name) => typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name));
 }
 
 /**

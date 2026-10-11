@@ -181,6 +181,15 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			background: var(--vscode-button-hoverBackground);
 		}
 
+		button.request-cancel {
+			color: var(--vscode-inputValidation-errorForeground, #fff);
+			background: var(--vscode-inputValidation-errorBackground, #a1260d);
+		}
+
+		button.request-cancel:hover {
+			background: var(--vscode-inputValidation-errorBorder, #c72e0f);
+		}
+
 			button:disabled {
 				opacity: 0.7;
 				cursor: wait;
@@ -309,6 +318,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			.secret-reference {
 				color: var(--vscode-charts-yellow, var(--vscode-editorWarning-foreground, var(--vscode-editor-foreground)));
 				background: transparent;
+			}
+
+			.secret-reference.is-missing,
+			.environment-variable-tooltip.is-missing {
+				color: var(--vscode-errorForeground, var(--vscode-editorError-foreground, #f14c4c));
 			}
 
 			.authorization-divider {
@@ -702,6 +716,22 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				font-weight: 600;
 			}
 
+			.environment-variable-tooltip {
+				position: fixed;
+				z-index: 20;
+				max-width: min(480px, calc(100vw - 24px));
+				padding: 6px 9px;
+				color: var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground));
+				background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+				border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+				border-radius: 4px;
+				box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+				font: 12px/1.4 var(--vscode-font-family);
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				pointer-events: none;
+			}
+
 			.hidden {
 				display: none;
 			}
@@ -757,7 +787,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			<span class="sr-only">Request URL</span>
 			<input id="url" name="url" type="text" placeholder="https://api.example.com/resource" aria-label="Request URL">
 		</label>
-		<button id="send" type="submit">Send</button>
+		<button id="send" type="submit" disabled title="Checking workspace trust...">Send</button>
 		</form>
 		<section class="request-panel" aria-label="Request configuration area">
 			<div class="request-tabs" role="tablist" aria-label="Request sections">
@@ -880,7 +910,15 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				<pre class="response-content" id="response-preview-empty">HTML preview is available for HTML responses.</pre>
 			</div>
 		</section>
+		<div class="environment-variable-tooltip hidden" id="environment-variable-tooltip" role="tooltip"></div>
 		<footer class="editor-footer" aria-label="Editor summary">
+			<button class="editor-footer-icon" id="footer-settings-button" type="button" aria-label="Settings" title="Settings">
+				<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M12 2.75v2.1m0 14.3v2.1m9.25-9.25h-2.1m-14.3 0h-2.1m15.79-6.54-1.49 1.49M6.95 17.05l-1.49 1.49m13.08 0-1.49-1.49M6.95 6.95 5.46 5.46"></path>
+					<circle cx="12" cy="12" r="7.25"></circle>
+					<circle cx="12" cy="12" r="2.75"></circle>
+				</svg>
+			</button>
 			<button class="editor-footer-icon" id="footer-repository-link" type="button" aria-label="Open RestCraft repository" title="Open RestCraft repository">
 				<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
 					<path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.6 7.6 0 0 1 8 3.86c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path>
@@ -913,6 +951,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				const method = document.getElementById('method');
 				const url = document.getElementById('url');
 				const send = document.getElementById('send');
+				let activeRequestId = 0;
+				let requestInProgress = false;
+			const environmentVariableTooltip = document.getElementById('environment-variable-tooltip');
 				const requestParamsTab = document.getElementById('request-params-tab');
 				const requestAuthorizationTab = document.getElementById('request-authorization-tab');
 				const requestHeadersTab = document.getElementById('request-headers-tab');
@@ -960,6 +1001,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			const responsePreviewEmpty = document.getElementById('response-preview-empty');
 			const footerRepositoryLink = document.getElementById('footer-repository-link');
 			const footerIssuesLink = document.getElementById('footer-issues-link');
+			const footerSettingsButton = document.getElementById('footer-settings-button');
 			const editorFooter = document.querySelector('.editor-footer');
 				const responseBodyContent = document.getElementById('response-body-content');
 				const responseBodyLines = document.getElementById('response-body-lines');
@@ -967,12 +1009,26 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				let requestStartedAt = 0;
 				let requestTimer = undefined;
 				let latestRequestUrl = '';
+				let hoveredEnvironmentVariable = '';
+				let environmentVariableRequestId = 0;
+				let environmentCheckRequestId = 0;
+				let environmentCheckTimer;
+				let environmentCheckNames = [];
+				let environmentValueTooltipEnabled = false;
+				let workspaceTrusted = false;
+				const missingEnvironmentVariables = new Set();
+				let textMeasureContext;
 				let activeAuthorizationType = 'none';
 				let activeRequestBodyType = 'raw';
 				renderRequestParamsFromUrl();
 				renderRequestHeaders({});
 				updateResponseAreaBounds();
 				window.addEventListener('resize', updateResponseAreaBounds);
+
+				document.addEventListener('pointermove', showHoveredEnvironmentVariable);
+				document.addEventListener('input', scheduleEnvironmentVariableCheck);
+				window.addEventListener('blur', clearHoveredEnvironmentVariable);
+				window.addEventListener('pointerleave', clearHoveredEnvironmentVariable);
 
 				footerRepositoryLink.addEventListener('click', () => {
 					vscode.postMessage({
@@ -983,6 +1039,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				footerIssuesLink.addEventListener('click', () => {
 					vscode.postMessage({
 						type: 'openIssues',
+					});
+				});
+
+				footerSettingsButton.addEventListener('click', () => {
+					vscode.postMessage({
+						type: 'openSettings',
 					});
 				});
 
@@ -1153,18 +1215,29 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 			form.addEventListener('submit', (event) => {
 				event.preventDefault();
+				if (requestInProgress) {
+					send.disabled = true;
+					setResponseStatus('Cancelling...');
+					vscode.postMessage({ type: 'cancelRequest', requestId: activeRequestId });
+					return;
+				}
 				latestRequestUrl = readEnabledRequestUrl();
-				send.disabled = true;
+				activeRequestId += 1;
+				requestInProgress = true;
+				send.disabled = false;
+				send.textContent = 'Cancel';
+				send.classList.add('request-cancel');
 				startRequestTimer();
 				setResponseStatus('Sending...');
 				responseSize.textContent = '';
 				responseHeaders.textContent = '(none)';
 				setRawContent('(empty)');
 				setBodyContent('(empty)');
-				setPreviewContent('', false, latestRequestUrl);
+				setPreviewContent('', false);
 
 			vscode.postMessage({
 						type: 'sendRequest',
+					requestId: activeRequestId,
 						method: method.value,
 						url: latestRequestUrl,
 						headers: readEnabledRequestHeaders(),
@@ -1176,7 +1249,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			const message = event.data;
 
 				if (message.type === 'requestComplete') {
-				send.disabled = false;
+				requestInProgress = false;
+				send.textContent = 'Send';
+				send.classList.remove('request-cancel');
+				send.disabled = !workspaceTrusted;
 				stopRequestTimer();
 				renderResponse(message.response);
 				updateResponseAreaBounds();
@@ -1184,15 +1260,82 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 				if (message.type === 'requestError') {
-					send.disabled = false;
+				requestInProgress = false;
+				send.textContent = 'Send';
+				send.classList.remove('request-cancel');
+				send.disabled = !workspaceTrusted;
 					stopRequestTimer();
-					setResponseStatus('Request failed', 'error');
+				setResponseStatus(message.cancelled ? 'Request cancelled' : 'Request failed', message.cancelled ? '' : 'error');
 					responseSize.textContent = '';
 					responseHeaders.textContent = '(none)';
 					setRawContent(message.message);
 					setBodyContent(message.message);
-					setPreviewContent('', false, latestRequestUrl);
+					setPreviewContent('', false);
 					updateResponseAreaBounds();
+					return;
+				}
+
+				if (message.type === 'workspaceTrust') {
+					workspaceTrusted = message.isTrusted === true;
+					send.disabled = requestInProgress ? send.disabled : !message.isTrusted;
+					send.title = message.isTrusted ? '' : 'Sending requests requires a trusted workspace.';
+					if (message.isTrusted) {
+						scheduleEnvironmentVariableCheck();
+					} else {
+						missingEnvironmentVariables.clear();
+						refreshVariableHighlights();
+					}
+					return;
+				}
+
+				if (message.type === 'environmentTooltipSetting') {
+					environmentValueTooltipEnabled = message.isEnabled === true;
+					if (!environmentValueTooltipEnabled) {
+						clearHoveredEnvironmentVariable();
+						missingEnvironmentVariables.clear();
+						refreshVariableHighlights();
+					} else {
+						scheduleEnvironmentVariableCheck();
+					}
+					return;
+				}
+
+				if (message.type === 'environmentVariablesChecked') {
+					if (message.requestId !== environmentCheckRequestId || !Array.isArray(message.definedNames)) {
+						return;
+					}
+					if (typeof message.error === 'string') {
+						return;
+					}
+					const definedNames = new Set(message.definedNames);
+					missingEnvironmentVariables.clear();
+					for (const name of environmentCheckNames) {
+						if (!definedNames.has(name)) {
+							missingEnvironmentVariables.add(name);
+						}
+					}
+					refreshVariableHighlights();
+					return;
+				}
+
+				if (message.type === 'environmentVariableResolved') {
+					if (message.requestId !== environmentVariableRequestId || message.name !== hoveredEnvironmentVariable) {
+						return;
+					}
+
+					if (typeof message.error === 'string') {
+						environmentVariableTooltip.classList.remove('is-missing');
+						environmentVariableTooltip.textContent = message.error;
+					} else if (typeof message.value === 'string') {
+						missingEnvironmentVariables.delete(message.name);
+						environmentVariableTooltip.classList.remove('is-missing');
+						environmentVariableTooltip.textContent = message.value;
+					} else {
+						missingEnvironmentVariables.add(message.name);
+						environmentVariableTooltip.classList.add('is-missing');
+						environmentVariableTooltip.textContent = '{{' + message.name + '}} is not defined in the sibling .env file.';
+					}
+					refreshVariableHighlights();
 					return;
 				}
 
@@ -1218,9 +1361,159 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 							: formatBody(message.request.body));
 						renderRequestBodyFormRows(requestBody.value);
 						setRequestBodyType(inferRequestBodyType(message.request.headers || {}, requestBody.value, activeRequestBodyType));
+						scheduleEnvironmentVariableCheck();
 						updateResponseAreaBounds();
 				}
 			});
+
+		function showHoveredEnvironmentVariable(event) {
+			if (!environmentValueTooltipEnabled) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+
+			const target = event.target;
+			if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+				|| target.type === 'checkbox' || target.type === 'submit'
+				|| !target.closest('.request-bar, .request-panel')) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+
+			const value = target.value;
+			const rect = target.getBoundingClientRect();
+			const style = window.getComputedStyle(target);
+			const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+			const paddingTop = Number.parseFloat(style.paddingTop) || 0;
+			if (!value) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+
+			textMeasureContext ??= document.createElement('canvas').getContext('2d');
+			if (!textMeasureContext) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+			textMeasureContext.font = style.font;
+			const pointerX = event.clientX - rect.left - paddingLeft + target.scrollLeft;
+			let sourceLine = value;
+			let sourceLineStart = 0;
+			if (target instanceof HTMLTextAreaElement) {
+				const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) || 16;
+				const paddingRight = Number.parseFloat(style.paddingRight) || 0;
+				const lineWidth = Math.max(1, target.clientWidth - paddingLeft - paddingRight);
+				const visualLines = [];
+				let sourceOffset = 0;
+				for (const hardLine of value.split('\\n')) {
+					if (!hardLine) {
+						visualLines.push({ text: '', start: sourceOffset });
+					} else {
+						let rowStart = 0;
+						for (let index = 1; index <= hardLine.length; index += 1) {
+							if (textMeasureContext.measureText(hardLine.slice(rowStart, index)).width > lineWidth && index - 1 > rowStart) {
+								visualLines.push({ text: hardLine.slice(rowStart, index - 1), start: sourceOffset + rowStart });
+								rowStart = index - 1;
+							}
+						}
+						visualLines.push({ text: hardLine.slice(rowStart), start: sourceOffset + rowStart });
+					}
+					sourceOffset += hardLine.length + 1;
+				}
+
+				const visualLineIndex = Math.max(0, Math.floor((event.clientY - rect.top - paddingTop + target.scrollTop) / lineHeight));
+			const visualLine = visualLines[visualLineIndex];
+			if (!visualLine) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+			sourceLine = visualLine.text;
+			sourceLineStart = visualLine.start;
+		}
+
+			let characterIndex = 0;
+				while (characterIndex < sourceLine.length
+				&& textMeasureContext.measureText(sourceLine.slice(0, characterIndex + 1)).width < pointerX) {
+				characterIndex += 1;
+			}
+
+			const tokenPattern = /\\{\\{([A-Za-z_][A-Za-z0-9_]*)\\}\\}/g;
+			let match;
+			let variableName = '';
+			const sourceCharacterIndex = sourceLineStart + characterIndex;
+			while ((match = tokenPattern.exec(value)) !== null) {
+				if (sourceCharacterIndex >= match.index && sourceCharacterIndex <= match.index + match[0].length) {
+					variableName = match[1];
+					break;
+				}
+			}
+
+			if (!variableName) {
+				clearHoveredEnvironmentVariable();
+				return;
+			}
+
+			environmentVariableTooltip.style.left = Math.max(8, Math.min(event.clientX + 12, window.innerWidth - 488)) + 'px';
+			environmentVariableTooltip.style.top = Math.max(8, Math.min(event.clientY + 16, window.innerHeight - 80)) + 'px';
+			environmentVariableTooltip.classList.remove('hidden');
+			if (variableName !== hoveredEnvironmentVariable) {
+				hoveredEnvironmentVariable = variableName;
+				environmentVariableRequestId += 1;
+					environmentVariableTooltip.classList.remove('is-missing');
+				environmentVariableTooltip.textContent = 'Looking up {{' + variableName + '}}…';
+				vscode.postMessage({
+					type: 'resolveEnvironmentVariable',
+					requestId: environmentVariableRequestId,
+					name: variableName,
+				});
+			}
+		}
+
+		function clearHoveredEnvironmentVariable() {
+			if (hoveredEnvironmentVariable) {
+				hoveredEnvironmentVariable = '';
+				environmentVariableRequestId += 1;
+			}
+			environmentVariableTooltip.classList.add('hidden');
+			environmentVariableTooltip.classList.remove('is-missing');
+		}
+
+		function scheduleEnvironmentVariableCheck() {
+			if (!environmentValueTooltipEnabled || !workspaceTrusted) {
+				return;
+			}
+			window.clearTimeout(environmentCheckTimer);
+			environmentCheckTimer = window.setTimeout(() => {
+				const variableNames = new Set();
+				for (const field of document.querySelectorAll('.request-bar input, .request-panel input, .request-panel textarea')) {
+					const pattern = /\\{\\{\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\}\\}/g;
+					let match;
+					while ((match = pattern.exec(field.value)) !== null) {
+						variableNames.add(match[1]);
+					}
+				}
+
+				environmentCheckNames = Array.from(variableNames);
+				environmentCheckRequestId += 1;
+				if (environmentCheckNames.length === 0) {
+					missingEnvironmentVariables.clear();
+					refreshVariableHighlights();
+					return;
+				}
+				vscode.postMessage({
+					type: 'checkEnvironmentVariables',
+					requestId: environmentCheckRequestId,
+					names: environmentCheckNames,
+				});
+			}, 120);
+		}
+
+		function refreshVariableHighlights() {
+			for (const input of document.querySelectorAll('.variable-input-wrapper input')) {
+				updateSecretReferenceState(input);
+			}
+			updateRequestBodyHighlight();
+		}
 
 		vscode.postMessage({
 			type: 'webviewReady',
@@ -1236,7 +1529,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					responseHeaders.textContent = formatHeaders(result.headers);
 					setRawContent(result.body || '(empty)');
 					setFormattedBodyContent(result.body || '(empty)', result.headers);
-					setPreviewContent(result.body || '', hasHtmlContentType(result.headers), latestRequestUrl);
+					setPreviewContent(result.body || '', hasHtmlContentType(result.headers));
 					updateResponseAreaBounds();
 				}
 
@@ -1932,7 +2225,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				function formatSecretHighlight(content) {
 					return escapeHtml(content).replace(
 						/\{\{\s*[A-Za-z_][A-Za-z0-9_]*\s*\}\}/g,
-						(match) => '<span class="secret-reference">' + match + '</span>',
+					(match) => {
+						const variableName = match.match(/[A-Za-z_][A-Za-z0-9_]*/)?.[0];
+						const missingClass = variableName && missingEnvironmentVariables.has(variableName) ? ' is-missing' : '';
+						return '<span class="secret-reference' + missingClass + '">' + match + '</span>';
+					},
 					);
 				}
 
@@ -2476,12 +2773,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			// Shows or clears the sandboxed HTML response preview.
-			function setPreviewContent(content, canPreview, baseUrl) {
+			function setPreviewContent(content, canPreview) {
 				responsePreview.classList.toggle('hidden', !canPreview);
 				responsePreviewEmpty.classList.toggle('hidden', canPreview);
 
 				if (canPreview) {
-					responsePreview.srcdoc = createPreviewDocument(content, baseUrl);
+					responsePreview.srcdoc = createPreviewDocument(content);
 					responsePreviewEmpty.textContent = '';
 					return;
 				}
@@ -2490,24 +2787,16 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				responsePreviewEmpty.textContent = 'HTML preview is available for HTML responses.';
 			}
 
-			// Builds an inert preview document with a base URL for relative assets.
-			function createPreviewDocument(content, baseUrl) {
-				const previewHead = '<base href="' + escapeHtmlAttribute(baseUrl) + '"><style>a, button, input, select, textarea, label, summary, [role="button"], [onclick] { pointer-events: none !important; } form { pointer-events: none !important; }</style>';
+			// Builds an inert preview document that cannot load external resources or run scripts.
+			function createPreviewDocument(content) {
+				const previewPolicy = "default-src 'none'; script-src 'none'; form-action 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; img-src data:; style-src 'unsafe-inline';";
+				const previewHead = '<meta http-equiv="Content-Security-Policy" content="' + previewPolicy + '"><style>a, button, input, select, textarea, label, summary, [role="button"], [onclick] { pointer-events: none !important; } form { pointer-events: none !important; }</style>';
 
 				if (/<head[\\s>]/i.test(content)) {
 					return content.replace(/<head([^>]*)>/i, '<head$1>' + previewHead);
 				}
 
-				return previewHead + content;
-			}
-
-			// Escapes text before inserting it into an HTML attribute.
-			function escapeHtmlAttribute(content) {
-				return content
-					.replace(/&/g, '&amp;')
-					.replace(/"/g, '&quot;')
-					.replace(/</g, '&lt;')
-					.replace(/>/g, '&gt;');
+				return '<!DOCTYPE html><html><head>' + previewHead + '</head><body>' + content + '</body></html>';
 			}
 
 			// Returns line numbers matching the provided text content.

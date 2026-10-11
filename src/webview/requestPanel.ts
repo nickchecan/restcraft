@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 import { RequestFileDefinition } from '../request/types';
-import { executeRequestWithEnvironment, initializeRequestWebview, loadRequestInWebview } from './requestWebview';
+import { executeRequestWithEnvironment, findDefinedEnvironmentVariables, initializeRequestWebview, loadRequestInWebview, resolveEnvironmentVariable } from './requestWebview';
 
 /**
  * Singleton API Workbench panel used by the `restcraft.openApiWorkbench` command.
@@ -23,7 +23,9 @@ export class ApiWorkbenchPanel {
 		this.panel = panel;
 		initializeRequestWebview(this.panel.webview, {
 			extensionVersion,
-			onSendRequest: (message) => executeRequestWithEnvironment(message, this.requestUri),
+			onSendRequest: (message, signal) => executeRequestWithEnvironment(message, this.requestUri, signal),
+			onResolveEnvironmentVariable: (name) => resolveEnvironmentVariable(name, this.requestUri),
+			onCheckEnvironmentVariables: (names) => findDefinedEnvironmentVariables(names, this.requestUri),
 		});
 
 		this.panel.onDidDispose(() => {
