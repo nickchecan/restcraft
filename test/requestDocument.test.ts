@@ -31,4 +31,21 @@ suite('OAuth request document persistence', () => {
 		assert.deepStrictEqual(JSON.parse(text).headerState, message.headerState);
 		assert.strictEqual(parseRequestFile(text).headers.Authorization, 'Bearer sensitive-token');
 	});
+	test('preserves a disabled header value when editing a legacy request', () => {
+		const legacy = '{"name":"Legacy","method":"GET","url":"https://example.com/","headers":{"Accept":"application/json"}}';
+		const change: RequestChangedMessage = { ...message, authorization: undefined,
+			headers: { Accept: 'application/json' },
+			headerState: [{ name: 'Accept', value: 'application/json', enabled: false }] };
+		const saved = parseRequestFile(createUpdatedRequestDocumentText(legacy, change));
+		assert.deepStrictEqual(saved.headerState, change.headerState);
+		assert.strictEqual(saved.headers.Accept, 'application/json');
+	});
+
+	test('keeps an OAuth env header disabled after saving and reopening', () => {
+		const change: RequestChangedMessage = { ...message,
+			headerState: [{ name: 'authorization', value: 'Bearer {{MY_TOKEN}}', enabled: false }] };
+		const saved = parseRequestFile(createUpdatedRequestDocumentText('{}', change));
+		assert.deepStrictEqual(saved.headerState, [{ name: 'Authorization', value: 'Bearer {{MY_TOKEN}}', enabled: false }]);
+		assert.strictEqual(saved.headers.Authorization, 'Bearer {{MY_TOKEN}}');
+	});
 });

@@ -73,7 +73,8 @@ export function headersForPersistence(headers: Record<string, string>, headerSta
 	if (authorization.storeAccessToken && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && authorization.grantType === 'client_credentials') {
 		const value = `Bearer {{${name}}}`;
 		persistedHeaders.Authorization = value;
-		persistedState.push({ name: 'Authorization', value, enabled: true });
+		const enabled = headerState.find(header => header.name.toLowerCase() === 'authorization')?.enabled ?? true;
+		persistedState.push({ name: 'Authorization', value, enabled });
 	}
 	return { headers: persistedHeaders, headerState: persistedState };
 }

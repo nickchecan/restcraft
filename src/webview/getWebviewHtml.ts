@@ -2670,7 +2670,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     if (authorizationType.value === 'oauth2' && oauthStoreToken.checked) {
                         const filtered = values.filter(header => header.name.toLowerCase() !== 'authorization');
                         const headers = persistedOAuthHeaders({});
-                        if (headers.Authorization) { filtered.push({ name: 'Authorization', value: headers.Authorization, enabled: true }); }
+                        if (headers.Authorization) {
+                            const enabled = values.find(header => header.name.toLowerCase() === 'authorization')?.enabled ?? true;
+                            filtered.push({ name: 'Authorization', value: headers.Authorization, enabled });
+                        }
                         return filtered;
                     }
                     return values;

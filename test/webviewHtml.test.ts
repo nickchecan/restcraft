@@ -95,4 +95,25 @@ suite('Webview HTML', () => {
 		runInNewContext('updateOAuthTokenDisplay();', context);
 		assert.strictEqual(context.oauthAccessToken.value, 'new-token');
 	});
+	test('keeps unchecked OAuth header rows saved but excludes them from sending', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function readRequestHeaders()');
+		const end = html.indexOf('// Returns the executable value for a header row.', start);
+		assert.ok(start >= 0 && end > start);
+		const rows = [
+			{ name: 'authorization', value: 'Bearer {{MY_TOKEN}}', enabled: false },
+			{ name: 'Accept', value: 'application/json', enabled: true },
+		].map(header => ({ querySelector: () => ({ checked: header.enabled }),
+			querySelectorAll: () => [{ value: header.name }, { value: header.value }] }));
+		const context = { authorizationType: { value: 'oauth2' }, oauthStoreToken: { checked: true },
+			oauthGrantType: { value: 'client_credentials' }, oauthTokenVariable: { value: 'MY_TOKEN' },
+			requestHeadersTable: { querySelectorAll: () => rows },
+			readHeaderRowValue: (_name: string, value: string) => value };
+		const result = runInNewContext(html.slice(start, end) + '; ({ state: readRequestHeaderState(), sent: readEnabledRequestHeaders() });', context);
+		const state = result.state.find((header: { name: string }) => header.name === 'Authorization');
+		assert.strictEqual(state.enabled, false);
+		assert.strictEqual(state.value, 'Bearer {{MY_TOKEN}}');
+		assert.strictEqual(result.sent.authorization, undefined);
+		assert.strictEqual(result.sent.Accept, 'application/json');
+	});
 });
