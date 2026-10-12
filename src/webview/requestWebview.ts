@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-import { parseEnvFile, resolveRequestVariables } from '../request/environment';
+import { parseEnvFile, resolveRequestVariables, updateEnvValue } from '../request/environment';
 import { buildOAuthTokenRequest, readOAuthAccessToken, OAuthTokenFields, isOAuthAuthorization } from '../request/oauth';
 import { executeRequest } from '../request/requestRunner';
 import { ApiResponse, OAuthAuthorizationDefinition, RequestFileDefinition, RequestHeaderDefinition, RequestParamDefinition } from '../request/types';
@@ -60,6 +60,7 @@ export interface RequestChangedMessage {
 
 export interface RequestWebviewHandlers {
 	extensionVersion?: string;
+	onGetRequestUri?: () => vscode.Uri | undefined;
 	onReady?: () => void;
 	onRequestChanged?: (message: RequestChangedMessage) => void;
 	onSendRequest?: (message: SendRequestMessage, signal: AbortSignal) => Promise<ApiResponse>;
@@ -100,6 +101,12 @@ export function initializeRequestWebview(
 			handlers.onRequestChanged?.(message);
 			return;
 		}
+        if (isRecord(message) && message.type === 'cancelOAuthToken') {
+            for (const [key, controller] of activeRequests) {
+                if (key < 0) { controller.abort(); }
+            }
+            return;
+        }
 		if (isCancelRequestMessage(message)) {
 			activeRequests.get(message.requestId)?.abort();
 			return;
@@ -131,10 +138,12 @@ export function initializeRequestWebview(
 		}
 
         if (isRecord(message) && message.type === 'getOAuthToken') {
-            if (!Number.isSafeInteger(message.requestId) || typeof message.requestId !== 'number'
+            if (!Number.isSafeInteger(message.requestId) || typeof message.requestId !== 'number' || message.requestId < 0
                 || typeof message.url !== 'string' || typeof message.clientId !== 'string'
-                || typeof message.clientSecret !== 'string' || typeof message.scope !== 'string') { return; }
-            void handleOAuthToken(webview, { url: message.url, clientId: message.clientId, clientSecret: message.clientSecret, scope: message.scope }, message.requestId, handlers, activeRequests);
+                || typeof message.clientSecret !== 'string' || typeof message.scope !== 'string'
+                || (message.storeAccessToken !== undefined && typeof message.storeAccessToken !== 'boolean')
+                || (message.accessTokenVariable !== undefined && typeof message.accessTokenVariable !== 'string')) { return; }
+            void handleOAuthToken(webview, { url: message.url, clientId: message.clientId, clientSecret: message.clientSecret, scope: message.scope }, message.requestId, handlers, activeRequests, message.storeAccessToken === true, typeof message.accessTokenVariable === 'string' ? message.accessTokenVariable : 'ACCESS_TOKEN');
             return;
         }
 		void handleMessage(webview, message, handlers, activeRequests);
@@ -430,6 +439,12 @@ function getRequestTimeout(): number {
  * stopping at the containing VS Code workspace folder.
  */
 async function readEnvironmentVariables(requestUri: vscode.Uri): Promise<Record<string, string>> {
+	const file = await findEnvironmentFile(requestUri);
+	return parseEnvFile(file.content);
+}
+
+/** Uses the same closest-file lookup for reading and writing tokens. */
+async function findEnvironmentFile(requestUri: vscode.Uri): Promise<{ uri: vscode.Uri; content: string }> {
 	const workspaceFolder = vscode.workspace.getWorkspaceFolder(requestUri);
 	const workspaceRoot = workspaceFolder?.uri ?? readRequestDirectory(requestUri);
 	let directory = readRequestDirectory(requestUri);
@@ -438,7 +453,7 @@ async function readEnvironmentVariables(requestUri: vscode.Uri): Promise<Record<
 		const envUri = vscode.Uri.joinPath(directory, '.env');
 		try {
 			const content = await vscode.workspace.fs.readFile(envUri);
-			return parseEnvFile(new TextDecoder().decode(content));
+			return { uri: envUri, content: new TextDecoder().decode(content) };
 		} catch (error) {
 			if (!isFileNotFoundError(error)) {
 				throw error;
@@ -456,7 +471,7 @@ async function readEnvironmentVariables(requestUri: vscode.Uri): Promise<Record<
 		directory = parentDirectory;
 	}
 
-	return {};
+	return { uri: vscode.Uri.joinPath(readRequestDirectory(requestUri), '.env'), content: '' };
 }
 
 /**
@@ -677,18 +692,24 @@ function isRequestHeaderState(value: unknown): value is RequestHeaderDefinition 
 async function handleOAuthToken(
     webview: vscode.Webview, fields: OAuthTokenFields, requestId: number,
     handlers: RequestWebviewHandlers, activeRequests: Map<number, AbortController>,
+    storeAccessToken = false, accessTokenVariable = 'ACCESS_TOKEN',
 ): Promise<void> {
     // Negative IDs keep token retrieval separate from normal request cancellation IDs.
+    const requestUri = handlers.onGetRequestUri?.();
     const key = -requestId - 1;
     if (activeRequests.has(key)) { return; }
     const controller = new AbortController();
     activeRequests.set(key, controller);
     try {
         if (!vscode.workspace.isTrusted) { throw new Error('Getting an access token requires a trusted workspace.'); }
-        const variables: Record<string, string> = {};
+        if (storeAccessToken) {
+            if (!requestUri) { throw new Error('Save or load a request file before storing an access token in .env.'); }
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(accessTokenVariable)) { throw new Error('Enter a valid access token variable name.'); }
+        }
+        const variables: Record<string, string> = requestUri ? await readEnvironmentVariables(requestUri) : {};
         for (const value of Object.values(fields)) {
             for (const match of value.matchAll(/\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}/g)) {
-                const resolved = await handlers.onResolveEnvironmentVariable?.(match[1]);
+                const resolved = requestUri ? variables[match[1]] : await handlers.onResolveEnvironmentVariable?.(match[1]);
                 if (resolved !== undefined) { variables[match[1]] = resolved; }
             }
         }
@@ -697,9 +718,38 @@ async function handleOAuthToken(
         const request = buildOAuthTokenRequest({ url: resolved.url, clientId: resolved.headers!.clientId,
             clientSecret: resolved.headers!.clientSecret, scope: resolved.headers!.scope });
         const response = await executeRequest(request, getRequestTimeout(), controller.signal, 'error');
-        await webview.postMessage({ type: 'oauthTokenResult', requestId, token: readOAuthAccessToken(response) });
+        const token = readOAuthAccessToken(response);
+        if (storeAccessToken && requestUri) {
+            await storeOAuthTokenInEnvironment(requestUri, accessTokenVariable, token, controller.signal);
+        }
+        await webview.postMessage({ type: 'oauthTokenResult', requestId, token, stored: storeAccessToken });
     } catch (error) {
         await webview.postMessage({ type: 'oauthTokenResult', requestId,
             error: error instanceof Error ? error.message : 'Unable to get an access token.' });
     } finally { activeRequests.delete(key); }
+}
+
+// Serializes environment writes so token retrievals in different editors do not lose updates.
+const environmentWrites = new Map<string, Promise<void>>();
+
+/** Stores a token in the exact environment selected by the request's lookup rules. */
+export async function storeOAuthTokenInEnvironment(requestUri: vscode.Uri, name: string, token: string, signal?: AbortSignal): Promise<void> {
+	if (!vscode.workspace.isTrusted) { throw new Error('Storing an access token requires a trusted workspace.'); }
+	const target = await findEnvironmentFile(requestUri);
+	const key = target.uri.toString();
+	const previous = environmentWrites.get(key) ?? Promise.resolve();
+	const write = previous.catch(() => {}).then(async () => {
+		if (!vscode.workspace.isTrusted) { throw new Error('Storing an access token requires a trusted workspace.'); }
+		const openDocument = vscode.workspace.textDocuments.find(document => document.uri.toString() === key);
+		if (openDocument?.isDirty) { throw new Error('Save the .env file before storing an access token.'); }
+		let content = '';
+		try { content = new TextDecoder().decode(await vscode.workspace.fs.readFile(target.uri)); }
+		catch (error) { if (!isFileNotFoundError(error)) { throw error; } }
+		if (signal?.aborted) { throw new Error('Token request cancelled.'); }
+		await vscode.workspace.fs.writeFile(target.uri, new TextEncoder().encode(updateEnvValue(content, name, token)));
+	});
+	environmentWrites.set(key, write);
+	try { await write; } finally {
+		if (environmentWrites.get(key) === write) { environmentWrites.delete(key); }
+	}
 }

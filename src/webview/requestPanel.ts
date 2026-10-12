@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 
+import { createUpdatedRequestDocumentText } from './requestDocument';
 import { RequestFileDefinition } from '../request/types';
-import { executeRequestWithEnvironment, findDefinedEnvironmentVariables, initializeRequestWebview, loadRequestInWebview, resolveEnvironmentVariable } from './requestWebview';
+import { executeRequestWithEnvironment, findDefinedEnvironmentVariables, initializeRequestWebview, loadRequestInWebview, resolveEnvironmentVariable, RequestChangedMessage } from './requestWebview';
 
 /**
  * Singleton API Workbench panel used by the `restcraft.openApiWorkbench` command.
@@ -15,6 +16,7 @@ export class ApiWorkbenchPanel {
 
 	private readonly panel: vscode.WebviewPanel;
 	private requestUri: vscode.Uri | undefined;
+	private documentWrites: Promise<void> = Promise.resolve();
 
 	/**
 	 * Creates the panel wrapper and connects request execution callbacks.
@@ -23,6 +25,14 @@ export class ApiWorkbenchPanel {
 		this.panel = panel;
 		initializeRequestWebview(this.panel.webview, {
 			extensionVersion,
+			onRequestChanged: (message) => {
+				const requestUri = this.requestUri;
+				if (!requestUri) { return; }
+				this.documentWrites = this.documentWrites.then(() => this.updateRequestDocument(requestUri, message)).catch(error => {
+					void vscode.window.showErrorMessage(error instanceof Error ? error.message : 'Unable to update request file.');
+				});
+			},
+			onGetRequestUri: () => this.requestUri,
 			onSendRequest: (message, signal) => executeRequestWithEnvironment(message, this.requestUri, signal),
 			onResolveEnvironmentVariable: (name) => resolveEnvironmentVariable(name, this.requestUri),
 			onCheckEnvironmentVariables: (names) => findDefinedEnvironmentVariables(names, this.requestUri),
@@ -31,6 +41,17 @@ export class ApiWorkbenchPanel {
 		this.panel.onDidDispose(() => {
 			ApiWorkbenchPanel.currentPanel = undefined;
 		});
+	}
+
+	/** Updates the loaded request through VS Code so edits participate in save and undo. */
+	private async updateRequestDocument(uri: vscode.Uri, message: RequestChangedMessage): Promise<void> {
+		const document = await vscode.workspace.openTextDocument(uri);
+		const content = document.getText();
+		const nextText = createUpdatedRequestDocumentText(content, message, document.eol === vscode.EndOfLine.CRLF);
+		if (content === nextText) { return; }
+		const edit = new vscode.WorkspaceEdit();
+		edit.replace(uri, new vscode.Range(document.positionAt(0), document.positionAt(content.length)), nextText);
+		if (!await vscode.workspace.applyEdit(edit)) { throw new Error('Unable to update request file.'); }
 	}
 
 	/**

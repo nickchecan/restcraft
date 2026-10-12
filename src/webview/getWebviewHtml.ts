@@ -299,9 +299,48 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				color: var(--vscode-descriptionForeground);
 			}
 
+			.authorization-layout {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr);
+				gap: 24px;
+				align-items: start;
+			}
+
+			.authorization-layout.has-oauth-token-panel {
+				grid-template-columns: minmax(300px, 500px) minmax(240px, 1fr);
+			}
+
+			.oauth-token-panel {
+				min-width: 0;
+				display: grid;
+				gap: 8px;
+			}
+
+			.oauth-token-panel label {
+				font-weight: 600;
+			}
+
+			#oauth-access-token {
+				width: 100%;
+				box-sizing: border-box;
+				min-height: 160px;
+				resize: vertical;
+				font-family: var(--vscode-editor-font-family);
+				overflow-wrap: anywhere;
+			}
+
+			@media (max-width: 760px) {
+				.authorization-layout.has-oauth-token-panel {
+					grid-template-columns: minmax(0, 1fr);
+				}
+				.authorization-field {
+					grid-template-columns: minmax(100px, 140px) minmax(0, 1fr);
+				}
+			}
+
 			.authorization-field {
 				display: grid;
-				grid-template-columns: minmax(120px, 180px) minmax(180px, 320px);
+				grid-template-columns: minmax(100px, 180px) minmax(0, 320px);
 				gap: 8px;
 				align-items: center;
 			}
@@ -816,6 +855,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				<button class="request-header-add" id="add-request-param" type="button">Add Param</button>
 			</div>
 			<div class="request-panel-content hidden" id="request-authorization-panel" role="tabpanel" aria-labelledby="request-authorization-tab">
+				<div class="authorization-layout" id="authorization-layout">
 				<div class="authorization-field">
 					<label for="authorization-type">Type</label>
 					<select id="authorization-type" name="authorization-type">
@@ -838,6 +878,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<input class="authorization-input oauth-client-field hidden" id="oauth-client-secret" type="password" autocomplete="off">
 					<label class="oauth-client-field hidden" for="oauth-scope">Scope</label>
 					<input class="authorization-input oauth-client-field hidden" id="oauth-scope" type="text" autocomplete="off">
+					<label class="oauth-client-field hidden" for="oauth-store-token">Store access token in .env</label>
+					<input class="oauth-client-field hidden" id="oauth-store-token" type="checkbox">
+					<label class="oauth-storage-field hidden" for="oauth-token-variable">Variable Name</label>
+					<input class="authorization-input oauth-storage-field hidden" id="oauth-token-variable" type="text" value="ACCESS_TOKEN" placeholder="ACCESS_TOKEN" autocomplete="off" spellcheck="false">
 					<button class="oauth-client-field hidden" id="oauth-get-token" type="button">Get new access token</button>
 					<span class="oauth-client-field hidden" id="oauth-status" role="status" aria-live="polite"></span>
 					<label class="bearer-authorization-field hidden" for="bearer-token">Token</label>
@@ -846,6 +890,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<input class="authorization-input basic-authorization-field hidden" id="basic-auth-username" name="basic-auth-username" type="text" autocomplete="off">
 					<label class="basic-authorization-field hidden" for="basic-auth-password">Password</label>
 					<input class="authorization-input basic-authorization-field hidden" id="basic-auth-password" name="basic-auth-password" type="text" autocomplete="off">
+				</div>
+				<div class="oauth-token-panel hidden" id="oauth-token-panel">
+					<label for="oauth-access-token">Access Token</label>
+					<textarea id="oauth-access-token" readonly spellcheck="false" aria-label="OAuth access token" placeholder="Get a new access token to see it here."></textarea>
+				</div>
 				</div>
 			</div>
 			<div class="request-panel-content hidden" id="request-headers-panel" role="tabpanel" aria-labelledby="request-headers-tab">
@@ -987,11 +1036,38 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 const oauthGrantType = document.getElementById('oauth-grant-type');
                 const oauthGetToken = document.getElementById('oauth-get-token');
                 const oauthStatus = document.getElementById('oauth-status');
+                const oauthAccessToken = document.getElementById('oauth-access-token');
+                const oauthTokenPanel = document.getElementById('oauth-token-panel');
+                const authorizationLayout = document.getElementById('authorization-layout');
+                const oauthStoreToken = document.getElementById('oauth-store-token');
+                const oauthTokenVariable = document.getElementById('oauth-token-variable');
+                oauthStoreToken.addEventListener('change', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = '';
+                    applyAuthorizationType();
+                    syncAuthorizationHeader();
+                    notifyRequestChanged();
+                });
+                oauthTokenVariable.addEventListener('input', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = '';
+                    syncAuthorizationHeader();
+                    notifyRequestChanged();
+                });
                 let oauthToken = '';
+                let retrievedOAuthToken = '';
                 let oauthRequestId = 0;
                 let oauthPending = false;
                 oauthGrantType.addEventListener('change', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
                     oauthToken = '';
+                    retrievedOAuthToken = '';
                     oauthStatus.textContent = '';
                     oauthRequestId++;
                     oauthPending = false;
@@ -1002,10 +1078,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 });
                 ['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope'].forEach((id) => {
                     document.getElementById(id).addEventListener('input', () => {
+                        vscode.postMessage({ type: 'cancelOAuthToken' });
                         oauthRequestId++;
                         oauthPending = false;
                         oauthGetToken.disabled = false;
                         oauthToken = '';
+                    retrievedOAuthToken = '';
                         oauthStatus.textContent = '';
                         if (authorizationType.value === 'oauth2') {
                             syncAuthorizationHeader();
@@ -1020,6 +1098,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     oauthStatus.textContent = 'Getting access token…';
                     vscode.postMessage({
                         type: 'getOAuthToken', requestId: ++oauthRequestId,
+                        storeAccessToken: oauthStoreToken.checked,
+                        accessTokenVariable: oauthTokenVariable.value.trim(),
                         url: document.getElementById('oauth-url').value,
                         clientId: document.getElementById('oauth-client-id').value,
                         clientSecret: document.getElementById('oauth-client-secret').value,
@@ -1163,6 +1243,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				});
 
 				authorizationType.addEventListener('change', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
                     oauthRequestId++;
                     oauthPending = false;
                     oauthGetToken.disabled = false;
@@ -1320,9 +1401,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     if (message.requestId !== oauthRequestId) { return; }
                     oauthPending = false;
                     oauthGetToken.disabled = false;
-                    oauthStatus.textContent = message.error || 'Access token ready.';
+                    oauthStatus.textContent = message.error || (message.stored ? 'Access token saved to .env.' : 'Access token ready.');
                     if (typeof message.token === 'string' && authorizationType.value === 'oauth2' && oauthGrantType.value === 'client_credentials') {
                         oauthToken = message.token;
+                        retrievedOAuthToken = message.token;
                         syncAuthorizationHeader();
                         notifyRequestChanged();
                     }
@@ -1436,13 +1518,17 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 							renderRequestHeaders(message.request.headers || {});
 						}
                         // Loading another request invalidates pending token results and clears old credentials.
+                        vscode.postMessage({ type: 'cancelOAuthToken' });
                         oauthRequestId++;
                         oauthPending = false;
                         oauthGetToken.disabled = false;
                         oauthStatus.textContent = '';
                         oauthToken = '';
+                    retrievedOAuthToken = '';
                         activeAuthorizationType = 'none';
                         const savedAuthorization = message.request.authorization;
+                        oauthStoreToken.checked = savedAuthorization?.storeAccessToken === true;
+                        oauthTokenVariable.value = savedAuthorization?.accessTokenVariable ?? 'ACCESS_TOKEN';
                         oauthGrantType.value = savedAuthorization?.grantType || 'client_credentials';
                         document.getElementById('oauth-url').value = savedAuthorization?.accessTokenUrl || '';
                         document.getElementById('oauth-client-id').value = savedAuthorization?.clientId || '';
@@ -1452,8 +1538,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                         if (savedAuthorization?.type === 'oauth2') {
                             authorizationType.value = 'oauth2';
                             activeAuthorizationType = 'oauth2';
-                            const header = readHeaderValue(message.request.headers || {}, 'Authorization');
-                            oauthToken = header.startsWith('Bearer ') ? header.slice(7) : '';
+                            const savedHeader = readHeaderValue(message.request.headers || {}, 'Authorization');
+                            oauthToken = !oauthStoreToken.checked && savedHeader.startsWith('Bearer ') && !hasVariableReference(savedHeader)
+                                ? savedHeader.slice(7) : '';
+                            bearerToken.value = '';
                             applyAuthorizationType();
                             syncAuthorizationHeader();
                         }
@@ -2205,6 +2293,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					const showBearerToken = authorizationType.value === 'bearer';
 					const showBasicAuth = authorizationType.value === 'basic';
                     const showOAuth = authorizationType.value === 'oauth2';
+                    updateOAuthTokenDisplay();
+                    document.querySelectorAll('.oauth-storage-field').forEach((field) => setAuthorizationFieldHidden(field, !showOAuth || oauthGrantType.value !== 'client_credentials' || !oauthStoreToken.checked));
                     document.querySelectorAll('.oauth-authorization-field').forEach((field) => setAuthorizationFieldHidden(field, !showOAuth));
                     document.querySelectorAll('.oauth-client-field').forEach((field) => setAuthorizationFieldHidden(field, !showOAuth || oauthGrantType.value !== 'client_credentials'));
 
@@ -2215,6 +2305,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					basicAuthorizationFields.forEach((field) => {
 						setAuthorizationFieldHidden(field, !showBasicAuth);
 					});
+				}
+
+				// Displays the current OAuth token without treating it as HTML.
+				function updateOAuthTokenDisplay() {
+					const visible = authorizationType.value === 'oauth2' && oauthGrantType.value === 'client_credentials';
+					oauthTokenPanel.classList.toggle('hidden', !visible);
+					authorizationLayout.classList.toggle('has-oauth-token-panel', visible);
+					oauthAccessToken.value = visible ? retrievedOAuthToken : '';
 				}
 
 				// Hides or shows an authorization field and its variable wrapper.
@@ -2228,6 +2326,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 				// Writes authorization control state back to the header table.
 				function syncAuthorizationHeader() {
+                    updateOAuthTokenDisplay();
 					activeAuthorizationType = authorizationType.value;
 					const headerValue = readAuthorizationHeaderValue();
 
@@ -2241,8 +2340,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 				// Builds the executable Authorization header value.
 				function readAuthorizationHeaderValue() {
-					if (authorizationType.value === 'oauth2' && oauthGrantType.value === 'client_credentials' && oauthToken) {
-                        return 'Bearer ' + oauthToken;
+					if (authorizationType.value === 'oauth2' && oauthGrantType.value === 'client_credentials') {
+                        if (oauthStoreToken.checked && /^[A-Za-z_][A-Za-z0-9_]*$/.test(oauthTokenVariable.value.trim())) {
+                            return 'Bearer {{' + oauthTokenVariable.value.trim() + '}}';
+                        }
+                        if (oauthToken) { return 'Bearer ' + oauthToken; }
                     }
                     if (authorizationType.value === 'bearer' && bearerToken.value) {
 						return 'Bearer ' + bearerToken.value;
@@ -2543,7 +2645,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 				// Reads all request headers from the editor rows.
 				function readRequestHeaders() {
-					return readHeaderRows(false);
+					const headers = readHeaderRows(false);
+					return persistedOAuthHeaders(headers);
 				}
 
 				// Reads header rows including enabled/disabled state for persistence.
@@ -2564,8 +2667,25 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						}
 					}
 
-					return values;
-				}
+                    if (authorizationType.value === 'oauth2' && oauthStoreToken.checked) {
+                        const filtered = values.filter(header => header.name.toLowerCase() !== 'authorization');
+                        const headers = persistedOAuthHeaders({});
+                        if (headers.Authorization) { filtered.push({ name: 'Authorization', value: headers.Authorization, enabled: true }); }
+                        return filtered;
+                    }
+                    return values;
+                }
+
+                // Persists a literal token unless environment storage is enabled.
+                function persistedOAuthHeaders(headers) {
+                    if (authorizationType.value !== 'oauth2' || !oauthStoreToken.checked) { return headers; }
+                    const filtered = Object.fromEntries(Object.entries(headers).filter(([name]) => name.toLowerCase() !== 'authorization'));
+                    const name = oauthTokenVariable.value.trim();
+                    if (oauthStoreToken.checked && oauthGrantType.value === 'client_credentials' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+                        filtered.Authorization = 'Bearer {{' + name + '}}';
+                    }
+                    return filtered;
+                }
 
 				// Reads only enabled headers for request execution.
 				function readEnabledRequestHeaders() {
@@ -2691,6 +2811,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                             clientId: document.getElementById('oauth-client-id').value,
                             clientSecret: document.getElementById('oauth-client-secret').value,
                             scope: document.getElementById('oauth-scope').value,
+                            storeAccessToken: oauthStoreToken.checked,
+                            accessTokenVariable: oauthTokenVariable.value.trim(),
                         } : undefined,
 						name: requestTitle.textContent || 'Untitled Request',
 						method: method.value,

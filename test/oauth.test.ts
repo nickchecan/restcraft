@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { buildOAuthTokenRequest, readOAuthAccessToken } from '../src/request/oauth';
+import { buildOAuthTokenRequest, readOAuthAccessToken, headersForPersistence } from '../src/request/oauth';
 import { ApiResponse } from '../src/request/types';
 
 suite('OAuth client credentials', () => {
@@ -29,5 +29,19 @@ suite('OAuth client credentials', () => {
 		for (const body of ['{}', '{"access_token":"", "token_type":"bearer"}', '{"access_token":"abc", "token_type":"mac"}']) {
 			assert.throws(() => readOAuthAccessToken(response(body)), /access_token/);
 		}
+	});
+	test('persists only the configured environment reference for OAuth tokens', () => {
+		const authorization = { type: 'oauth2' as const, grantType: 'client_credentials' as const,
+			accessTokenUrl: '', clientId: '', clientSecret: '', scope: '' };
+		const headers = { authorization: 'Bearer private-token', Accept: 'application/json' };
+		const state = [{ name: 'AUTHORIZATION', value: 'Bearer private-token', enabled: true }];
+		assert.deepStrictEqual(headersForPersistence(headers, state, authorization), {
+			headers, headerState: state,
+		});
+		const persisted = headersForPersistence(headers, state, { ...authorization, storeAccessToken: true, accessTokenVariable: 'MY_TOKEN' });
+		assert.strictEqual(persisted.headers.Authorization, 'Bearer {{MY_TOKEN}}');
+		assert.strictEqual(persisted.headerState[0].value, 'Bearer {{MY_TOKEN}}');
+		assert.ok(!JSON.stringify(persisted).includes('private-token'));
+		assert.deepStrictEqual(headersForPersistence(headers, state), { headers, headerState: state });
 	});
 });

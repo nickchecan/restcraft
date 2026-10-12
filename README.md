@@ -174,7 +174,24 @@ OAuth settings are saved in the optional `authorization` object in `.api.json`.
 Save the request file to keep the selected grant type and all OAuth fields when
 reopening it. Empty fields are supported while configuring the request. Older
 files without this object continue to infer authentication from their headers.
-The resulting Bearer header is saved through the existing request editor.
+When **Store access token in .env** is unchecked, retrieved tokens persist directly
+in the request's `Authorization` header and are restored when reopened.
+The read-only **Access Token** field shows only tokens retrieved in the current
+editor session and clears when the request is reopened. The saved Authorization
+header remains available for sending requests.
+
+To persist a token, enable **Store access token in .env**, enter a **Variable Name**
+(default `ACCESS_TOKEN`), and click **Get new access token**. Each successful
+retrieval updates that variable in the closest `.env`, searching the request's
+folder and then its parents up to the workspace root. If none exists, a `.env`
+is created beside the request. Other variables and comments are preserved.
+Save any unsaved `.env` edits before retrieving a token with storage enabled.
+A request file must be saved or loaded to use token storage.
+
+The request stores `Bearer {{ACCESS_TOKEN}}` (or your chosen variable name) rather
+than the token itself. Reopened requests resolve this reference when sent.
+Changing the checkbox or variable name takes effect on the next token retrieval;
+it does not move or delete previously stored values.
 Literal client secrets are stored as plain text in the request file; use
 `{{CLIENT_SECRET}}` with your `.env` file to keep the secret out of the request.
 
@@ -187,7 +204,9 @@ Example OAuth configuration (alongside the existing request properties):
   "accessTokenUrl": "https://demo.duendesoftware.com/connect/token",
   "clientId": "m2m",
   "clientSecret": "{{CLIENT_SECRET}}",
-  "scope": "api"
+  "scope": "api",
+  "storeAccessToken": true,
+  "accessTokenVariable": "ACCESS_TOKEN"
 }
 ```
 

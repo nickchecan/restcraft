@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 
+import { createUpdatedRequestDocumentText } from './requestDocument';
+
 import { isOAuthAuthorization, readOAuthAuthorization } from '../request/oauth';
 import { parseRequestFile } from '../request/requestFile';
 import { HttpMethod, isHttpMethod, RequestFileDefinition } from '../request/types';
@@ -64,6 +66,7 @@ export class RequestEditorProvider implements vscode.CustomTextEditorProvider {
 		let draftHeaderState: RequestChangedMessage['headerState'] | undefined;
 		const messageSubscription = initializeRequestWebview(webviewPanel.webview, {
 			extensionVersion: this.extensionVersion,
+			onGetRequestUri: () => document.uri,
 			onReady: () => {
 				void this.loadDocument(webviewPanel, document, draftParams, draftHeaderState);
 			},
@@ -147,25 +150,7 @@ export class RequestEditorProvider implements vscode.CustomTextEditorProvider {
 	 * Applies a webview edit message to the current request JSON document.
 	 */
 	private createUpdatedDocumentText(document: vscode.TextDocument, message: RequestChangedMessage): string {
-		const parsed = readDocumentObject(document.getText());
-
-		parsed.name = message.name.trim() || 'Untitled Request';
-		parsed.method = message.method;
-		parsed.url = message.url;
-		parsed.params = message.params;
-		parsed.headerState = message.headerState;
-		parsed.headers = message.headers;
-		if (message.authorization) {
-			parsed.authorization = readOAuthAuthorization(message.authorization);
-		} else {
-			delete parsed.authorization;
-		}
-		parsed.body = message.body.trim() ? readBodyValue(message.body) : null;
-
-		const serialized = `${JSON.stringify(parsed, null, 2)}\n`;
-		// applyEdit uses the document's line endings; the pending-text check
-		// must compare against the same representation for CRLF files too.
-		return document.eol === vscode.EndOfLine.CRLF ? serialized.replace(/\n/g, '\r\n') : serialized;
+		return createUpdatedRequestDocumentText(document.getText(), message, document.eol === vscode.EndOfLine.CRLF);
 	}
 }
 
@@ -311,17 +296,6 @@ function readDocumentObject(content: string): Record<string, unknown> {
 	}
 
 	return {};
-}
-
-/**
- * Preserves valid JSON body values and falls back to raw text.
- */
-function readBodyValue(body: string): unknown {
-	try {
-		return JSON.parse(body);
-	} catch {
-		return body;
-	}
 }
 
 /**

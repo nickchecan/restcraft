@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 
-import { parseEnvFile, resolveRequestVariables } from '../src/request/environment';
+import { updateEnvValue, parseEnvFile, resolveRequestVariables } from '../src/request/environment';
 
 suite('Environment variables', () => {
 	test('parses env files', () => {
@@ -93,5 +93,15 @@ suite('Environment variables', () => {
 			}, {}),
 			/Missing environment variables: DOMAIN, ID/,
 		);
+	});
+	test('updates token values without changing unrelated env lines or CRLF endings', () => {
+		const content = '# Config\r\nOTHER=keep\r\nACCESS_TOKEN=old\r\nACCESS_TOKEN=duplicate\r\n';
+		const updated = updateEnvValue(content, 'ACCESS_TOKEN', 'new.token=');
+		assert.strictEqual(updated, '# Config\r\nOTHER=keep\r\nACCESS_TOKEN="new.token="\r\nACCESS_TOKEN="new.token="\r\n');
+		assert.strictEqual(parseEnvFile(updated).ACCESS_TOKEN, 'new.token=');
+		assert.strictEqual(updateEnvValue('OTHER=keep', 'MY_TOKEN', 'abc'), 'OTHER=keep\nMY_TOKEN="abc"\n');
+		assert.strictEqual(parseEnvFile(updateEnvValue('', 'ACCESS_TOKEN', 'abc')).ACCESS_TOKEN, 'abc');
+		assert.throws(() => updateEnvValue('', 'INVALID NAME', 'abc'), /variable name/);
+		assert.throws(() => updateEnvValue('', 'ACCESS_TOKEN', 'abc\nINJECT=value'), /unsupported/);
 	});
 });

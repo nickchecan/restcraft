@@ -7,7 +7,8 @@ suite('Request file parser', () => {
 	for (const grantType of ['client_credentials', 'authorization_code']) {
 		test(`round-trips OAuth settings for ${grantType}`, () => {
 			const authorization = { type: 'oauth2', grantType, accessTokenUrl: '',
-				clientId: 'm2m', clientSecret: '{{CLIENT_SECRET}}', scope: 'api' };
+				clientId: 'm2m', clientSecret: '{{CLIENT_SECRET}}', scope: 'api',
+                storeAccessToken: true, accessTokenVariable: 'MY_TOKEN' };
 			const content = { name: 'OAuth', method: 'GET', url: 'https://example.com/', authorization };
 			const request = parseRequestFile(JSON.stringify(content));
 			assert.deepStrictEqual(request.authorization, authorization);
