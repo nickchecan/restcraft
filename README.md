@@ -174,13 +174,15 @@ OAuth settings are saved in the optional `authorization` object in `.api.json`.
 Save the request file to keep the selected grant type and all OAuth fields when
 reopening it. Empty fields are supported while configuring the request. Older
 files without this object continue to infer authentication from their headers.
-When **Store access token in .env** is unchecked, retrieved tokens persist directly
+When **Save token to .env** is unchecked, retrieved tokens persist directly
 in the request's `Authorization` header and are restored when reopened.
 The read-only **Access Token** field shows only tokens retrieved in the current
 editor session and clears when the request is reopened. The saved Authorization
-header remains available for sending requests.
+header remains available for sending requests. The output area has **Access Token**
+and **Decoded Token** radio buttons. JWT header and payload decoding happens locally;
+signatures are not verified. Opaque or malformed tokens show an explanatory message.
 
-To persist a token, enable **Store access token in .env**, enter a **Variable Name**
+To persist a token, enable **Save token to .env**, enter a **Variable Name**
 (default `ACCESS_TOKEN`), and click **Get new access token**. Each successful
 retrieval updates that variable in the closest `.env`, searching the request's
 folder and then its parents up to the workspace root. If none exists, a `.env`

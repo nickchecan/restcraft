@@ -312,19 +312,76 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 			.oauth-token-panel {
 				min-width: 0;
+				min-height: 0;
+				align-self: stretch;
 				display: grid;
+				grid-template-rows: auto minmax(0, 1fr);
 				gap: 8px;
+			}
+
+			.oauth-token-options {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 16px;
+			}
+
+			.oauth-token-options label {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				cursor: pointer;
+			}
+
+			.oauth-token-options input[type="radio"],
+			#oauth-store-token {
+				width: 16px;
+				height: 16px;
+				padding: 0;
+				margin: 0;
+				flex: 0 0 16px;
+				justify-self: start;
+			}
+
+			label[for="oauth-store-token"],
+			#oauth-store-token {
+				margin-top: 8px;
+			}
+
+			#oauth-get-token,
+			#oauth-status {
+				margin-top: 12px;
+			}
+
+			.oauth-storage-description {
+				grid-column: 1 / -1;
+				color: var(--vscode-descriptionForeground);
+				font-size: 12px;
+			}
+
+			.oauth-token-content {
+				grid-row: 2;
+				min-height: 0;
+				display: flex;
+				flex-direction: column;
+				padding: 12px;
+				border: 1px solid var(--vscode-panel-border);
+			}
+
+			.oauth-token-content p {
+				margin: 0 0 8px;
+				color: var(--vscode-descriptionForeground);
 			}
 
 			.oauth-token-panel label {
 				font-weight: 600;
 			}
 
-			#oauth-access-token {
+			#oauth-access-token, #oauth-decoded-token {
 				width: 100%;
 				box-sizing: border-box;
-				min-height: 160px;
-				resize: vertical;
+				min-height: 0;
+				flex: 1 1 0;
+				resize: none;
 				font-family: var(--vscode-editor-font-family);
 				overflow-wrap: anywhere;
 			}
@@ -335,6 +392,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				}
 				.authorization-field {
 					grid-template-columns: minmax(100px, 140px) minmax(0, 1fr);
+				}
+				.oauth-token-panel {
+					min-height: 260px;
 				}
 			}
 
@@ -627,7 +687,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			.response-body-content {
 				display: grid;
 				grid-template-columns: auto minmax(0, 1fr);
-				min-height: 160px;
+				min-height: 220px;
 				max-height: max(160px, var(--response-area-max-height, calc(100vh - 320px)));
 				overflow: auto;
 				position: relative;
@@ -660,7 +720,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			.response-headers-content {
-				min-height: 160px;
+				min-height: 220px;
 				max-height: max(160px, var(--response-area-max-height, calc(100vh - 320px)));
 				overflow: auto;
 				background: var(--vscode-editor-inactiveSelectionBackground);
@@ -678,7 +738,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			.response-preview {
 				display: block;
 				width: 100%;
-				min-height: 160px;
+				min-height: 220px;
 				height: max(160px, var(--response-area-max-height, max(360px, calc(100vh - 260px))));
 				max-height: max(160px, var(--response-area-max-height, max(360px, calc(100vh - 260px))));
 				border: 0;
@@ -686,7 +746,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			#response-preview-empty {
-				min-height: 160px;
+				min-height: 220px;
 				max-height: max(160px, var(--response-area-max-height, 360px));
 				overflow: auto;
 			}
@@ -878,8 +938,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<input class="authorization-input oauth-client-field hidden" id="oauth-client-secret" type="password" autocomplete="off">
 					<label class="oauth-client-field hidden" for="oauth-scope">Scope</label>
 					<input class="authorization-input oauth-client-field hidden" id="oauth-scope" type="text" autocomplete="off">
-					<label class="oauth-client-field hidden" for="oauth-store-token">Store access token in .env</label>
-					<input class="oauth-client-field hidden" id="oauth-store-token" type="checkbox">
+					<label class="oauth-client-field hidden" for="oauth-store-token">Save token to .env</label>
+					<input class="oauth-client-field hidden" id="oauth-store-token" type="checkbox" aria-describedby="oauth-store-token-description">
+					<span class="oauth-client-field oauth-storage-description hidden" id="oauth-store-token-description">Save each retrieved token to the selected environment variable.</span>
 					<label class="oauth-storage-field hidden" for="oauth-token-variable">Variable Name</label>
 					<input class="authorization-input oauth-storage-field hidden" id="oauth-token-variable" type="text" value="ACCESS_TOKEN" placeholder="ACCESS_TOKEN" autocomplete="off" spellcheck="false">
 					<button class="oauth-client-field hidden" id="oauth-get-token" type="button">Get new access token</button>
@@ -892,8 +953,17 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<input class="authorization-input basic-authorization-field hidden" id="basic-auth-password" name="basic-auth-password" type="text" autocomplete="off">
 				</div>
 				<div class="oauth-token-panel hidden" id="oauth-token-panel">
-					<label for="oauth-access-token">Access Token</label>
-					<textarea id="oauth-access-token" readonly spellcheck="false" aria-label="OAuth access token" placeholder="Get a new access token to see it here."></textarea>
+					<div class="oauth-token-options" role="group" aria-label="Access token views">
+						<label><input id="oauth-raw-option" type="radio" name="oauth-token-view" value="raw" aria-controls="oauth-raw-panel" checked> Access Token</label>
+						<label><input id="oauth-decoded-option" type="radio" name="oauth-token-view" value="decoded" aria-controls="oauth-decoded-panel"> Decoded Token</label>
+					</div>
+					<div class="oauth-token-content" id="oauth-raw-panel" role="region" aria-label="Access Token">
+						<textarea id="oauth-access-token" readonly spellcheck="false" aria-label="OAuth access token" placeholder="Get a new access token to see it here."></textarea>
+					</div>
+					<div class="oauth-token-content hidden" id="oauth-decoded-panel" role="region" aria-label="Decoded Token">
+						<p>JWT header and payload. Signature is not verified.</p>
+						<textarea id="oauth-decoded-token" readonly spellcheck="false" aria-label="Decoded OAuth access token" placeholder="Get a new access token to see it here."></textarea>
+					</div>
 				</div>
 				</div>
 			</div>
@@ -1037,6 +1107,13 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 const oauthGetToken = document.getElementById('oauth-get-token');
                 const oauthStatus = document.getElementById('oauth-status');
                 const oauthAccessToken = document.getElementById('oauth-access-token');
+                const oauthDecodedToken = document.getElementById('oauth-decoded-token');
+                const oauthRawOption = document.getElementById('oauth-raw-option');
+                const oauthDecodedOption = document.getElementById('oauth-decoded-option');
+                const oauthRawPanel = document.getElementById('oauth-raw-panel');
+                const oauthDecodedPanel = document.getElementById('oauth-decoded-panel');
+                oauthRawOption.addEventListener('change', () => showOAuthTokenView(false));
+                oauthDecodedOption.addEventListener('change', () => showOAuthTokenView(true));
                 const oauthTokenPanel = document.getElementById('oauth-token-panel');
                 const authorizationLayout = document.getElementById('authorization-layout');
                 const oauthStoreToken = document.getElementById('oauth-store-token');
@@ -2313,6 +2390,33 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					oauthTokenPanel.classList.toggle('hidden', !visible);
 					authorizationLayout.classList.toggle('has-oauth-token-panel', visible);
 					oauthAccessToken.value = visible ? retrievedOAuthToken : '';
+					oauthDecodedToken.value = decodeOAuthToken(oauthAccessToken.value);
+				}
+
+				// Switches token views without changing request authorization.
+				function showOAuthTokenView(decoded) {
+					oauthRawOption.checked = !decoded;
+					oauthDecodedOption.checked = decoded;
+					oauthRawPanel.classList.toggle('hidden', decoded);
+					oauthDecodedPanel.classList.toggle('hidden', !decoded);
+				}
+
+				// Decodes locally; JSON is displayed as plain text and never executed.
+				function decodeOAuthToken(token) {
+					if (!token) { return ''; }
+					const parts = token.split('.');
+					if (parts.length !== 3) { return 'This access token is not a readable JWT.'; }
+					try {
+						const decodePart = (part) => {
+							if (!/^[A-Za-z0-9_-]+$/.test(part)) { throw new Error('Invalid JWT encoding'); }
+							const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+							const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
+							const value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+							if (!value || typeof value !== 'object' || Array.isArray(value)) { throw new Error('Invalid JWT JSON'); }
+							return value;
+						};
+						return JSON.stringify({ header: decodePart(parts[0]), payload: decodePart(parts[1]) }, null, 2);
+					} catch { return 'Unable to decode this access token. It may be opaque or malformed.'; }
 				}
 
 				// Hides or shows an authorization field and its variable wrapper.

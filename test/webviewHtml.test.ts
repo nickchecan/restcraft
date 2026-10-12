@@ -88,6 +88,7 @@ suite('Webview HTML', () => {
 		const end = html.indexOf('// Hides or shows an authorization field', start);
 		const context = { authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
 			oauthToken: 'saved-token', retrievedOAuthToken: '', oauthAccessToken: { value: '' },
+            oauthDecodedToken: { value: '' }, TextDecoder, atob,
 			oauthTokenPanel: { classList: { toggle: () => {} } }, authorizationLayout: { classList: { toggle: () => {} } } };
 		runInNewContext(html.slice(start, end) + '; updateOAuthTokenDisplay();', context);
 		assert.strictEqual(context.oauthAccessToken.value, '');
@@ -115,5 +116,45 @@ suite('Webview HTML', () => {
 		assert.strictEqual(state.value, 'Bearer {{MY_TOKEN}}');
 		assert.strictEqual(result.sent.authorization, undefined);
 		assert.strictEqual(result.sent.Accept, 'application/json');
+	});
+	test('decodes JWT header and UTF-8 payload locally and handles opaque or malformed tokens', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function decodeOAuthToken(token)');
+		const end = html.indexOf('// Hides or shows an authorization field', start);
+		const context = { TextDecoder, atob, token: '' };
+		const header = { alg: 'RS256', typ: 'JWT' };
+		const payload = { name: 'José', scope: 'api', text: '<script>alert(1)</script>' };
+		context.token = [header, payload].map(value => Buffer.from(JSON.stringify(value)).toString('base64url')).join('.') + '.signature';
+		const decoded = runInNewContext(html.slice(start, end) + '; decodeOAuthToken(token);', context);
+		assert.deepStrictEqual(JSON.parse(decoded), { header, payload });
+		for (const token of ['', 'opaque-token', 'bad.invalid.signature']) {
+			context.token = token;
+			const result = runInNewContext('decodeOAuthToken(token);', context);
+			assert.strictEqual(result, token ? (token.includes('.')
+				? 'Unable to decode this access token. It may be opaque or malformed.'
+				: 'This access token is not a readable JWT.') : '');
+		}
+	});
+
+	test('token radio buttons update checked state and show the matching content panel', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function showOAuthTokenView(decoded)');
+		const end = html.indexOf('// Decodes locally;', start);
+		const element = () => {
+			const classes: Record<string, boolean> = {};
+			const attributes: Record<string, string> = {};
+			return { classes, attributes, checked: false,
+				classList: { toggle: (name: string, value: boolean) => { classes[name] = value; } },
+				setAttribute: (name: string, value: string) => { attributes[name] = value; } };
+		};
+		const context = { oauthRawOption: element(), oauthDecodedOption: element(), oauthRawPanel: element(), oauthDecodedPanel: element() };
+		runInNewContext(html.slice(start, end) + '; showOAuthTokenView(true);', context);
+		assert.strictEqual(context.oauthRawPanel.classes.hidden, true);
+		assert.strictEqual(context.oauthDecodedPanel.classes.hidden, false);
+		assert.strictEqual(context.oauthDecodedOption.checked, true);
+		assert.strictEqual(context.oauthRawOption.checked, false);
+		runInNewContext('showOAuthTokenView(false);', context);
+		assert.strictEqual(context.oauthRawPanel.classes.hidden, false);
+		assert.strictEqual(context.oauthDecodedPanel.classes.hidden, true);
 	});
 });
