@@ -157,6 +157,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			padding: 0 8px;
 		}
 
+		#method {
+			color: var(--vscode-charts-yellow, #d7ba7d);
+			font-weight: 600;
+		}
+
 		.variable-input-wrapper {
 			display: block;
 			position: relative;
