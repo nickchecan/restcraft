@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
+import { isAbsolute, posix } from 'path';
+import { isEnvironmentFileSettings, copyEnvironmentFileSettings } from '../request/environmentSettings';
 
 import { parseEnvFile, resolveRequestVariables, updateEnvValue } from '../request/environment';
 import { buildOAuthTokenRequest, readOAuthAccessToken, OAuthTokenFields, isOAuthAuthorization } from '../request/oauth';
 import { executeRequest } from '../request/requestRunner';
-import { ApiResponse, OAuthAuthorizationDefinition, RequestFileDefinition, RequestHeaderDefinition, RequestParamDefinition } from '../request/types';
+import { ApiResponse, EnvironmentFileSettings, OAuthAuthorizationDefinition, RequestFileDefinition, RequestHeaderDefinition, RequestParamDefinition } from '../request/types';
 import { isRecord, isStringRecord } from '../shared/object';
 import { getWebviewHtml } from './getWebviewHtml';
 
@@ -48,6 +50,7 @@ interface CheckEnvironmentVariablesMessage {
 
 export interface RequestChangedMessage {
 	type: 'requestChanged';
+	environment?: EnvironmentFileSettings;
 	authorization?: OAuthAuthorizationDefinition;
 	name: string;
 	method: string;
@@ -98,8 +101,16 @@ export function initializeRequestWebview(
 		}
 
         if (isRecord(message) && message.type === 'getEnvironmentFile'
-            && typeof message.requestId === 'number' && Number.isSafeInteger(message.requestId)) {
+            && typeof message.requestId === 'number' && Number.isSafeInteger(message.requestId)
+            && (message.environment === undefined || isEnvironmentFileSettings(message.environment))) {
+            const uri = handlers.onGetRequestUri?.();
+            if (uri) { environmentSelections.set(uri.toString(), message.environment as EnvironmentFileSettings | undefined); }
             void postEnvironmentFile(webview, handlers.onGetRequestUri?.(), message.requestId);
+            return;
+        }
+        if (isRecord(message) && message.type === 'chooseEnvironmentFile'
+            && typeof message.requestId === 'number' && Number.isSafeInteger(message.requestId)) {
+            void chooseEnvironmentFile(webview, handlers.onGetRequestUri?.(), message.requestId);
             return;
         }
         if (isRecord(message) && message.type === 'openEnvironmentFile') {
@@ -107,6 +118,8 @@ export function initializeRequestWebview(
             return;
         }
 		if (isRequestChangedMessage(message)) {
+            const uri = handlers.onGetRequestUri?.();
+            if (uri) { environmentSelections.set(uri.toString(), message.environment); }
 			handlers.onRequestChanged?.(message);
 			return;
 		}
@@ -452,8 +465,29 @@ async function readEnvironmentVariables(requestUri: vscode.Uri): Promise<Record<
 	return parseEnvFile(file.content);
 }
 
+
+const environmentSelections = new Map<string, EnvironmentFileSettings | undefined>();
+
+async function readEnvironmentSelection(requestUri: vscode.Uri): Promise<EnvironmentFileSettings | undefined> {
+	if (environmentSelections.has(requestUri.toString())) { return environmentSelections.get(requestUri.toString()); }
+	try {
+		const document = vscode.workspace.textDocuments.find(document => document.uri.toString() === requestUri.toString());
+		const content = document?.getText() ?? new TextDecoder().decode(await vscode.workspace.fs.readFile(requestUri));
+		const parsed: unknown = JSON.parse(content);
+		if (isRecord(parsed) && isEnvironmentFileSettings(parsed.environment)) { return copyEnvironmentFileSettings(parsed.environment); }
+	} catch (error) { if (!(error instanceof SyntaxError) && !isFileNotFoundError(error)) { throw error; } }
+	return undefined;
+}
+
 /** Uses the same closest-file lookup for reading and writing tokens. */
 async function findEnvironmentFile(requestUri: vscode.Uri): Promise<{ uri: vscode.Uri; content: string; exists: boolean }> {
+    const selection = await readEnvironmentSelection(requestUri);
+    if (selection?.mode === 'manual') {
+        if (!selection.path.trim()) { throw new Error('Choose an environment file in Request Settings.'); }
+        const uri = vscode.Uri.joinPath(readRequestDirectory(requestUri), selection.path);
+        const content = await vscode.workspace.fs.readFile(uri);
+        return { uri, content: new TextDecoder().decode(content), exists: true };
+    }
 	const workspaceFolder = vscode.workspace.getWorkspaceFolder(requestUri);
 	const workspaceRoot = workspaceFolder?.uri ?? readRequestDirectory(requestUri);
 	let directory = readRequestDirectory(requestUri);
@@ -654,7 +688,8 @@ function isRequestChangedMessage(message: unknown): message is RequestChangedMes
 
 	const candidate = message as Partial<RequestChangedMessage>;
 
-	return (candidate.authorization === undefined || isOAuthAuthorization(candidate.authorization))
+	return (candidate.environment === undefined || isEnvironmentFileSettings(candidate.environment))
+		&& (candidate.authorization === undefined || isOAuthAuthorization(candidate.authorization))
 		&& candidate.type === 'requestChanged'
 		&& typeof candidate.name === 'string'
 		&& typeof candidate.method === 'string'
@@ -787,5 +822,38 @@ async function openEnvironmentFile(requestUri: vscode.Uri | undefined): Promise<
 		if (uri) { await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri)); }
 	} catch (error) {
 		void vscode.window.showErrorMessage(error instanceof Error ? error.message : 'Unable to open the environment file.');
+	}
+}
+
+async function chooseEnvironmentFile(webview: vscode.Webview, requestUri: vscode.Uri | undefined, requestId: number): Promise<void> {
+	try {
+		if (!requestUri) { throw new Error('Save or load a request file before choosing an environment file.'); }
+		const root = vscode.workspace.getWorkspaceFolder(requestUri)?.uri ?? readRequestDirectory(requestUri);
+		// VS Code's picker lists dotfiles independently of the native dialog's hidden-file setting.
+		const files = await vscode.workspace.findFiles(new vscode.RelativePattern(root, '**/{.env,.env.*}'), null, 500);
+		const items: (vscode.QuickPickItem & { uri?: vscode.Uri })[] = files
+			.sort((left, right) => left.path.localeCompare(right.path))
+			.map(uri => ({ label: posix.basename(uri.path), description: posix.relative(root.path, uri.path), uri }));
+		items.push({ label: 'Enter a file path…', description: 'Select a file outside this project or another environment file' });
+		const selected = await vscode.window.showQuickPick(items, { title: 'Choose environment file',
+			placeHolder: 'Select an .env file, including hidden files', matchOnDescription: true });
+		if (!selected) { return; }
+		let uri = selected.uri;
+		if (!uri) {
+			const entered = await vscode.window.showInputBox({ title: 'Environment file path',
+				prompt: 'Enter an existing file path, absolute or relative to the request folder.', placeHolder: '../config/.env' });
+			if (!entered?.trim()) { return; }
+			const path = entered.trim();
+			uri = requestUri.scheme === 'file' && isAbsolute(path) ? vscode.Uri.file(path)
+				: path.startsWith('/') ? requestUri.with({ path }) : vscode.Uri.joinPath(readRequestDirectory(requestUri), path.replace(/\\/g, '/'));
+		}
+		const stat = await vscode.workspace.fs.stat(uri);
+		if (!(stat.type & vscode.FileType.File)) { throw new Error('Choose an existing environment file, rather than a folder.'); }
+		if (uri.scheme !== requestUri.scheme || uri.authority !== requestUri.authority) { throw new Error('Choose a file on the same filesystem as the request.'); }
+		const path = posix.relative(readRequestDirectory(requestUri).path, uri.path);
+		await webview.postMessage({ type: 'environmentFileSelected', requestId, path });
+	} catch (error) {
+		await webview.postMessage({ type: 'environmentFileSelected', requestId,
+			error: error instanceof Error ? error.message : 'Unable to choose an environment file.' });
 	}
 }

@@ -223,3 +223,22 @@ request as a full absolute path (or URI for remote files). Click **Open** beside
 the field stays empty. Lookup starts beside the request and walks up to the
 workspace root, matching request execution. Reopen the Settings tab to refresh
 the path after creating or moving an environment file.
+
+In **Settings**, **Use nearest .env** is the default. Select **Set up .env manually**
+and use **Browse…** to choose an existing environment file. The picker lists
+hidden `.env` and `.env.*` files in the project, including ignored files. Choose
+**Enter a file path…** for a file outside the project or a different filename. The selected file is
+used for variable resolution, tooltips, and OAuth token storage. **Open** opens it.
+Manual mode never falls back to another file when the selected file is missing.
+Save the request to persist the selection in an optional `environment` object:
+
+```json
+"environment": {
+  "mode": "manual",
+  "path": "../config/.env"
+}
+```
+
+Manual paths are relative to the request's directory. Older files without
+`environment` continue to use the nearest `.env`. Selecting nearest mode removes
+the manual configuration from the saved request.

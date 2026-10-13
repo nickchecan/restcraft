@@ -7,6 +7,7 @@ import {
 	supportedMethods,
 } from './types';
 import { isOAuthAuthorization, readOAuthAuthorization } from './oauth';
+import { isEnvironmentFileSettings, copyEnvironmentFileSettings } from './environmentSettings';
 import { isRecord } from '../shared/object';
 
 /**
@@ -32,6 +33,9 @@ export function parseRequestFile(content: string): RequestFileDefinition {
 	}
 
 	const url = readUrl(parsed);
+	if (parsed.environment !== undefined && !isEnvironmentFileSettings(parsed.environment)) {
+		throw new Error('Request file property "environment" must contain a nearest or manual mode and a string path.');
+	}
 	if (parsed.authorization !== undefined && !isOAuthAuthorization(parsed.authorization)) {
 		throw new Error('Request file property "authorization" must contain valid OAuth 2.0 settings.');
 	}
@@ -44,6 +48,7 @@ export function parseRequestFile(content: string): RequestFileDefinition {
 		headerState: readHeaderState(parsed),
 		headers: readHeaders(parsed),
 		body: parsed.body ?? null,
+		...(isEnvironmentFileSettings(parsed.environment) ? { environment: copyEnvironmentFileSettings(parsed.environment) } : {}),
 		...(isOAuthAuthorization(parsed.authorization) ? { authorization: readOAuthAuthorization(parsed.authorization) } : {}),
 	};
 }

@@ -37,6 +37,11 @@ export interface OAuthAuthorizationDefinition {
 	accessTokenVariable?: string;
 }
 
+export interface EnvironmentFileSettings {
+	mode: 'nearest' | 'manual';
+	path: string;
+}
+
 export interface RequestFileDefinition {
 	name: string;
 	method: HttpMethod;
@@ -46,6 +51,7 @@ export interface RequestFileDefinition {
 	headers: Record<string, string>;
 	body: unknown;
 	authorization?: OAuthAuthorizationDefinition;
+	environment?: EnvironmentFileSettings;
 }
 
 /**

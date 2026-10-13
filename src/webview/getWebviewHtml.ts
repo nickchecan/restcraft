@@ -162,9 +162,29 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			font-weight: 600;
 		}
 
+		.request-env-options {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 16px;
+			margin-bottom: 16px;
+		}
+
+		.request-env-options label {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+		}
+
+		.request-env-options input[type="radio"] {
+			width: 16px;
+			height: 16px;
+			padding: 0;
+			margin: 0;
+		}
+
 		.request-env-row {
 			display: grid;
-			grid-template-columns: minmax(100px, 180px) minmax(0, 1fr) max-content;
+			grid-template-columns: minmax(100px, 180px) minmax(0, 1fr) max-content max-content;
 			align-items: center;
 			justify-content: start;
 			gap: 8px;
@@ -178,6 +198,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 		#request-env-path {
 			flex: 1;
 			min-width: 0;
+		}
+
+		#request-env-open:disabled {
+			cursor: default;
 		}
 
 		#request-env-error {
@@ -1102,9 +1126,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				</div>
 			</div>
 			<div class="request-panel-content hidden" id="request-settings-panel" role="tabpanel" aria-labelledby="request-settings-tab">
+				<div class="request-env-options" role="group" aria-label="Environment file selection">
+					<label><input id="request-env-nearest" type="radio" name="request-env-mode" value="nearest" checked> Use nearest .env</label>
+					<label><input id="request-env-manual" type="radio" name="request-env-mode" value="manual"> Set up .env manually</label>
+				</div>
 				<div class="request-env-row">
 					<label for="request-env-path">Environment File</label>
 					<input id="request-env-path" type="text" readonly aria-label="Environment file path">
+					<button id="request-env-choose" class="hidden" type="button">Browse…</button>
 					<button id="request-env-open" type="button" disabled>Open</button>
 				</div>
 				<div id="request-env-error" role="status" aria-live="polite"></div>
@@ -1205,6 +1234,22 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 const requestEnvPath = document.getElementById('request-env-path');
                 const requestEnvOpen = document.getElementById('request-env-open');
                 const requestEnvError = document.getElementById('request-env-error');
+                const requestEnvNearest = document.getElementById('request-env-nearest');
+                const requestEnvManual = document.getElementById('request-env-manual');
+                const requestEnvChoose = document.getElementById('request-env-choose');
+                let manualEnvironmentPath = '';
+                let environmentSelectionRequestId = 0;
+                [requestEnvNearest, requestEnvManual].forEach(option => option.addEventListener('change', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    environmentSelectionRequestId++;
+                    requestEnvChoose.classList.toggle('hidden', !requestEnvManual.checked);
+                    notifyRequestChanged();
+                    refreshEnvironmentFile();
+                    scheduleEnvironmentVariableCheck();
+                }));
+                requestEnvChoose.addEventListener('click', () => {
+                    vscode.postMessage({ type: 'chooseEnvironmentFile', requestId: ++environmentSelectionRequestId });
+                });
                 let environmentFileRequestId = 0;
                 requestSettingsTab.addEventListener('click', () => {
                     showRequestTab('settings');
@@ -1591,6 +1636,17 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 		window.addEventListener('message', (event) => {
 			const message = event.data;
+                if (message.type === 'environmentFileSelected') {
+                    if (message.requestId !== environmentSelectionRequestId || !requestEnvManual.checked) { return; }
+                    if (typeof message.error === 'string') { requestEnvError.textContent = message.error; return; }
+                    if (typeof message.path !== 'string') { return; }
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    manualEnvironmentPath = message.path;
+                    notifyRequestChanged();
+                    refreshEnvironmentFile();
+                    scheduleEnvironmentVariableCheck();
+                    return;
+                }
                 if (message.type === 'environmentFile') {
                     if (message.requestId !== environmentFileRequestId) { return; }
                     requestEnvPath.value = typeof message.path === 'string' ? message.path : '';
@@ -1705,6 +1761,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				}
 
 				if (message.type === 'loadRequest') {
+                        environmentSelectionRequestId++;
+                        requestEnvManual.checked = message.request.environment?.mode === 'manual';
+                        requestEnvNearest.checked = !requestEnvManual.checked;
+                        manualEnvironmentPath = message.request.environment?.path || '';
+                        requestEnvChoose.classList.toggle('hidden', !requestEnvManual.checked);
                         refreshEnvironmentFile();
 						setRequestTitle(message.request.name);
 						method.value = message.request.method;
@@ -2088,11 +2149,15 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					};
 				}
 
+				function readEnvironmentSettings() {
+					return requestEnvManual.checked ? { mode: 'manual', path: manualEnvironmentPath } : undefined;
+				}
+
 				function refreshEnvironmentFile() {
 					requestEnvPath.value = '';
 					requestEnvOpen.disabled = true;
 					requestEnvError.textContent = '';
-					vscode.postMessage({ type: 'getEnvironmentFile', requestId: ++environmentFileRequestId });
+					vscode.postMessage({ type: 'getEnvironmentFile', requestId: ++environmentFileRequestId, environment: readEnvironmentSettings() });
 				}
 
 				// Switches between request configuration tabs.
@@ -3078,6 +3143,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				function notifyRequestChanged() {
 					vscode.postMessage({
 						type: 'requestChanged',
+                        environment: readEnvironmentSettings(),
                         authorization: authorizationType.value === 'oauth2' ? {
                             type: 'oauth2', grantType: oauthGrantType.value,
                             accessTokenUrl: document.getElementById('oauth-url').value,

@@ -1,4 +1,5 @@
 import { headersForPersistence, readOAuthAuthorization } from '../request/oauth';
+import { copyEnvironmentFileSettings } from '../request/environmentSettings';
 import { isRecord } from '../shared/object';
 import type { RequestChangedMessage } from './requestWebview';
 
@@ -10,6 +11,8 @@ export function createUpdatedRequestDocumentText(content: string, message: Reque
 		parsed.method = message.method;
 		parsed.url = message.url;
 		parsed.params = message.params;
+		if (message.environment) { parsed.environment = copyEnvironmentFileSettings(message.environment); }
+		else { delete parsed.environment; }
 		const persisted = headersForPersistence(message.headers, message.headerState, message.authorization);
 		parsed.headerState = persisted.headerState;
 		parsed.headers = persisted.headers;

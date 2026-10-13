@@ -26,6 +26,17 @@ suite('Request file parser', () => {
 		}
 	});
 
+	test('round-trips manual environment selection and rejects invalid settings', () => {
+		const request = { name: 'Manual env', method: 'GET', url: 'https://example.com/',
+			environment: { mode: 'manual', path: '../config/.env' } };
+		const parsed = parseRequestFile(JSON.stringify(request));
+		assert.deepStrictEqual(parsed.environment, request.environment);
+		assert.deepStrictEqual(parseRequestFile(JSON.stringify(parsed)).environment, request.environment);
+		for (const environment of [null, { mode: 'unknown', path: '' }, { mode: 'manual', path: 123 }]) {
+			assert.throws(() => parseRequestFile(JSON.stringify({ ...request, environment })), /environment/);
+		}
+	});
+
 	test('parses a valid request file', () => {
 		const request = parseRequestFile(JSON.stringify({
 			name: 'Get Users',

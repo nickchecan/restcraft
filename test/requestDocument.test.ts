@@ -48,4 +48,11 @@ suite('OAuth request document persistence', () => {
 		assert.deepStrictEqual(saved.headerState, [{ name: 'Authorization', value: 'Bearer {{MY_TOKEN}}', enabled: false }]);
 		assert.strictEqual(saved.headers.Authorization, 'Bearer {{MY_TOKEN}}');
 	});
+	test('saves manual file selection and removes it when returning to nearest mode', () => {
+		const change: RequestChangedMessage = { ...message, environment: { mode: 'manual', path: '../config/.env' } };
+		const text = createUpdatedRequestDocumentText('{}', change);
+		assert.deepStrictEqual(parseRequestFile(text).environment, change.environment);
+		const nearest = createUpdatedRequestDocumentText(text, message);
+		assert.strictEqual(parseRequestFile(nearest).environment, undefined);
+	});
 });

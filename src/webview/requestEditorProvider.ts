@@ -5,6 +5,7 @@ import { createUpdatedRequestDocumentText } from './requestDocument';
 import { isOAuthAuthorization, readOAuthAuthorization } from '../request/oauth';
 import { parseRequestFile } from '../request/requestFile';
 import { HttpMethod, isHttpMethod, RequestFileDefinition } from '../request/types';
+import { isEnvironmentFileSettings, copyEnvironmentFileSettings } from '../request/environmentSettings';
 import { isRecord } from '../shared/object';
 import {
 	executeRequestWithEnvironment,
@@ -185,6 +186,7 @@ function readDraftRequestDocument(content: string): RequestFileDefinition {
 		headerState: readDraftHeaderState(parsed.headerState, parsed.headers),
 		headers: readDraftHeaders(parsed.headers),
 		body: parsed.body ?? null,
+		...(isEnvironmentFileSettings(parsed.environment) ? { environment: copyEnvironmentFileSettings(parsed.environment) } : {}),
 		...(isOAuthAuthorization(parsed.authorization) ? { authorization: readOAuthAuthorization(parsed.authorization) } : {}),
 	};
 }
