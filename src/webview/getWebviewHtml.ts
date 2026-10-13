@@ -163,8 +163,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 		}
 
 		.request-env-row {
-			display: flex;
+			display: grid;
+			grid-template-columns: minmax(100px, 180px) minmax(0, 1fr) max-content;
 			align-items: center;
+			justify-content: start;
 			gap: 8px;
 		}
 

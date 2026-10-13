@@ -219,7 +219,7 @@ selecting it hides the token fields and retrieval button.
 ### Request Settings
 
 The **Settings** tab shows the path of the existing `.env` selected for the
-request. Click **Open** beside the read-only path to open the file in VS Code. If no `.env` is found,
+request as a full absolute path (or URI for remote files). Click **Open** beside the read-only path to open the file in VS Code. If no `.env` is found,
 the field stays empty. Lookup starts beside the request and walks up to the
 workspace root, matching request execution. Reopen the Settings tab to refresh
 the path after creating or moving an environment file.
