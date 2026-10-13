@@ -286,6 +286,24 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				background: var(--vscode-editor-inactiveSelectionBackground);
 			}
 
+			.request-tabs-toolbar {
+				display: flex;
+				align-items: center;
+				background: var(--vscode-sideBarSectionHeader-background);
+				border-bottom: 1px solid var(--vscode-panel-border);
+			}
+
+			.request-tabs-toolbar .request-tabs {
+				flex: 1;
+				min-width: 0;
+				overflow-x: auto;
+				border-bottom: 0;
+			}
+
+			#request-config-collapse {
+				margin: 0 6px;
+			}
+
 			.request-tabs {
 				display: flex;
 				background: var(--vscode-sideBarSectionHeader-background);
@@ -1016,6 +1034,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 		<button id="send" type="submit" disabled title="Checking workspace trust...">${buttonIcons.send}<span>Send</span></button>
 		</form>
 		<section class="request-panel" aria-label="Request configuration area">
+			<div class="request-tabs-toolbar">
 			<div class="request-tabs" role="tablist" aria-label="Request sections">
 				<button class="request-tab active" id="request-params-tab" type="button" role="tab" aria-selected="true" aria-controls="request-params-panel">Params</button>
 				<button class="request-tab" id="request-authorization-tab" type="button" role="tab" aria-selected="false" aria-controls="request-authorization-panel">Authorization</button>
@@ -1023,6 +1042,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				<button class="request-tab" id="request-body-tab" type="button" role="tab" aria-selected="false" aria-controls="request-body-panel">Body</button>
 				<button class="request-tab" id="request-settings-tab" type="button" role="tab" aria-selected="false" aria-controls="request-settings-panel">Settings</button>
 			</div>
+			<button class="section-collapse" id="request-config-collapse" type="button" aria-expanded="true" aria-controls="request-config-content" aria-label="Collapse request configuration" title="Collapse request configuration"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+			</div>
+			<div id="request-config-content">
 			<div class="request-panel-content" id="request-params-panel" role="tabpanel" aria-labelledby="request-params-tab">
 				<table class="request-headers-table" aria-label="Request query parameters">
 					<thead>
@@ -1163,6 +1185,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				</div>
 				<div id="request-env-error" role="status" aria-live="polite"></div>
 			</div>
+			</div>
 		</section>
 		</div>
 		<div class="section-divider response-divider">
@@ -1237,6 +1260,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			const vscode = acquireVsCodeApi();
             const buttonIcons = ${JSON.stringify(buttonIcons)};
 			const form = document.getElementById('request-form');
+            const requestConfigCollapse = document.getElementById('request-config-collapse');
+            const requestConfigContent = document.getElementById('request-config-content');
+            requestConfigCollapse.addEventListener('click', () => toggleRequestSection(requestConfigCollapse, requestConfigContent, 'request configuration'));
             ['request', 'response'].forEach((name) => {
                 const button = document.getElementById(name + '-collapse');
                 const section = document.getElementById(name + '-section');
