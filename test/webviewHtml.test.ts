@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { runInNewContext } from 'vm';
 
+import { buttonIcons } from '../src/webview/buttonIcons';
 import { getWebviewHtml } from '../src/webview/getWebviewHtml';
 
 suite('Webview HTML', () => {
@@ -162,11 +163,12 @@ suite('Webview HTML', () => {
 		const start = html.indexOf('function setOAuthSecretVisible(visible)');
 		const end = html.indexOf('function setBasicPasswordVisible', start);
 		const attributes: Record<string, string> = {};
-		const context = { oauthClientSecret: { type: 'password', value: 'unchanged' },
-			oauthSecretToggle: { textContent: 'Show', setAttribute: (name: string, value: string) => { attributes[name] = value; } } };
+		const context = { buttonIcons, oauthClientSecret: { type: 'password', value: 'unchanged' },
+			oauthSecretToggle: { innerHTML: '', setAttribute: (name: string, value: string) => { attributes[name] = value; } } };
 		runInNewContext(html.slice(start, end) + '; setOAuthSecretVisible(true);', context);
 		assert.strictEqual(context.oauthClientSecret.type, 'text');
-		assert.strictEqual(context.oauthSecretToggle.textContent, 'Hide');
+		assert.ok(context.oauthSecretToggle.innerHTML.includes(buttonIcons.eyeClosed));
+		assert.ok(context.oauthSecretToggle.innerHTML.includes('Hide'));
 		assert.strictEqual(attributes['aria-pressed'], 'true');
 		runInNewContext('setOAuthSecretVisible(false);', context);
 		assert.strictEqual(context.oauthClientSecret.type, 'password');
@@ -179,11 +181,12 @@ suite('Webview HTML', () => {
 		const start = html.indexOf('function setBasicPasswordVisible(visible)');
 		const end = html.indexOf('// Shows the authorization inputs', start);
 		const attributes: Record<string, string> = {};
-		const context = { basicAuthPassword: { type: 'password', value: 'unchanged' },
-			basicPasswordToggle: { textContent: 'Show', setAttribute: (name: string, value: string) => { attributes[name] = value; } } };
+		const context = { buttonIcons, basicAuthPassword: { type: 'password', value: 'unchanged' },
+			basicPasswordToggle: { innerHTML: '', setAttribute: (name: string, value: string) => { attributes[name] = value; } } };
 		runInNewContext(html.slice(start, end) + '; setBasicPasswordVisible(true);', context);
 		assert.strictEqual(context.basicAuthPassword.type, 'text');
-		assert.strictEqual(context.basicPasswordToggle.textContent, 'Hide');
+		assert.ok(context.basicPasswordToggle.innerHTML.includes(buttonIcons.eyeClosed));
+		assert.ok(context.basicPasswordToggle.innerHTML.includes('Hide'));
 		runInNewContext('setBasicPasswordVisible(false);', context);
 		assert.strictEqual(context.basicAuthPassword.type, 'password');
 		assert.strictEqual(attributes['aria-label'], 'Show password');

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { buttonIcons } from './buttonIcons';
 
 /**
  * Generates the complete API Workbench webview document.
@@ -253,6 +254,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			cursor: pointer;
 		}
 
+		.button-icon {
+			width: 16px;
+			height: 16px;
+			vertical-align: middle;
+			margin-right: 6px;
+			flex-shrink: 0;
+		}
+
 		button:hover {
 			background: var(--vscode-button-hoverBackground);
 		}
@@ -445,6 +454,17 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			#oauth-get-token,
 			#oauth-status {
 				margin-top: 12px;
+			}
+
+			#oauth-get-token {
+				grid-column: 1 / -1;
+				justify-self: start;
+				width: max-content;
+				white-space: nowrap;
+			}
+
+			#oauth-status {
+				grid-column: 1 / -1;
 			}
 
 			.oauth-storage-description {
@@ -993,7 +1013,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			<span class="sr-only">Request URL</span>
 			<input id="url" name="url" type="text" placeholder="https://api.example.com/resource" aria-label="Request URL">
 		</label>
-		<button id="send" type="submit" disabled title="Checking workspace trust...">Send</button>
+		<button id="send" type="submit" disabled title="Checking workspace trust...">${buttonIcons.send}<span>Send</span></button>
 		</form>
 		<section class="request-panel" aria-label="Request configuration area">
 			<div class="request-tabs" role="tablist" aria-label="Request sections">
@@ -1015,7 +1035,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					</thead>
 					<tbody id="request-params-table"></tbody>
 				</table>
-				<button class="request-header-add" id="add-request-param" type="button">Add Param</button>
+				<button class="request-header-add" id="add-request-param" type="button">${buttonIcons.add}<span>Add Param</span></button>
 			</div>
 			<div class="request-panel-content hidden" id="request-authorization-panel" role="tabpanel" aria-labelledby="request-authorization-tab">
 				<div class="authorization-layout" id="authorization-layout">
@@ -1040,7 +1060,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<label class="oauth-client-field hidden" for="oauth-client-secret">Client Secret</label>
 					<div class="authorization-secret-control oauth-client-field hidden">
 						<input class="authorization-input" id="oauth-client-secret" type="password" autocomplete="off">
-						<button id="oauth-secret-toggle" type="button" aria-controls="oauth-client-secret" aria-label="Show client secret" aria-pressed="false">Show</button>
+						<button id="oauth-secret-toggle" type="button" aria-controls="oauth-client-secret" aria-label="Show client secret" aria-pressed="false">${buttonIcons.eye}<span>Show</span></button>
 					</div>
 					<label class="oauth-client-field hidden" for="oauth-scope">Scope</label>
 					<input class="authorization-input oauth-client-field hidden" id="oauth-scope" type="text" autocomplete="off">
@@ -1049,7 +1069,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<span class="oauth-client-field oauth-storage-description hidden" id="oauth-store-token-description">Save each retrieved token to the selected environment variable.</span>
 					<label class="oauth-storage-field hidden" for="oauth-token-variable">Variable Name</label>
 					<input class="authorization-input oauth-storage-field hidden" id="oauth-token-variable" type="text" value="ACCESS_TOKEN" placeholder="ACCESS_TOKEN" autocomplete="off" spellcheck="false">
-					<button class="oauth-client-field hidden" id="oauth-get-token" type="button">Get new access token</button>
+					<button class="oauth-client-field hidden" id="oauth-get-token" type="button">${buttonIcons.key}<span>Get new access token</span></button>
 					<span class="oauth-client-field hidden" id="oauth-status" role="status" aria-live="polite"></span>
 					<label class="bearer-authorization-field hidden" for="bearer-token">Token</label>
 					<input class="authorization-input bearer-authorization-field hidden" id="bearer-token" name="bearer-token" type="text" autocomplete="off">
@@ -1058,7 +1078,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<label class="basic-authorization-field hidden" for="basic-auth-password">Password</label>
 					<div class="authorization-secret-control basic-authorization-field hidden">
 						<input class="authorization-input" id="basic-auth-password" name="basic-auth-password" type="password" autocomplete="off">
-						<button id="basic-password-toggle" type="button" aria-controls="basic-auth-password" aria-label="Show password" aria-pressed="false">Show</button>
+						<button id="basic-password-toggle" type="button" aria-controls="basic-auth-password" aria-label="Show password" aria-pressed="false">${buttonIcons.eye}<span>Show</span></button>
 					</div>
 				</div>
 				<div class="oauth-token-panel hidden" id="oauth-token-panel">
@@ -1088,7 +1108,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					</thead>
 					<tbody id="request-headers-table"></tbody>
 				</table>
-				<button class="request-header-add" id="add-request-header" type="button">Add Header</button>
+				<button class="request-header-add" id="add-request-header" type="button">${buttonIcons.add}<span>Add Header</span></button>
 			</div>
 			<div class="request-panel-content hidden" id="request-body-panel" role="tabpanel" aria-labelledby="request-body-tab">
 				<div class="request-body-toolbar">
@@ -1122,7 +1142,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						</thead>
 						<tbody id="request-body-form-table"></tbody>
 					</table>
-					<button class="request-header-add" id="add-request-body-form-row" type="button">Add Pair</button>
+					<button class="request-header-add" id="add-request-body-form-row" type="button">${buttonIcons.add}<span>Add Pair</span></button>
 				</div>
 			</div>
 			<div class="request-panel-content hidden" id="request-settings-panel" role="tabpanel" aria-labelledby="request-settings-tab">
@@ -1133,8 +1153,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				<div class="request-env-row">
 					<label for="request-env-path">Environment File</label>
 					<input id="request-env-path" type="text" readonly aria-label="Environment file path">
-					<button id="request-env-choose" class="hidden" type="button">Browse…</button>
-					<button id="request-env-open" type="button" disabled>Open</button>
+					<button id="request-env-choose" class="hidden" type="button">${buttonIcons.folder}<span>Browse…</span></button>
+					<button id="request-env-open" type="button" disabled>${buttonIcons.linkExternal}<span>Open</span></button>
 				</div>
 				<div id="request-env-error" role="status" aria-live="polite"></div>
 			</div>
@@ -1210,6 +1230,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 	<script nonce="${nonce}">
 			const vscode = acquireVsCodeApi();
+            const buttonIcons = ${JSON.stringify(buttonIcons)};
 			const form = document.getElementById('request-form');
             ['request', 'response'].forEach((name) => {
                 const button = document.getElementById(name + '-collapse');
@@ -1671,7 +1692,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 }
                 if (message.type === 'requestComplete') {
 				requestInProgress = false;
-				send.textContent = 'Send';
+				send.innerHTML = buttonIcons.send + '<span>Send</span>';
 				send.classList.remove('request-cancel');
 				send.disabled = !workspaceTrusted;
 				stopRequestTimer();
@@ -1682,7 +1703,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 				if (message.type === 'requestError') {
 				requestInProgress = false;
-				send.textContent = 'Send';
+				send.innerHTML = buttonIcons.send + '<span>Send</span>';
 				send.classList.remove('request-cancel');
 				send.disabled = !workspaceTrusted;
 					stopRequestTimer();
@@ -2584,14 +2605,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				// Secret visibility is temporary UI state and does not alter the request.
 				function setOAuthSecretVisible(visible) {
 					oauthClientSecret.type = visible ? 'text' : 'password';
-					oauthSecretToggle.textContent = visible ? 'Hide' : 'Show';
+					oauthSecretToggle.innerHTML = (visible ? buttonIcons.eyeClosed : buttonIcons.eye) + '<span>' + (visible ? 'Hide' : 'Show') + '</span>';
 					oauthSecretToggle.setAttribute('aria-label', visible ? 'Hide client secret' : 'Show client secret');
 					oauthSecretToggle.setAttribute('aria-pressed', String(visible));
 				}
 
 				function setBasicPasswordVisible(visible) {
 					basicAuthPassword.type = visible ? 'text' : 'password';
-					basicPasswordToggle.textContent = visible ? 'Hide' : 'Show';
+					basicPasswordToggle.innerHTML = (visible ? buttonIcons.eyeClosed : buttonIcons.eye) + '<span>' + (visible ? 'Hide' : 'Show') + '</span>';
 					basicPasswordToggle.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
 					basicPasswordToggle.setAttribute('aria-pressed', String(visible));
 				}
