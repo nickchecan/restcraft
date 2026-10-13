@@ -141,6 +141,11 @@ export function initializeRequestWebview(
 			return;
 		}
 
+		if (isRecord(message) && message.type === 'openXProfile') {
+			void vscode.env.openExternal(vscode.Uri.parse('https://x.com/nickchecan'));
+			return;
+		}
+
 		if (isOpenRepositoryMessage(message)) {
 			void vscode.env.openExternal(vscode.Uri.parse('https://github.com/nickchecan/restcraft'));
 			return;
