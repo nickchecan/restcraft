@@ -190,4 +190,28 @@ suite('Webview HTML', () => {
 		assert.strictEqual(attributes['aria-pressed'], 'false');
 		assert.strictEqual(context.basicAuthPassword.value, 'unchanged');
 	});
+	test('request and response sections collapse independently without clearing content', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		for (const name of ['request', 'response']) {
+			assert.ok(html.includes(`aria-controls="${name}-section"`));
+			const attributes: Record<string, string> = { 'aria-expanded': 'true' };
+			let hidden = false;
+			let resizeCount = 0;
+			const context = { name, button: { title: '', getAttribute: (key: string) => attributes[key],
+				setAttribute: (key: string, value: string) => { attributes[key] = value; } },
+				section: { value: 'preserved', classList: { toggle: (_key: string, value: boolean) => { hidden = value; } } },
+				updateResponseAreaBounds: () => { resizeCount++; } };
+			const start = html.indexOf('function toggleRequestSection(button, section, name)');
+			const end = html.indexOf('// Sizes the active response panel', start);
+			runInNewContext(html.slice(start, end) + '; toggleRequestSection(button, section, name);', context);
+			assert.strictEqual(hidden, true);
+			assert.strictEqual(attributes['aria-expanded'], 'false');
+			assert.strictEqual(attributes['aria-label'], 'Expand ' + name);
+			runInNewContext('toggleRequestSection(button, section, name);', context);
+			assert.strictEqual(hidden, false);
+			assert.strictEqual(attributes['aria-expanded'], 'true');
+			assert.strictEqual(context.section.value, 'preserved');
+			assert.strictEqual(resizeCount, 2);
+		}
+	});
 });

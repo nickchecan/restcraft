@@ -98,6 +98,30 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			text-transform: uppercase;
 		}
 
+		.section-collapse {
+			width: 24px;
+			height: 24px;
+			padding: 4px;
+			border: 0;
+			background: transparent;
+			color: var(--vscode-foreground);
+			cursor: pointer;
+			flex-shrink: 0;
+		}
+
+		.section-collapse:hover {
+			background: var(--vscode-toolbar-hoverBackground);
+		}
+
+		.section-collapse svg {
+			width: 16px;
+			height: 16px;
+		}
+
+		.section-collapse[aria-expanded="false"] svg {
+			transform: rotate(-90deg);
+		}
+
 		.section-divider::after {
 			content: "";
 			flex: 1;
@@ -895,7 +919,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
 		</svg>
 	</h1>
-	<div class="section-divider">Request</div>
+	<div class="section-divider">
+			<button class="section-collapse" id="request-collapse" type="button" aria-expanded="true" aria-controls="request-section" aria-label="Collapse request" title="Collapse request"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+			Request
+		</div>
+	<div id="request-section">
 	<form class="request-bar" id="request-form">
 		<label>
 			<span class="sr-only">HTTP method</span>
@@ -1045,8 +1073,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				</div>
 			</div>
 		</section>
-		<div class="section-divider response-divider">Response</div>
-		<section class="response-panel" aria-label="Response area">
+		</div>
+		<div class="section-divider response-divider">
+			<button class="section-collapse" id="response-collapse" type="button" aria-expanded="true" aria-controls="response-section" aria-label="Collapse response" title="Collapse response"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+			Response
+		</div>
+		<section class="response-panel" id="response-section" aria-label="Response area">
 			<div class="response-tabs">
 				<div class="response-tab-list" role="tablist" aria-label="Response sections">
 					<button class="response-tab active" id="body-tab" type="button" role="tab" aria-selected="true" aria-controls="body-panel">Body</button>
@@ -1113,6 +1145,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 	<script nonce="${nonce}">
 			const vscode = acquireVsCodeApi();
 			const form = document.getElementById('request-form');
+            ['request', 'response'].forEach((name) => {
+                const button = document.getElementById(name + '-collapse');
+                const section = document.getElementById(name + '-section');
+                button.addEventListener('click', () => toggleRequestSection(button, section, name));
+            });
 			const requestTitleContainer = document.getElementById('request-title-container');
 			const requestTitle = document.getElementById('request-title');
 			const requestTitleInput = document.getElementById('request-title-input');
@@ -1831,6 +1868,17 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					setRawContent(result.body || '(empty)');
 					setFormattedBodyContent(result.body || '(empty)', result.headers);
 					setPreviewContent(result.body || '', hasHtmlContentType(result.headers));
+					updateResponseAreaBounds();
+				}
+
+				// Collapses content without discarding field values or request results.
+				function toggleRequestSection(button, section, name) {
+					const expanded = button.getAttribute('aria-expanded') !== 'true';
+					section.classList.toggle('hidden', !expanded);
+					button.setAttribute('aria-expanded', String(expanded));
+					const label = (expanded ? 'Collapse ' : 'Expand ') + name;
+					button.setAttribute('aria-label', label);
+					button.title = label;
 					updateResponseAreaBounds();
 				}
 
