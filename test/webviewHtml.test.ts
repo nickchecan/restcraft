@@ -263,7 +263,8 @@ suite('Webview HTML', () => {
 		const end = html.indexOf("if (message.type === 'requestComplete')", start);
 		let headerUpdates = 0;
 		let renders = 0;
-		const context = { message: { type: 'oauthTokenResult', requestId: 1, token: 'new-token', stored: true },
+        let selectedView = '';
+		const context = { defaultTokenView: 'raw', showOAuthTokenView: (view: string) => { selectedView = view; }, message: { type: 'oauthTokenResult', requestId: 1, token: 'new-token', stored: true },
 			oauthRequestId: 1, configuredOAuthTokenRequestId: 0, oauthPending: true, oauthGetToken: { disabled: true },
 			oauthStatus: { textContent: '' }, authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
 			oauthUpdateHeader: { checked: false }, oauthToken: 'existing-token', displayedOAuthToken: '',
@@ -275,6 +276,11 @@ suite('Webview HTML', () => {
 		assert.strictEqual(context.oauthToken, 'existing-token');
 		assert.strictEqual(headerUpdates, 0);
 		assert.strictEqual(renders, 1);
+        for (const view of ['raw', 'decoded', 'hidden']) {
+            context.defaultTokenView = view;
+            runInNewContext(code, context);
+            assert.strictEqual(selectedView, '', 'Retrieving tokens must not switch the current output view');
+        }
 		context.oauthUpdateHeader.checked = true;
 		runInNewContext(code, context);
 		assert.strictEqual(headerUpdates, 1);
@@ -391,5 +397,36 @@ suite('Webview HTML', () => {
 		context.requestEnvManual.checked = false;
 		runInNewContext('updateRequestTabIndicators();', context);
 		assert.ok(tabs.every(item => !item.populated));
+	});
+	test('extension setting updates the retrieval preference without changing the current output', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		assert.ok(!html.includes('id="default-token-view"'));
+		const start = html.indexOf("if (message.type === 'tokenViewSetting')");
+		const end = html.indexOf("if (message.type === 'configuredOAuthToken')", start);
+		const context = { defaultTokenView: 'raw', message: { type: 'tokenViewSetting', value: 'hidden' } };
+		const code = '(function () {' + html.slice(start, end) + '})();';
+		runInNewContext(code, context);
+		assert.strictEqual(context.defaultTokenView, 'hidden');
+		context.message.value = 'invalid';
+		runInNewContext(code, context);
+		assert.strictEqual(context.defaultTokenView, 'raw');
+	});
+	test('opening Authorization applies the extension preference while clicking the active tab preserves the view', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf("requestAuthorizationTab.addEventListener('click'");
+		const end = html.indexOf("requestHeadersTab.addEventListener('click'", start);
+		let click = () => {};
+		let active = false;
+		let selectedView = 'raw';
+		const context = { defaultTokenView: 'hidden', requestAuthorizationTab: {
+			getAttribute: () => String(active), addEventListener: (_event: string, callback: () => void) => { click = callback; } },
+			showOAuthTokenView: (view: string) => { selectedView = view; }, showRequestTab: () => { active = true; },
+			refreshConfiguredOAuthToken: () => {}, updateOAuthTokenDisplay: () => {} };
+		runInNewContext(html.slice(start, end), context);
+		click();
+		assert.strictEqual(selectedView, 'hidden');
+		selectedView = 'decoded';
+		click();
+		assert.strictEqual(selectedView, 'decoded');
 	});
 });

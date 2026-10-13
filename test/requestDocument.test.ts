@@ -81,4 +81,9 @@ suite('OAuth request document persistence', () => {
 			}
 		}
 	});
+	test('removes old per-request token view settings when saving', () => {
+		const text = createUpdatedRequestDocumentText('{"defaultTokenView":"hidden"}', message);
+		assert.strictEqual(JSON.parse(text).defaultTokenView, undefined);
+		assert.strictEqual(JSON.parse(text).displayedOAuthToken, undefined);
+	});
 });

@@ -1196,6 +1196,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<button id="request-env-open" type="button" disabled>${buttonIcons.linkExternal}<span>Open</span></button>
 				</div>
 				<div id="request-env-error" role="status" aria-live="polite"></div>
+
 			</div>
 			</div>
 		</section>
@@ -1298,6 +1299,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 const requestEnvPath = document.getElementById('request-env-path');
                 const requestEnvOpen = document.getElementById('request-env-open');
                 const requestEnvError = document.getElementById('request-env-error');
+                let defaultTokenView = 'raw';
                 const requestEnvNearest = document.getElementById('request-env-nearest');
                 const requestEnvManual = document.getElementById('request-env-manual');
                 const requestEnvChoose = document.getElementById('request-env-choose');
@@ -1533,6 +1535,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				});
 
 				requestAuthorizationTab.addEventListener('click', () => {
+                    if (requestAuthorizationTab.getAttribute('aria-selected') !== 'true') {
+                        showOAuthTokenView(defaultTokenView);
+                    }
 					showRequestTab('authorization');
                     refreshConfiguredOAuthToken();
                     updateOAuthTokenDisplay();
@@ -1710,6 +1715,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 		window.addEventListener('message', (event) => {
 			const message = event.data;
+                if (message.type === 'tokenViewSetting') {
+                    defaultTokenView = ['raw', 'decoded', 'hidden'].includes(message.value) ? message.value : 'raw';
+                    return;
+                }
                 if (message.type === 'configuredOAuthToken') {
                     if (message.requestId !== configuredOAuthTokenRequestId) { return; }
                     displayedOAuthToken = typeof message.token === 'string' ? message.token : '';
@@ -1886,7 +1895,6 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                         activeAuthorizationType = 'none';
                         setOAuthSecretVisible(false);
                         setBasicPasswordVisible(false);
-                        showOAuthTokenView('raw');
                         const savedAuthorization = message.request.authorization;
                         oauthUpdateHeader.checked = savedAuthorization?.updateAuthorizationHeader !== false;
                         oauthStoreToken.checked = savedAuthorization?.storeAccessToken === true;

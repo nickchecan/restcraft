@@ -253,3 +253,10 @@ disabled values remain saved but are not sent. The redundant `headers` object is
 no longer written. Old files containing only `headers` remain supported: their
 entries load as enabled rows and convert to `headerState` on the next editor save.
 If both forms exist, `headerState` takes precedence.
+
+In VS Code **Settings**, set **RestCraft: Default Token View**
+(`restcraft.defaultTokenView`) to **raw** (Access Token, default), **decoded**
+(Decoded Token), or **hidden**. This extension-wide preference applies when you open the Authorization tab.
+Retrieving tokens preserves your current output selection. It is not stored in request files. Existing
+per-request `defaultTokenView` fields are removed the next time the request is
+edited and saved. Output radio options remain available for temporary changes.

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { isAbsolute, posix } from 'path';
-import { isEnvironmentFileSettings, copyEnvironmentFileSettings } from '../request/environmentSettings';
+import { isEnvironmentFileSettings, copyEnvironmentFileSettings, isTokenView } from '../request/environmentSettings';
 
 import { parseEnvFile, resolveRequestVariables, updateEnvValue } from '../request/environment';
 import { buildOAuthTokenRequest, readOAuthAccessToken, OAuthTokenFields, isOAuthAuthorization } from '../request/oauth';
@@ -96,6 +96,7 @@ export function initializeRequestWebview(
 				isTrusted: vscode.workspace.isTrusted,
 			});
 			void postEnvironmentTooltipSetting(webview);
+            void postTokenViewSetting(webview);
 			handlers.onReady?.();
 			return;
 		}
@@ -183,6 +184,9 @@ export function initializeRequestWebview(
 		});
 	});
 	const settingsSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
+		if (event.affectsConfiguration('restcraft.defaultTokenView')) {
+			void postTokenViewSetting(webview);
+		}
 		if (event.affectsConfiguration('restcraft.showEnvironmentVariableValues')) {
 			void postEnvironmentTooltipSetting(webview);
 		}
@@ -192,6 +196,13 @@ export function initializeRequestWebview(
 		for (const controller of activeRequests.values()) { controller.abort(); }
 		activeRequests.clear();
 	}));
+}
+
+
+/** Sends the extension-wide token output preference to each open webview. */
+async function postTokenViewSetting(webview: vscode.Webview): Promise<void> {
+	const configured = vscode.workspace.getConfiguration('restcraft').get<string>('defaultTokenView', 'raw');
+	await webview.postMessage({ type: 'tokenViewSetting', value: isTokenView(configured) ? configured : 'raw' });
 }
 
 /** Sends the current environment-value tooltip preference into the webview. */

@@ -86,6 +86,27 @@
           "default": true,
           "scope": "application",
           "description": "Show resolved .env values in tooltips when hovering over {{VARIABLE}} references in request fields."
+        },
+        "restcraft.defaultTokenView": {
+          "type": "string",
+          "enum": [
+            "raw",
+            "decoded",
+            "hidden"
+          ],
+          "enumDescriptions": [
+            "Show the access token.",
+            "Show the decoded JWT header and payload.",
+            "Hide the token output."
+          ],
+          "default": "raw",
+          "scope": "application",
+          "description": "Token output view to select when opening the Authorization tab. Retrieving tokens preserves the selected view.",
+          "enumItemLabels": [
+            "Access Token",
+            "Decoded Token",
+            "Hidden"
+          ]
         }
       }
     }
