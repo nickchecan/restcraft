@@ -320,6 +320,17 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				cursor: pointer;
 			}
 
+			.request-tab.has-values::after {
+				content: '';
+				display: inline-block;
+				width: 5px;
+				height: 5px;
+				margin-left: 7px;
+				border-radius: 50%;
+				background: var(--vscode-textLink-foreground);
+				vertical-align: middle;
+			}
+
 			.request-tab:hover {
 				background: var(--vscode-list-hoverBackground);
 			}
@@ -1727,6 +1738,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     requestEnvPath.value = typeof message.path === 'string' ? message.path : '';
                     requestEnvOpen.disabled = !requestEnvPath.value;
                     requestEnvError.textContent = typeof message.error === 'string' ? message.error : '';
+                    updateRequestTabIndicators();
                     return;
                 }
 
@@ -1904,6 +1916,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 							: formatBody(message.request.body));
 						renderRequestBodyFormRows(requestBody.value);
 						setRequestBodyType(inferRequestBodyType(message.request.headers || {}, requestBody.value, activeRequestBodyType));
+                        updateRequestTabIndicators();
 						scheduleEnvironmentVariableCheck();
 						updateResponseAreaBounds();
 				}
@@ -3238,8 +3251,25 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					url.value = parsed.toString();
 				}
 
+				// Marks sections with values, including partial and disabled rows.
+				function updateRequestTabIndicators() {
+					const hasRowValues = table => Array.from(table.querySelectorAll('.request-header-input')).some(input => input.value.trim());
+					const states = [
+						[requestParamsTab, hasRowValues(requestParamsTable)],
+						[requestAuthorizationTab, authorizationType.value !== 'none'],
+						[requestHeadersTab, hasRowValues(requestHeadersTable)],
+						[requestBodyTab, Boolean(requestBody.value.trim()) || hasRowValues(requestBodyFormTable)],
+						[requestSettingsTab, requestEnvManual.checked && Boolean(manualEnvironmentPath.trim())],
+					];
+					for (const [tab, hasValues] of states) {
+						tab.classList.toggle('has-values', Boolean(hasValues));
+						tab.setAttribute('aria-label', tab.textContent.trim() + (hasValues ? ', contains values' : ''));
+					}
+				}
+
 				// Posts the current editor state to the extension host for syncing.
 				function notifyRequestChanged() {
+                    updateRequestTabIndicators();
 					vscode.postMessage({
 						type: 'requestChanged',
                         environment: readEnvironmentSettings(),

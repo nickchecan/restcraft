@@ -42,6 +42,7 @@ suite('Webview HTML', () => {
             hasVariableReference: (value: string) => value.includes('{{'),
 			applyAuthorizationType: () => {}, syncAuthorizationHeader: () => {},
             refreshConfiguredOAuthToken: () => { configuredTokenRefreshes++; },
+            updateRequestTabIndicators: () => {},
 			message: { request: {} as Record<string, unknown> } };
 		for (const grantType of ['client_credentials', 'authorization_code']) {
 			context.message.request = { authorization: { type: 'oauth2', grantType,
@@ -209,7 +210,7 @@ suite('Webview HTML', () => {
 		assert.ok(html.includes("type: 'openEnvironmentFile'"));
 		const start = html.indexOf("if (message.type === 'environmentFile')");
 		const end = html.indexOf("if (message.type === 'oauthTokenResult')", start);
-		const context = { environmentFileRequestId: 2,
+		const context = { environmentFileRequestId: 2, updateRequestTabIndicators: () => {},
 			requestEnvPath: { value: '' }, requestEnvOpen: { disabled: true },
 			requestEnvError: { textContent: '' }, message: { type: 'environmentFile', requestId: 2, path: '/workspace/.env' } };
 		const code = '(function () {' + html.slice(start, end) + '})();';
@@ -355,5 +356,40 @@ suite('Webview HTML', () => {
 			assert.strictEqual(messages.find(message => message.type === 'getConfiguredOAuthToken')?.authorization, header);
 			assert.strictEqual(context.readAuthorizationHeaderValue(), header);
 		}
+	});
+	test('request tabs show dots for populated sections and clear them when emptied', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function updateRequestTabIndicators()');
+		const end = html.indexOf('// Posts the current editor state', start);
+		const tab = (name: string) => ({ textContent: name, populated: false, label: '',
+			classList: { toggle: (_name: string, _value: boolean) => {} }, setAttribute: (_name: string, _value: string) => {} });
+		const tabs = ['Params', 'Authorization', 'Headers', 'Body', 'Settings'].map(name => {
+			const item = tab(name);
+			item.classList.toggle = (_name, value) => { item.populated = value; };
+			item.setAttribute = (_name, value) => { item.label = value; };
+			return item;
+		});
+		let values = ['partial'];
+		const table = { querySelectorAll: () => values.map(value => ({ value })) };
+		const context = { requestParamsTab: tabs[0], requestAuthorizationTab: tabs[1], requestHeadersTab: tabs[2],
+			requestBodyTab: tabs[3], requestSettingsTab: tabs[4], requestParamsTable: table, requestHeadersTable: table,
+			requestBodyFormTable: table, requestBody: { value: '' }, authorizationType: { value: 'oauth2' },
+			requestEnvManual: { checked: true }, manualEnvironmentPath: '../custom/.env', requestEnvPath: { value: '' } };
+		runInNewContext(html.slice(start, end) + '; updateRequestTabIndicators();', context);
+		assert.ok(tabs.every(item => item.populated));
+		assert.ok(tabs.every(item => item.label.includes('contains values')));
+        context.manualEnvironmentPath = '';
+        context.requestEnvPath.value = '/project/.env';
+        runInNewContext('updateRequestTabIndicators();', context);
+        assert.strictEqual(tabs[4].populated, false);
+        context.manualEnvironmentPath = '../custom/.env';
+        context.requestEnvManual.checked = false;
+        runInNewContext('updateRequestTabIndicators();', context);
+        assert.strictEqual(tabs[4].populated, false);
+		values = ['   '];
+		context.authorizationType.value = 'none';
+		context.requestEnvManual.checked = false;
+		runInNewContext('updateRequestTabIndicators();', context);
+		assert.ok(tabs.every(item => !item.populated));
 	});
 });
