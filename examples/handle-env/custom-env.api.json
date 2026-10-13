@@ -10,9 +10,6 @@
       "enabled": true
     }
   ],
-  "headers": {
-    "Authorization": "Bearer {{TEST_NEW_TOKEN}}"
-  },
   "authorization": {
     "type": "oauth2",
     "grantType": "client_credentials",

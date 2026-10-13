@@ -15,7 +15,7 @@ export function createUpdatedRequestDocumentText(content: string, message: Reque
 		else { delete parsed.environment; }
 		const persisted = headersForPersistence(message.headers, message.headerState, message.authorization);
 		parsed.headerState = persisted.headerState;
-		parsed.headers = persisted.headers;
+		delete parsed.headers;
 		if (message.authorization) {
 			parsed.authorization = readOAuthAuthorization(message.authorization);
 		} else {

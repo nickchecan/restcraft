@@ -30,7 +30,7 @@ suite('OAuth client credentials', () => {
 			assert.throws(() => readOAuthAccessToken(response(body)), /access_token/);
 		}
 	});
-	test('persists only the configured environment reference for OAuth tokens', () => {
+	test('preserves header rows while OAuth configuration changes', () => {
 		const authorization = { type: 'oauth2' as const, grantType: 'client_credentials' as const,
 			accessTokenUrl: '', clientId: '', clientSecret: '', scope: '' };
 		const headers = { authorization: 'Bearer private-token', Accept: 'application/json' };
@@ -39,9 +39,9 @@ suite('OAuth client credentials', () => {
 			headers, headerState: state,
 		});
 		const persisted = headersForPersistence(headers, state, { ...authorization, storeAccessToken: true, accessTokenVariable: 'MY_TOKEN' });
-		assert.strictEqual(persisted.headers.Authorization, 'Bearer {{MY_TOKEN}}');
-		assert.strictEqual(persisted.headerState[0].value, 'Bearer {{MY_TOKEN}}');
-		assert.ok(!JSON.stringify(persisted).includes('private-token'));
+		assert.strictEqual(persisted.headers.authorization, 'Bearer private-token');
+		assert.strictEqual(persisted.headerState[0].value, 'Bearer private-token');
+		assert.deepStrictEqual(persisted, { headers, headerState: state });
 		assert.deepStrictEqual(headersForPersistence(headers, state), { headers, headerState: state });
 	});
 });

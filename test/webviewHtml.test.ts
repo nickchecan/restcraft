@@ -30,16 +30,18 @@ suite('Webview HTML', () => {
 			fields[id] = { value: 'previous request' };
 		}
 		const authorizationType = { value: 'none' };
+        let configuredTokenRefreshes = 0;
 		const context = { document: { getElementById: (id: string) => fields[id] },
 			oauthRequestId: 1, oauthPending: true, oauthGetToken: { disabled: true },
             setOAuthSecretVisible: () => {}, setBasicPasswordVisible: () => {}, vscode: { postMessage: () => {} }, bearerToken: { value: '' },
-            oauthStoreToken: { checked: false }, oauthTokenVariable: { value: 'ACCESS_TOKEN' },
+            oauthUpdateHeader: { checked: true }, oauthStoreToken: { checked: false }, oauthTokenVariable: { value: 'ACCESS_TOKEN' },
 			oauthStatus: { textContent: 'Getting token' }, oauthToken: 'old', displayedOAuthToken: 'old',
 			activeAuthorizationType: 'none', oauthGrantType: { value: '' }, authorizationType,
 			readAuthorizationFromHeaders: () => { authorizationType.value = 'none'; },
 			readHeaderValue: (headers: Record<string, string>, name: string) => headers[name] || '',
             hasVariableReference: (value: string) => value.includes('{{'),
 			applyAuthorizationType: () => {}, syncAuthorizationHeader: () => {},
+            refreshConfiguredOAuthToken: () => { configuredTokenRefreshes++; },
 			message: { request: {} as Record<string, unknown> } };
 		for (const grantType of ['client_credentials', 'authorization_code']) {
 			context.message.request = { authorization: { type: 'oauth2', grantType,
@@ -55,33 +57,13 @@ suite('Webview HTML', () => {
 			assert.strictEqual(context.oauthToken, 'saved');
             assert.strictEqual(context.displayedOAuthToken, '', 'Reopening must clear the token output');
 			assert.strictEqual(context.oauthPending, false);
+            assert.ok(configuredTokenRefreshes > 0, 'Loading OAuth settings must resolve the configured token for output');
 		}
 		context.message.request = { headers: {} };
 		runInNewContext('{ ' + html.slice(start, end) + ' }', context);
 		assert.strictEqual(authorizationType.value, 'none');
 		assert.strictEqual(context.oauthToken, '');
 		assert.ok(Object.values(fields).every(field => field.value === ''));
-	});
-	test('uses the env reference for the header table and execution after token retrieval', () => {
-		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
-		const start = html.indexOf('function syncAuthorizationHeader()');
-		const end = html.indexOf('// Detects RestCraft environment variable placeholders.', start);
-		const headers: Record<string, string> = {};
-		const context = {
-			authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
-			oauthStoreToken: { checked: true }, oauthTokenVariable: { value: 'MY_TOKEN' }, oauthToken: 'sensitive-token',
-			activeAuthorizationType: 'oauth2', updateOAuthTokenDisplay: () => {}, refreshConfiguredOAuthToken: () => {},
-			setHeaderValue: (name: string, value: string) => { headers[name] = value; },
-			removeHeaderValue: (name: string) => { delete headers[name]; },
-		};
-		runInNewContext(html.slice(start, end) + '; syncAuthorizationHeader();', context);
-		assert.strictEqual(headers.Authorization, 'Bearer {{MY_TOKEN}}');
-		context.oauthTokenVariable.value = 'NEW_TOKEN';
-		runInNewContext('syncAuthorizationHeader();', context);
-		assert.strictEqual(headers.Authorization, 'Bearer {{NEW_TOKEN}}');
-		context.oauthStoreToken.checked = false;
-		runInNewContext('syncAuthorizationHeader();', context);
-		assert.strictEqual(headers.Authorization, 'Bearer sensitive-token');
 	});
 	test('token output renders resolved display state independently of the saved header', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
@@ -107,12 +89,12 @@ suite('Webview HTML', () => {
 			{ name: 'Accept', value: 'application/json', enabled: true },
 		].map(header => ({ querySelector: () => ({ checked: header.enabled }),
 			querySelectorAll: () => [{ value: header.name }, { value: header.value }] }));
-		const context = { authorizationType: { value: 'oauth2' }, oauthStoreToken: { checked: true },
+		const context = { authorizationType: { value: 'oauth2' }, oauthUpdateHeader: { checked: true }, oauthStoreToken: { checked: true },
 			oauthGrantType: { value: 'client_credentials' }, oauthTokenVariable: { value: 'MY_TOKEN' },
 			requestHeadersTable: { querySelectorAll: () => rows },
 			readHeaderRowValue: (_name: string, value: string) => value };
 		const result = runInNewContext(html.slice(start, end) + '; ({ state: readRequestHeaderState(), sent: readEnabledRequestHeaders() });', context);
-		const state = result.state.find((header: { name: string }) => header.name === 'Authorization');
+		const state = result.state.find((header: { name: string }) => header.name.toLowerCase() === 'authorization');
 		assert.strictEqual(state.enabled, false);
 		assert.strictEqual(state.value, 'Bearer {{MY_TOKEN}}');
 		assert.strictEqual(result.sent.authorization, undefined);
@@ -263,10 +245,111 @@ suite('Webview HTML', () => {
 		const end = html.indexOf('// Displays the current OAuth token', start);
 		const context = { configuredOAuthTokenRequestId: 1, displayedOAuthToken: '',
 			oauthStatus: { textContent: 'Choose an environment file in Request Settings.' },
+            oauthUpdateHeader: { checked: true },
 			authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
 			readAuthorizationHeaderValue: () => '' };
 		runInNewContext(html.slice(start, end) + '; refreshConfiguredOAuthToken();', context);
 		assert.strictEqual(context.oauthStatus.textContent, '');
 		assert.strictEqual(context.configuredOAuthTokenRequestId, 2);
+	});
+	test('retrieval displays tokens without changing authorization when Update Authorization Header is unchecked', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf("if (message.type === 'oauthTokenResult')");
+		const end = html.indexOf("if (message.type === 'requestComplete')", start);
+		let headerUpdates = 0;
+		let renders = 0;
+		const context = { message: { type: 'oauthTokenResult', requestId: 1, token: 'new-token', stored: true },
+			oauthRequestId: 1, configuredOAuthTokenRequestId: 0, oauthPending: true, oauthGetToken: { disabled: true },
+			oauthStatus: { textContent: '' }, authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
+			oauthUpdateHeader: { checked: false }, oauthToken: 'existing-token', displayedOAuthToken: '',
+			refreshEnvironmentFile: () => {}, notifyRequestChanged: () => {},
+			applyRetrievedOAuthHeader: () => { headerUpdates++; }, updateOAuthTokenDisplay: () => { renders++; } };
+		const code = '(function () {' + html.slice(start, end) + '})();';
+		runInNewContext(code, context);
+		assert.strictEqual(context.displayedOAuthToken, 'new-token');
+		assert.strictEqual(context.oauthToken, 'existing-token');
+		assert.strictEqual(headerUpdates, 0);
+		assert.strictEqual(renders, 1);
+		context.oauthUpdateHeader.checked = true;
+		runInNewContext(code, context);
+		assert.strictEqual(headerUpdates, 1);
+		assert.strictEqual(context.oauthToken, 'new-token');
+	});
+	test('explains that a missing token variable will be created on retrieval', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function formatConfiguredOAuthError(error)');
+		const end = html.indexOf('// This output is separate', start);
+		const context = { oauthStoreToken: { checked: true }, oauthTokenVariable: { value: 'ACCESS_TOKENASD' },
+			error: 'Missing environment variable: ACCESS_TOKENASD' };
+		const formatted = runInNewContext(html.slice(start, end) + '; formatConfiguredOAuthError(error);', context);
+		assert.match(formatted, /will be created in .env when you get a new access token/);
+		context.error = 'Missing environment variable: CLIENT_SECRET';
+		assert.strictEqual(runInNewContext('formatConfiguredOAuthError(error);', context), context.error);
+		context.oauthStoreToken.checked = false;
+		context.error = 'Missing environment variable: ACCESS_TOKENASD';
+		assert.strictEqual(runInNewContext('formatConfiguredOAuthError(error);', context), context.error);
+	});
+	test('successful retrieval applies a token or env reference using the chosen storage option', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function applyRetrievedOAuthHeader(token)');
+		const end = html.indexOf('// Writes authorization control state', start);
+		let header = '';
+		const context = { oauthStoreToken: { checked: true }, oauthTokenVariable: { value: 'NEW_TOKEN' },
+			setHeaderValue: (_name: string, value: string) => { header = value; } };
+		runInNewContext(html.slice(start, end) + "; applyRetrievedOAuthHeader('new-token');", context);
+		assert.strictEqual(header, 'Bearer {{NEW_TOKEN}}');
+		context.oauthStoreToken.checked = false;
+		runInNewContext("applyRetrievedOAuthHeader('new-token');", context);
+		assert.strictEqual(header, 'Bearer new-token');
+	});
+	test('preserves Bearer variable references in the header display when loading requests', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function readAuthorizationHeaderDisplayValue(headerValue)');
+		const end = html.indexOf('// Detects RestCraft environment variable placeholders.', start);
+		for (const type of ['bearer', 'oauth2']) {
+			const context = { authorizationType: { value: type }, bearerToken: { value: '{{ACCESS_TOKEN}}' },
+				header: 'Bearer {{ACCESS_TOKEN}}' };
+			const displayed = runInNewContext(html.slice(start, end) + '; readAuthorizationHeaderDisplayValue(header);', context);
+			assert.strictEqual(displayed, 'Bearer {{ACCESS_TOKEN}}');
+		}
+	});
+	test('configured token refresh resolves literal and env headers without modifying saved rows', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function refreshConfiguredOAuthToken()');
+		const end = html.indexOf('// Displays the current OAuth token', start);
+		for (const authorization of ['Bearer saved-token', 'Bearer {{ACCESS_TOKEN}}']) {
+			let posted: { type: string; authorization: string } | undefined;
+			const context = { configuredOAuthTokenRequestId: 0, displayedOAuthToken: '', oauthStatus: { textContent: '' },
+				authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
+				oauthUpdateHeader: { checked: true }, readAuthorizationHeaderValue: () => authorization,
+				vscode: { postMessage: (message: { type: string; authorization: string }) => { posted = message; } } };
+			runInNewContext(html.slice(start, end) + '; refreshConfiguredOAuthToken();', context);
+			assert.strictEqual(posted?.type, 'getConfiguredOAuthToken');
+			assert.strictEqual(posted?.authorization, authorization);
+		}
+	});
+	test('switching grant types re-resolves the configured token without updating the header', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const listenerStart = html.indexOf("oauthGrantType.addEventListener('change', () => {");
+		const listenerEnd = html.indexOf("['oauth-url'", listenerStart);
+		const refreshStart = html.indexOf('function refreshConfiguredOAuthToken()');
+		const refreshEnd = html.indexOf('// Displays the current OAuth token', refreshStart);
+		for (const header of ['Bearer configured-token', 'Bearer {{ACCESS_TOKEN}}']) {
+			let change = () => {};
+			const messages: { type: string; authorization?: string }[] = [];
+			const context = { oauthGrantType: { value: 'authorization_code', addEventListener: (_event: string, callback: () => void) => { change = callback; } },
+				authorizationType: { value: 'oauth2' }, oauthUpdateHeader: { checked: true }, oauthToken: '', displayedOAuthToken: '',
+				oauthStatus: { textContent: '' }, oauthRequestId: 0, configuredOAuthTokenRequestId: 0, oauthPending: false,
+				oauthGetToken: { disabled: false }, applyAuthorizationType: () => {}, notifyRequestChanged: () => {},
+				readAuthorizationHeaderValue: () => header,
+				vscode: { postMessage: (message: { type: string; authorization?: string }) => { messages.push(message); } } };
+			runInNewContext(html.slice(refreshStart, refreshEnd) + html.slice(listenerStart, listenerEnd), context);
+			change();
+			assert.strictEqual(messages.filter(message => message.type === 'getConfiguredOAuthToken').length, 0);
+			context.oauthGrantType.value = 'client_credentials';
+			change();
+			assert.strictEqual(messages.find(message => message.type === 'getConfiguredOAuthToken')?.authorization, header);
+			assert.strictEqual(context.readAuthorizationHeaderValue(), header);
+		}
 	});
 });

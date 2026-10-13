@@ -6,19 +6,19 @@ import type { RequestChangedMessage } from '../src/webview/requestWebview';
 suite('OAuth request document persistence', () => {
 	const message: RequestChangedMessage = {
 		type: 'requestChanged', name: 'OAuth', method: 'GET', url: 'https://example.com/', params: [], body: '',
-		headers: { Authorization: 'Bearer sensitive-token', Accept: 'application/json' },
-		headerState: [{ name: 'Authorization', value: 'Bearer sensitive-token', enabled: true }],
+		headers: { Authorization: 'Bearer {{MY_TOKEN}}' },
+		headerState: [{ name: 'Authorization', value: 'Bearer {{MY_TOKEN}}', enabled: true }],
 		authorization: { type: 'oauth2', grantType: 'client_credentials', accessTokenUrl: 'https://example.com/token',
 			clientId: 'client', clientSecret: '{{SECRET}}', scope: 'api', storeAccessToken: true, accessTokenVariable: 'MY_TOKEN' },
 	};
 
-	test('saves the env reference in both header representations and restores it after parsing', () => {
+	test('saves the env reference only in headerState and restores it after parsing', () => {
 		const text = createUpdatedRequestDocumentText('{"custom":"preserved"}', message);
 		const saved = JSON.parse(text);
-		assert.strictEqual(saved.headers.Authorization, 'Bearer {{MY_TOKEN}}');
+		assert.strictEqual(saved.headers, undefined);
 		assert.deepStrictEqual(saved.headerState, [{ name: 'Authorization', value: 'Bearer {{MY_TOKEN}}', enabled: true }]);
 		assert.strictEqual(saved.custom, 'preserved');
-		assert.strictEqual(saved.headers.Accept, 'application/json');
+		assert.strictEqual(saved.headers, undefined);
 		assert.ok(!text.includes('sensitive-token'));
 		assert.strictEqual(parseRequestFile(text).headers.Authorization, 'Bearer {{MY_TOKEN}}');
 		assert.strictEqual(createUpdatedRequestDocumentText(text, message), text);
@@ -26,9 +26,11 @@ suite('OAuth request document persistence', () => {
 
 	test('persists literal tokens when storage is unchecked', () => {
 		const text = createUpdatedRequestDocumentText('{}', { ...message,
-			authorization: { ...message.authorization!, storeAccessToken: false } });
-		assert.strictEqual(JSON.parse(text).headers.Authorization, 'Bearer sensitive-token');
-		assert.deepStrictEqual(JSON.parse(text).headerState, message.headerState);
+			authorization: { ...message.authorization!, storeAccessToken: false },
+            headers: { Authorization: 'Bearer sensitive-token' },
+            headerState: [{ name: 'Authorization', value: 'Bearer sensitive-token', enabled: true }] });
+		assert.strictEqual(JSON.parse(text).headers, undefined);
+		assert.strictEqual(JSON.parse(text).headerState[0].value, 'Bearer sensitive-token');
 		assert.strictEqual(parseRequestFile(text).headers.Authorization, 'Bearer sensitive-token');
 	});
 	test('preserves a disabled header value when editing a legacy request', () => {
@@ -38,15 +40,15 @@ suite('OAuth request document persistence', () => {
 			headerState: [{ name: 'Accept', value: 'application/json', enabled: false }] };
 		const saved = parseRequestFile(createUpdatedRequestDocumentText(legacy, change));
 		assert.deepStrictEqual(saved.headerState, change.headerState);
-		assert.strictEqual(saved.headers.Accept, 'application/json');
+		assert.strictEqual(saved.headers.Accept, undefined);
 	});
 
 	test('keeps an OAuth env header disabled after saving and reopening', () => {
 		const change: RequestChangedMessage = { ...message,
 			headerState: [{ name: 'authorization', value: 'Bearer {{MY_TOKEN}}', enabled: false }] };
 		const saved = parseRequestFile(createUpdatedRequestDocumentText('{}', change));
-		assert.deepStrictEqual(saved.headerState, [{ name: 'Authorization', value: 'Bearer {{MY_TOKEN}}', enabled: false }]);
-		assert.strictEqual(saved.headers.Authorization, 'Bearer {{MY_TOKEN}}');
+		assert.deepStrictEqual(saved.headerState, [{ name: 'authorization', value: 'Bearer {{MY_TOKEN}}', enabled: false }]);
+		assert.strictEqual(saved.headers.Authorization, undefined);
 	});
 	test('saves manual file selection and removes it when returning to nearest mode', () => {
 		const change: RequestChangedMessage = { ...message, environment: { mode: 'manual', path: '../config/.env' } };
@@ -54,5 +56,29 @@ suite('OAuth request document persistence', () => {
 		assert.deepStrictEqual(parseRequestFile(text).environment, change.environment);
 		const nearest = createUpdatedRequestDocumentText(text, message);
 		assert.strictEqual(parseRequestFile(nearest).environment, undefined);
+	});
+	test('preserves existing headers when automatic OAuth header updates are disabled', () => {
+		const change: RequestChangedMessage = { ...message,
+			authorization: { ...message.authorization!, updateAuthorizationHeader: false } };
+		const saved = parseRequestFile(createUpdatedRequestDocumentText('{}', change));
+		assert.deepStrictEqual(saved.headers, change.headers);
+		assert.deepStrictEqual(saved.headerState, change.headerState);
+		assert.strictEqual(saved.authorization?.updateAuthorizationHeader, false);
+		const empty = parseRequestFile(createUpdatedRequestDocumentText('{}', { ...change, headers: {}, headerState: [] }));
+		assert.deepStrictEqual(empty.headers, {});
+		assert.deepStrictEqual(empty.headerState, []);
+	});
+	test('toggling token storage preserves the previously applied Authorization header', () => {
+		for (const value of ['Bearer {{OLD_TOKEN}}', 'Bearer previously-retrieved-token']) {
+			for (const storeAccessToken of [false, true]) {
+				const change: RequestChangedMessage = { ...message,
+					headers: { Authorization: value },
+					headerState: [{ name: 'Authorization', value, enabled: true }],
+					authorization: { ...message.authorization!, storeAccessToken, accessTokenVariable: 'NEW_TOKEN' } };
+				const saved = parseRequestFile(createUpdatedRequestDocumentText('{}', change));
+				assert.strictEqual(saved.headers.Authorization, value);
+				assert.strictEqual(saved.headerState[0].value, value);
+			}
+		}
 	});
 });

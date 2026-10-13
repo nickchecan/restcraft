@@ -10,8 +10,5 @@
       "enabled": true
     }
   ],
-  "headers": {
-    "Authorization": "Bearer test-token"
-  },
   "body": null
 }

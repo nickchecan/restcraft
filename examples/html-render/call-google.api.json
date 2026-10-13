@@ -2,11 +2,19 @@
   "name": "Render Website",
   "method": "GET",
   "url": "https://google.com/",
-  "headers": {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer 12123"
-  },
   "body": {
     "tye": "test"
-  }
+  },
+  "headerState": [
+    {
+      "name": "Content-Type",
+      "value": "application/json",
+      "enabled": true
+    },
+    {
+      "name": "Authorization",
+      "value": "Bearer 12123",
+      "enabled": true
+    }
+  ]
 }

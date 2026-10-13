@@ -60,6 +60,7 @@ suite('Request editor document synchronization', () => {
 				assert.deepStrictEqual(saved.params, change.params);
 				assert.deepStrictEqual(saved.headerState, change.headerState);
 				assert.deepStrictEqual(saved.authorization, change.authorization);
+                assert.strictEqual(saved.headers, undefined);
 				assert.strictEqual(loads.length, 1, 'Local edits must not reload the webview');
 
 				await document.save();

@@ -52,6 +52,7 @@ export function isOAuthAuthorization(value: unknown): value is OAuthAuthorizatio
 		&& (value.grantType === 'client_credentials' || value.grantType === 'authorization_code')
 		&& typeof value.accessTokenUrl === 'string' && typeof value.clientId === 'string'
 		&& typeof value.clientSecret === 'string' && typeof value.scope === 'string'
+		&& (value.updateAuthorizationHeader === undefined || typeof value.updateAuthorizationHeader === 'boolean')
 		&& (value.storeAccessToken === undefined || typeof value.storeAccessToken === 'boolean')
 		&& (value.accessTokenVariable === undefined || typeof value.accessTokenVariable === 'string');
 }
@@ -60,21 +61,12 @@ export function isOAuthAuthorization(value: unknown): value is OAuthAuthorizatio
 export function readOAuthAuthorization(value: OAuthAuthorizationDefinition): OAuthAuthorizationDefinition {
 	return { type: 'oauth2', grantType: value.grantType, accessTokenUrl: value.accessTokenUrl,
 		clientId: value.clientId, clientSecret: value.clientSecret, scope: value.scope,
+		...(value.updateAuthorizationHeader !== undefined ? { updateAuthorizationHeader: value.updateAuthorizationHeader } : {}),
 		...(value.storeAccessToken !== undefined ? { storeAccessToken: value.storeAccessToken } : {}),
 		...(value.accessTokenVariable !== undefined ? { accessTokenVariable: value.accessTokenVariable } : {}) };
 }
 
-/** Stores the Bearer token directly unless environment storage is enabled. */
-export function headersForPersistence(headers: Record<string, string>, headerState: RequestHeaderDefinition[], authorization?: OAuthAuthorizationDefinition) {
-	if (!authorization?.storeAccessToken) { return { headers, headerState }; }
-	const persistedHeaders = Object.fromEntries(Object.entries(headers).filter(([name]) => name.toLowerCase() !== 'authorization'));
-	const persistedState = headerState.filter(header => header.name.toLowerCase() !== 'authorization');
-	const name = authorization.accessTokenVariable ?? 'ACCESS_TOKEN';
-	if (authorization.storeAccessToken && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && authorization.grantType === 'client_credentials') {
-		const value = `Bearer {{${name}}}`;
-		persistedHeaders.Authorization = value;
-		const enabled = headerState.find(header => header.name.toLowerCase() === 'authorization')?.enabled ?? true;
-		persistedState.push({ name: 'Authorization', value, enabled });
-	}
-	return { headers: persistedHeaders, headerState: persistedState };
+/** Header rows are the source of truth; configuration edits must not rewrite them. */
+export function headersForPersistence(headers: Record<string, string>, headerState: RequestHeaderDefinition[], _authorization?: OAuthAuthorizationDefinition) {
+	return { headers, headerState };
 }

@@ -73,11 +73,6 @@ Example request file:
       "enabled": false
     }
   ],
-  "headers": {
-    "Authorization": "Bearer {{API_TOKEN}}",
-    "Accept": "application/json",
-    "X-Debug": "1"
-  },
   "body": null
 }
 ```
@@ -93,7 +88,7 @@ Request files use the `.api.json` extension and support:
 | `url` | Yes | An `http` or `https` URL. |
 | `params` | No | Array of query parameters with `name`, `value`, and `enabled` fields. Disabled params stay in the editor but are omitted from the sent URL. |
 | `headerState` | No | Array of headers with `name`, `value`, and `enabled` fields. Disabled headers stay in the editor but are omitted when sending the request. |
-| `headers` | No | JSON object where each header value is a string. |
+| `headers` | Legacy | Supported for older files; converted to enabled `headerState` rows when `headerState` is absent. |
 | `body` | No | Any JSON value. Use `null` when the request does not need a body. |
 
 When `params` is omitted, RestCraft backfills enabled params from the query string in `url` for compatibility with older request files. After editing query params in the custom editor, RestCraft saves the `params` array so enabled and disabled states are remembered when the request is reopened.
@@ -134,10 +129,6 @@ You can use variables in URLs, headers, and request bodies:
       "enabled": true
     }
   ],
-  "headers": {
-    "Authorization": "Bearer {{API_TOKEN}}",
-    "Content-Type": "application/json"
-  },
   "body": {
     "name": "Launch Plan"
   }
@@ -208,6 +199,7 @@ Example OAuth configuration (alongside the existing request properties):
   "clientId": "m2m",
   "clientSecret": "{{CLIENT_SECRET}}",
   "scope": "api",
+  "updateAuthorizationHeader": true,
   "storeAccessToken": true,
   "accessTokenVariable": "ACCESS_TOKEN"
 }
@@ -243,3 +235,21 @@ Save the request to persist the selection in an optional `environment` object:
 Manual paths are relative to the request's directory. Older files without
 `environment` continue to use the nearest `.env`. Selecting nearest mode removes
 the manual configuration from the saved request.
+
+**Update header** is checked by default. Uncheck it to retrieve a
+token for display (and save it to `.env` if enabled) without adding or replacing
+the request's Authorization header. The choice persists in OAuth settings as
+`updateAuthorizationHeader`; older requests default to enabled.
+
+Changing **Save token to .env**, **Variable Name**, or **Update header** does not
+rewrite existing header rows. A new token or environment reference is applied
+only after **Get new access token** succeeds with **Update header** checked.
+
+### Header storage and older requests
+
+`headerState` is the canonical saved header representation. Each row stores its
+`name`, `value`, and `enabled` flag. Execution derives headers from enabled rows;
+disabled values remain saved but are not sent. The redundant `headers` object is
+no longer written. Old files containing only `headers` remain supported: their
+entries load as enabled rows and convert to `headerState` on the next editor save.
+If both forms exist, `headerState` takes precedence.

@@ -33,6 +33,7 @@ export interface OAuthAuthorizationDefinition {
 	clientId: string;
 	clientSecret: string;
 	scope: string;
+	updateAuthorizationHeader?: boolean;
 	storeAccessToken?: boolean;
 	accessTokenVariable?: string;
 }

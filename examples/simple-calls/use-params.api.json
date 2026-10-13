@@ -2,7 +2,6 @@
   "name": "Testing Params",
   "method": "GET",
   "url": "https://postman-echo.com/get?foo=bar&page=1&limit=10",
-  "headers": {},
   "body": null,
   "params": [
     {
@@ -20,5 +19,6 @@
       "value": "10",
       "enabled": true
     }
-  ]
+  ],
+  "headerState": []
 }

@@ -37,6 +37,18 @@ suite('Request file parser', () => {
 		}
 	});
 
+	test('derives execution headers from enabled state and ignores redundant legacy values', () => {
+		const parsed = parseRequestFile(JSON.stringify({ name: 'Headers', method: 'GET', url: 'https://example.com/',
+			headers: { Authorization: 'outdated' }, headerState: [
+				{ name: 'Authorization', value: 'Bearer {{TOKEN}}', enabled: false },
+				{ name: 'Accept', value: 'application/json', enabled: true },
+			] }));
+		assert.deepStrictEqual(parsed.headers, { Accept: 'application/json' });
+		assert.strictEqual(parsed.headerState[0].value, 'Bearer {{TOKEN}}');
+		const content = createDefaultRequestFileContent('new.api.json');
+		assert.strictEqual(JSON.parse(content).headers, undefined);
+	});
+
 	test('parses a valid request file', () => {
 		const request = parseRequestFile(JSON.stringify({
 			name: 'Get Users',
