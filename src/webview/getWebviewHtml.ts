@@ -316,7 +316,26 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				align-self: stretch;
 				display: grid;
 				grid-template-rows: auto minmax(0, 1fr);
+				border-left: 1px solid var(--vscode-panel-border);
+				padding-left: 24px;
 				gap: 8px;
+			}
+
+			.authorization-secret-control {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				min-width: 0;
+			}
+
+			.authorization-secret-control > input,
+			.authorization-secret-control > .variable-input-wrapper {
+				flex: 1;
+				min-width: 0;
+			}
+
+			#oauth-secret-toggle, #basic-password-toggle {
+				flex-shrink: 0;
 			}
 
 			.oauth-token-options {
@@ -364,7 +383,6 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				display: flex;
 				flex-direction: column;
 				padding: 12px;
-				border: 1px solid var(--vscode-panel-border);
 			}
 
 			.oauth-token-content p {
@@ -395,6 +413,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				}
 				.oauth-token-panel {
 					min-height: 260px;
+					border-left: 0;
+					padding-left: 0;
+					border-top: 1px solid var(--vscode-panel-border);
+					padding-top: 16px;
 				}
 			}
 
@@ -935,7 +957,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<label class="oauth-client-field hidden" for="oauth-client-id">Client ID</label>
 					<input class="authorization-input oauth-client-field hidden" id="oauth-client-id" type="text" autocomplete="off">
 					<label class="oauth-client-field hidden" for="oauth-client-secret">Client Secret</label>
-					<input class="authorization-input oauth-client-field hidden" id="oauth-client-secret" type="password" autocomplete="off">
+					<div class="authorization-secret-control oauth-client-field hidden">
+						<input class="authorization-input" id="oauth-client-secret" type="password" autocomplete="off">
+						<button id="oauth-secret-toggle" type="button" aria-controls="oauth-client-secret" aria-label="Show client secret" aria-pressed="false">Show</button>
+					</div>
 					<label class="oauth-client-field hidden" for="oauth-scope">Scope</label>
 					<input class="authorization-input oauth-client-field hidden" id="oauth-scope" type="text" autocomplete="off">
 					<label class="oauth-client-field hidden" for="oauth-store-token">Save token to .env</label>
@@ -950,7 +975,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<label class="basic-authorization-field hidden" for="basic-auth-username">Username</label>
 					<input class="authorization-input basic-authorization-field hidden" id="basic-auth-username" name="basic-auth-username" type="text" autocomplete="off">
 					<label class="basic-authorization-field hidden" for="basic-auth-password">Password</label>
-					<input class="authorization-input basic-authorization-field hidden" id="basic-auth-password" name="basic-auth-password" type="text" autocomplete="off">
+					<div class="authorization-secret-control basic-authorization-field hidden">
+						<input class="authorization-input" id="basic-auth-password" name="basic-auth-password" type="password" autocomplete="off">
+						<button id="basic-password-toggle" type="button" aria-controls="basic-auth-password" aria-label="Show password" aria-pressed="false">Show</button>
+					</div>
 				</div>
 				<div class="oauth-token-panel hidden" id="oauth-token-panel">
 					<div class="oauth-token-options" role="group" aria-label="Access token views">
@@ -1106,6 +1134,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 const oauthGrantType = document.getElementById('oauth-grant-type');
                 const oauthGetToken = document.getElementById('oauth-get-token');
                 const oauthStatus = document.getElementById('oauth-status');
+                const oauthClientSecret = document.getElementById('oauth-client-secret');
+                const oauthSecretToggle = document.getElementById('oauth-secret-toggle');
+                oauthSecretToggle.addEventListener('click', () => setOAuthSecretVisible(oauthClientSecret.type === 'password'));
                 const oauthAccessToken = document.getElementById('oauth-access-token');
                 const oauthDecodedToken = document.getElementById('oauth-decoded-token');
                 const oauthRawOption = document.getElementById('oauth-raw-option');
@@ -1188,6 +1219,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				const bearerAuthorizationFields = Array.from(document.querySelectorAll('.bearer-authorization-field'));
 				const basicAuthUsername = document.getElementById('basic-auth-username');
 				const basicAuthPassword = document.getElementById('basic-auth-password');
+                const basicPasswordToggle = document.getElementById('basic-password-toggle');
+                basicPasswordToggle.addEventListener('click', () => setBasicPasswordVisible(basicAuthPassword.type === 'password'));
 				const basicAuthorizationFields = Array.from(document.querySelectorAll('.basic-authorization-field'));
 				const requestParamsTable = document.getElementById('request-params-table');
 				const requestHeadersTable = document.getElementById('request-headers-table');
@@ -1603,6 +1636,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                         oauthToken = '';
                     retrievedOAuthToken = '';
                         activeAuthorizationType = 'none';
+                        setOAuthSecretVisible(false);
+                        setBasicPasswordVisible(false);
                         const savedAuthorization = message.request.authorization;
                         oauthStoreToken.checked = savedAuthorization?.storeAccessToken === true;
                         oauthTokenVariable.value = savedAuthorization?.accessTokenVariable ?? 'ACCESS_TOKEN';
@@ -2363,6 +2398,21 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					applyAuthorizationType();
 					updateAuthorizationSecretStates();
 					syncAuthorizationHeader();
+				}
+
+				// Secret visibility is temporary UI state and does not alter the request.
+				function setOAuthSecretVisible(visible) {
+					oauthClientSecret.type = visible ? 'text' : 'password';
+					oauthSecretToggle.textContent = visible ? 'Hide' : 'Show';
+					oauthSecretToggle.setAttribute('aria-label', visible ? 'Hide client secret' : 'Show client secret');
+					oauthSecretToggle.setAttribute('aria-pressed', String(visible));
+				}
+
+				function setBasicPasswordVisible(visible) {
+					basicAuthPassword.type = visible ? 'text' : 'password';
+					basicPasswordToggle.textContent = visible ? 'Hide' : 'Show';
+					basicPasswordToggle.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+					basicPasswordToggle.setAttribute('aria-pressed', String(visible));
 				}
 
 				// Shows the authorization inputs for the selected auth type.

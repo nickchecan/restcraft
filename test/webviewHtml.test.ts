@@ -31,7 +31,7 @@ suite('Webview HTML', () => {
 		const authorizationType = { value: 'none' };
 		const context = { document: { getElementById: (id: string) => fields[id] },
 			oauthRequestId: 1, oauthPending: true, oauthGetToken: { disabled: true },
-            vscode: { postMessage: () => {} }, bearerToken: { value: '' },
+            setOAuthSecretVisible: () => {}, setBasicPasswordVisible: () => {}, vscode: { postMessage: () => {} }, bearerToken: { value: '' },
             oauthStoreToken: { checked: false }, oauthTokenVariable: { value: 'ACCESS_TOKEN' },
 			oauthStatus: { textContent: 'Getting token' }, oauthToken: 'old', retrievedOAuthToken: 'old',
 			activeAuthorizationType: 'none', oauthGrantType: { value: '' }, authorizationType,
@@ -156,5 +156,38 @@ suite('Webview HTML', () => {
 		runInNewContext('showOAuthTokenView(false);', context);
 		assert.strictEqual(context.oauthRawPanel.classes.hidden, false);
 		assert.strictEqual(context.oauthDecodedPanel.classes.hidden, true);
+	});
+	test('toggles client secret visibility and accessible button labels', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function setOAuthSecretVisible(visible)');
+		const end = html.indexOf('function setBasicPasswordVisible', start);
+		const attributes: Record<string, string> = {};
+		const context = { oauthClientSecret: { type: 'password', value: 'unchanged' },
+			oauthSecretToggle: { textContent: 'Show', setAttribute: (name: string, value: string) => { attributes[name] = value; } } };
+		runInNewContext(html.slice(start, end) + '; setOAuthSecretVisible(true);', context);
+		assert.strictEqual(context.oauthClientSecret.type, 'text');
+		assert.strictEqual(context.oauthSecretToggle.textContent, 'Hide');
+		assert.strictEqual(attributes['aria-pressed'], 'true');
+		runInNewContext('setOAuthSecretVisible(false);', context);
+		assert.strictEqual(context.oauthClientSecret.type, 'password');
+		assert.strictEqual(attributes['aria-label'], 'Show client secret');
+		assert.strictEqual(context.oauthClientSecret.value, 'unchanged');
+	});
+	test('Basic Auth password starts masked and supports showing and hiding', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		assert.match(html, /id="basic-auth-password"[^>]*type="password"/);
+		const start = html.indexOf('function setBasicPasswordVisible(visible)');
+		const end = html.indexOf('// Shows the authorization inputs', start);
+		const attributes: Record<string, string> = {};
+		const context = { basicAuthPassword: { type: 'password', value: 'unchanged' },
+			basicPasswordToggle: { textContent: 'Show', setAttribute: (name: string, value: string) => { attributes[name] = value; } } };
+		runInNewContext(html.slice(start, end) + '; setBasicPasswordVisible(true);', context);
+		assert.strictEqual(context.basicAuthPassword.type, 'text');
+		assert.strictEqual(context.basicPasswordToggle.textContent, 'Hide');
+		runInNewContext('setBasicPasswordVisible(false);', context);
+		assert.strictEqual(context.basicAuthPassword.type, 'password');
+		assert.strictEqual(attributes['aria-label'], 'Show password');
+		assert.strictEqual(attributes['aria-pressed'], 'false');
+		assert.strictEqual(context.basicAuthPassword.value, 'unchanged');
 	});
 });
