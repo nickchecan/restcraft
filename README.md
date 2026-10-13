@@ -37,7 +37,7 @@ Use it to:
 
 ## Getting Started
 
-1. Run `RestCraft: Open API Workbench` or `RestCraft: Create Request File` from the Command Palette.
+1. Run `RestCraft: Create Request File` from the Command Palette.
 2. Choose the request file's name and location. RestCraft adds `.api.json` if needed and opens the new file in the API Workbench editor.
 3. Edit your request and save the file with `Cmd+S` (macOS) or `Ctrl+S` (Windows/Linux).
 4. Send the request from the editor. You can also open an existing `.api.json` file directly in VS Code.
@@ -137,13 +137,11 @@ You can use variables in URLs, headers, and request bodies:
 
 ## Commands
 
-RestCraft contributes these commands to VS Code:
+RestCraft contributes one command to VS Code:
 
 | Command | Description |
 | --- | --- |
-| `RestCraft: Open API Workbench` | Asks for a name and location, creates a `.api.json` request file, and opens its API Workbench editor. |
 | `RestCraft: Create Request File` | Creates and opens a request file after choosing its name and location. |
-| `RestCraft: Load Request File` | Loads the active `.api.json` file into the API Workbench. |
 
 ## Feedback
 
