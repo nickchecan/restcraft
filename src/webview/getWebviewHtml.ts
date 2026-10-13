@@ -1112,6 +1112,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<div class="oauth-token-options" role="group" aria-label="Access token views">
 						<label><input id="oauth-raw-option" type="radio" name="oauth-token-view" value="raw" aria-controls="oauth-raw-panel" checked> Access Token</label>
 						<label><input id="oauth-decoded-option" type="radio" name="oauth-token-view" value="decoded" aria-controls="oauth-decoded-panel"> Decoded Token</label>
+						<label><input id="oauth-hidden-option" type="radio" name="oauth-token-view" value="hidden"> Hidden</label>
 					</div>
 					<div class="oauth-token-content" id="oauth-raw-panel" role="region" aria-label="Access Token">
 						<textarea id="oauth-access-token" readonly spellcheck="false" aria-label="OAuth access token" placeholder="No access token configured."></textarea>
@@ -1326,12 +1327,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 oauthSecretToggle.addEventListener('click', () => setOAuthSecretVisible(oauthClientSecret.type === 'password'));
                 const oauthAccessToken = document.getElementById('oauth-access-token');
                 const oauthDecodedToken = document.getElementById('oauth-decoded-token');
+                const oauthHiddenOption = document.getElementById('oauth-hidden-option');
                 const oauthRawOption = document.getElementById('oauth-raw-option');
                 const oauthDecodedOption = document.getElementById('oauth-decoded-option');
                 const oauthRawPanel = document.getElementById('oauth-raw-panel');
                 const oauthDecodedPanel = document.getElementById('oauth-decoded-panel');
-                oauthRawOption.addEventListener('change', () => showOAuthTokenView(false));
-                oauthDecodedOption.addEventListener('change', () => showOAuthTokenView(true));
+                oauthHiddenOption.addEventListener('change', () => showOAuthTokenView('hidden'));
+                oauthRawOption.addEventListener('change', () => showOAuthTokenView('raw'));
+                oauthDecodedOption.addEventListener('change', () => showOAuthTokenView('decoded'));
                 const oauthTokenPanel = document.getElementById('oauth-token-panel');
                 const authorizationLayout = document.getElementById('authorization-layout');
                 const oauthUpdateHeader = document.getElementById('oauth-update-header');
@@ -1871,6 +1874,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                         activeAuthorizationType = 'none';
                         setOAuthSecretVisible(false);
                         setBasicPasswordVisible(false);
+                        showOAuthTokenView('raw');
                         const savedAuthorization = message.request.authorization;
                         oauthUpdateHeader.checked = savedAuthorization?.updateAuthorizationHeader !== false;
                         oauthStoreToken.checked = savedAuthorization?.storeAccessToken === true;
@@ -2728,11 +2732,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				}
 
 				// Switches token views without changing request authorization.
-				function showOAuthTokenView(decoded) {
-					oauthRawOption.checked = !decoded;
-					oauthDecodedOption.checked = decoded;
-					oauthRawPanel.classList.toggle('hidden', decoded);
-					oauthDecodedPanel.classList.toggle('hidden', !decoded);
+				function showOAuthTokenView(view) {
+					oauthHiddenOption.checked = view === 'hidden';
+					oauthRawOption.checked = view === 'raw';
+					oauthDecodedOption.checked = view === 'decoded';
+					oauthRawPanel.classList.toggle('hidden', view !== 'raw');
+					oauthDecodedPanel.classList.toggle('hidden', view !== 'decoded');
 				}
 
 				// Decodes locally; JSON is displayed as plain text and never executed.

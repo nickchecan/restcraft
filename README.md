@@ -171,7 +171,7 @@ The read-only **Access Token** field shows the token configured for the request,
 resolving environment references from its selected `.env`. This output is never
 saved as an additional field in the request file. The saved Authorization
 header remains available for sending requests. The output area has **Access Token**
-and **Decoded Token** radio buttons. JWT header and payload decoding happens locally;
+, **Decoded Token**, and a **Hidden** radio option that hides the output area. JWT header and payload decoding happens locally;
 signatures are not verified. Opaque or malformed tokens show an explanatory message.
 
 To persist a token, enable **Save token to .env**, enter a **Variable Name**

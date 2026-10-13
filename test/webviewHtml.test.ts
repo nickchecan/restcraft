@@ -33,7 +33,7 @@ suite('Webview HTML', () => {
         let configuredTokenRefreshes = 0;
 		const context = { document: { getElementById: (id: string) => fields[id] },
 			oauthRequestId: 1, oauthPending: true, oauthGetToken: { disabled: true },
-            setOAuthSecretVisible: () => {}, setBasicPasswordVisible: () => {}, vscode: { postMessage: () => {} }, bearerToken: { value: '' },
+            setOAuthSecretVisible: () => {}, setBasicPasswordVisible: () => {}, showOAuthTokenView: () => {}, vscode: { postMessage: () => {} }, bearerToken: { value: '' },
             oauthUpdateHeader: { checked: true }, oauthStoreToken: { checked: false }, oauthTokenVariable: { value: 'ACCESS_TOKEN' },
 			oauthStatus: { textContent: 'Getting token' }, oauthToken: 'old', displayedOAuthToken: 'old',
 			activeAuthorizationType: 'none', oauthGrantType: { value: '' }, authorizationType,
@@ -121,7 +121,7 @@ suite('Webview HTML', () => {
 
 	test('token radio buttons update checked state and show the matching content panel', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
-		const start = html.indexOf('function showOAuthTokenView(decoded)');
+		const start = html.indexOf('function showOAuthTokenView(view)');
 		const end = html.indexOf('// Decodes locally;', start);
 		const element = () => {
 			const classes: Record<string, boolean> = {};
@@ -130,15 +130,19 @@ suite('Webview HTML', () => {
 				classList: { toggle: (name: string, value: boolean) => { classes[name] = value; } },
 				setAttribute: (name: string, value: string) => { attributes[name] = value; } };
 		};
-		const context = { oauthRawOption: element(), oauthDecodedOption: element(), oauthRawPanel: element(), oauthDecodedPanel: element() };
-		runInNewContext(html.slice(start, end) + '; showOAuthTokenView(true);', context);
+		const context = { oauthHiddenOption: element(), oauthRawOption: element(), oauthDecodedOption: element(), oauthRawPanel: element(), oauthDecodedPanel: element() };
+		runInNewContext(html.slice(start, end) + "; showOAuthTokenView('decoded');", context);
 		assert.strictEqual(context.oauthRawPanel.classes.hidden, true);
 		assert.strictEqual(context.oauthDecodedPanel.classes.hidden, false);
 		assert.strictEqual(context.oauthDecodedOption.checked, true);
 		assert.strictEqual(context.oauthRawOption.checked, false);
-		runInNewContext('showOAuthTokenView(false);', context);
+		runInNewContext("showOAuthTokenView('raw');", context);
 		assert.strictEqual(context.oauthRawPanel.classes.hidden, false);
 		assert.strictEqual(context.oauthDecodedPanel.classes.hidden, true);
+        runInNewContext("showOAuthTokenView('hidden');", context);
+        assert.strictEqual(context.oauthHiddenOption.checked, true);
+        assert.strictEqual(context.oauthRawPanel.classes.hidden, true);
+        assert.strictEqual(context.oauthDecodedPanel.classes.hidden, true);
 	});
 	test('toggles client secret visibility and accessible button labels', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
