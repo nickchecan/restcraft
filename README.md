@@ -215,3 +215,11 @@ Example OAuth configuration (alongside the existing request properties):
 `grantType` accepts `client_credentials` or `authorization_code`. Tokens are not
 refreshed automatically. **Authorization Code** is a placeholder for future work;
 selecting it hides the token fields and retrieval button.
+
+### Request Settings
+
+The **Settings** tab shows the path of the existing `.env` selected for the
+request. Click **Open** beside the read-only path to open the file in VS Code. If no `.env` is found,
+the field stays empty. Lookup starts beside the request and walks up to the
+workspace root, matching request execution. Reopen the Settings tab to refresh
+the path after creating or moving an environment file.

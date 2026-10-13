@@ -97,6 +97,15 @@ export function initializeRequestWebview(
 			return;
 		}
 
+        if (isRecord(message) && message.type === 'getEnvironmentFile'
+            && typeof message.requestId === 'number' && Number.isSafeInteger(message.requestId)) {
+            void postEnvironmentFile(webview, handlers.onGetRequestUri?.(), message.requestId);
+            return;
+        }
+        if (isRecord(message) && message.type === 'openEnvironmentFile') {
+            void openEnvironmentFile(handlers.onGetRequestUri?.());
+            return;
+        }
 		if (isRequestChangedMessage(message)) {
 			handlers.onRequestChanged?.(message);
 			return;
@@ -444,7 +453,7 @@ async function readEnvironmentVariables(requestUri: vscode.Uri): Promise<Record<
 }
 
 /** Uses the same closest-file lookup for reading and writing tokens. */
-async function findEnvironmentFile(requestUri: vscode.Uri): Promise<{ uri: vscode.Uri; content: string }> {
+async function findEnvironmentFile(requestUri: vscode.Uri): Promise<{ uri: vscode.Uri; content: string; exists: boolean }> {
 	const workspaceFolder = vscode.workspace.getWorkspaceFolder(requestUri);
 	const workspaceRoot = workspaceFolder?.uri ?? readRequestDirectory(requestUri);
 	let directory = readRequestDirectory(requestUri);
@@ -453,7 +462,7 @@ async function findEnvironmentFile(requestUri: vscode.Uri): Promise<{ uri: vscod
 		const envUri = vscode.Uri.joinPath(directory, '.env');
 		try {
 			const content = await vscode.workspace.fs.readFile(envUri);
-			return { uri: envUri, content: new TextDecoder().decode(content) };
+			return { uri: envUri, content: new TextDecoder().decode(content), exists: true };
 		} catch (error) {
 			if (!isFileNotFoundError(error)) {
 				throw error;
@@ -471,7 +480,7 @@ async function findEnvironmentFile(requestUri: vscode.Uri): Promise<{ uri: vscod
 		directory = parentDirectory;
 	}
 
-	return { uri: vscode.Uri.joinPath(readRequestDirectory(requestUri), '.env'), content: '' };
+	return { uri: vscode.Uri.joinPath(readRequestDirectory(requestUri), '.env'), content: '', exists: false };
 }
 
 /**
@@ -751,5 +760,32 @@ export async function storeOAuthTokenInEnvironment(requestUri: vscode.Uri, name:
 	environmentWrites.set(key, write);
 	try { await write; } finally {
 		if (environmentWrites.get(key) === write) { environmentWrites.delete(key); }
+	}
+}
+
+/** Returns the existing environment file selected by request execution, without exposing its contents. */
+export async function findRequestEnvironmentUri(requestUri: vscode.Uri | undefined): Promise<vscode.Uri | undefined> {
+	if (!requestUri) { return undefined; }
+	const file = await findEnvironmentFile(requestUri);
+	return file.exists ? file.uri : undefined;
+}
+
+async function postEnvironmentFile(webview: vscode.Webview, requestUri: vscode.Uri | undefined, requestId: number): Promise<void> {
+	try {
+		const uri = await findRequestEnvironmentUri(requestUri);
+		await webview.postMessage({ type: 'environmentFile', requestId, path: uri ? (uri.scheme === 'file' ? uri.fsPath : uri.toString()) : '' });
+	} catch (error) {
+		await webview.postMessage({ type: 'environmentFile', requestId, path: '',
+			error: error instanceof Error ? error.message : 'Unable to locate the environment file.' });
+	}
+}
+
+/** Re-resolves the file in the extension host instead of trusting a webview-supplied path. */
+async function openEnvironmentFile(requestUri: vscode.Uri | undefined): Promise<void> {
+	try {
+		const uri = await findRequestEnvironmentUri(requestUri);
+		if (uri) { await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri)); }
+	} catch (error) {
+		void vscode.window.showErrorMessage(error instanceof Error ? error.message : 'Unable to open the environment file.');
 	}
 }

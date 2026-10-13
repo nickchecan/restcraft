@@ -214,4 +214,26 @@ suite('Webview HTML', () => {
 			assert.strictEqual(resizeCount, 2);
 		}
 	});
+	test('Settings displays environment paths, remains empty when missing, and ignores stale results', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		assert.ok(html.includes('id="request-settings-tab"'));
+		assert.ok(html.includes("type: 'openEnvironmentFile'"));
+		const start = html.indexOf("if (message.type === 'environmentFile')");
+		const end = html.indexOf("if (message.type === 'oauthTokenResult')", start);
+		const context = { environmentFileRequestId: 2,
+			requestEnvPath: { value: '' }, requestEnvOpen: { disabled: true },
+			requestEnvError: { textContent: '' }, message: { type: 'environmentFile', requestId: 2, path: '/workspace/.env' } };
+		const code = '(function () {' + html.slice(start, end) + '})();';
+		runInNewContext(code, context);
+		assert.strictEqual(context.requestEnvPath.value, '/workspace/.env');
+		assert.strictEqual(context.requestEnvOpen.disabled, false);
+		context.message.path = '';
+		runInNewContext(code, context);
+		assert.strictEqual(context.requestEnvPath.value, '');
+		assert.strictEqual(context.requestEnvOpen.disabled, true);
+		context.message.requestId = 1;
+		context.message.path = '/old/.env';
+		runInNewContext(code, context);
+		assert.strictEqual(context.requestEnvPath.value, '');
+	});
 });

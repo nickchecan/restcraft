@@ -162,6 +162,27 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			font-weight: 600;
 		}
 
+		.request-env-row {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+
+		.request-env-row label,
+		#request-env-open {
+			flex-shrink: 0;
+		}
+
+		#request-env-path {
+			flex: 1;
+			min-width: 0;
+		}
+
+		#request-env-error {
+			margin-top: 8px;
+			color: var(--vscode-errorForeground);
+		}
+
 		.variable-input-wrapper {
 			display: block;
 			position: relative;
@@ -954,6 +975,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				<button class="request-tab" id="request-authorization-tab" type="button" role="tab" aria-selected="false" aria-controls="request-authorization-panel">Authorization</button>
 				<button class="request-tab" id="request-headers-tab" type="button" role="tab" aria-selected="false" aria-controls="request-headers-panel">Headers</button>
 				<button class="request-tab" id="request-body-tab" type="button" role="tab" aria-selected="false" aria-controls="request-body-panel">Body</button>
+				<button class="request-tab" id="request-settings-tab" type="button" role="tab" aria-selected="false" aria-controls="request-settings-panel">Settings</button>
 			</div>
 			<div class="request-panel-content" id="request-params-panel" role="tabpanel" aria-labelledby="request-params-tab">
 				<table class="request-headers-table" aria-label="Request query parameters">
@@ -1077,6 +1099,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<button class="request-header-add" id="add-request-body-form-row" type="button">Add Pair</button>
 				</div>
 			</div>
+			<div class="request-panel-content hidden" id="request-settings-panel" role="tabpanel" aria-labelledby="request-settings-tab">
+				<div class="request-env-row">
+					<label for="request-env-path">Environment File</label>
+					<input id="request-env-path" type="text" readonly aria-label="Environment file path">
+					<button id="request-env-open" type="button" disabled>Open</button>
+				</div>
+				<div id="request-env-error" role="status" aria-live="polite"></div>
+			</div>
 		</section>
 		</div>
 		<div class="section-divider response-divider">
@@ -1168,6 +1198,17 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				const requestAuthorizationTab = document.getElementById('request-authorization-tab');
 				const requestHeadersTab = document.getElementById('request-headers-tab');
 				const requestBodyTab = document.getElementById('request-body-tab');
+                const requestSettingsTab = document.getElementById('request-settings-tab');
+                const requestSettingsPanel = document.getElementById('request-settings-panel');
+                const requestEnvPath = document.getElementById('request-env-path');
+                const requestEnvOpen = document.getElementById('request-env-open');
+                const requestEnvError = document.getElementById('request-env-error');
+                let environmentFileRequestId = 0;
+                requestSettingsTab.addEventListener('click', () => {
+                    showRequestTab('settings');
+                    refreshEnvironmentFile();
+                });
+                requestEnvOpen.addEventListener('click', () => vscode.postMessage({ type: 'openEnvironmentFile' }));
 				const requestParamsPanel = document.getElementById('request-params-panel');
 				const requestAuthorizationPanel = document.getElementById('request-authorization-panel');
 				const requestHeadersPanel = document.getElementById('request-headers-panel');
@@ -1548,12 +1589,20 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 		window.addEventListener('message', (event) => {
 			const message = event.data;
+                if (message.type === 'environmentFile') {
+                    if (message.requestId !== environmentFileRequestId) { return; }
+                    requestEnvPath.value = typeof message.path === 'string' ? message.path : '';
+                    requestEnvOpen.disabled = !requestEnvPath.value;
+                    requestEnvError.textContent = typeof message.error === 'string' ? message.error : '';
+                    return;
+                }
 
 				if (message.type === 'oauthTokenResult') {
                     if (message.requestId !== oauthRequestId) { return; }
                     oauthPending = false;
                     oauthGetToken.disabled = false;
                     oauthStatus.textContent = message.error || (message.stored ? 'Access token saved to .env.' : 'Access token ready.');
+                    if (message.stored) { refreshEnvironmentFile(); }
                     if (typeof message.token === 'string' && authorizationType.value === 'oauth2' && oauthGrantType.value === 'client_credentials') {
                         oauthToken = message.token;
                         retrievedOAuthToken = message.token;
@@ -1654,6 +1703,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				}
 
 				if (message.type === 'loadRequest') {
+                        refreshEnvironmentFile();
 						setRequestTitle(message.request.name);
 						method.value = message.request.method;
 						url.value = message.request.url;
@@ -2036,12 +2086,23 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					};
 				}
 
+				function refreshEnvironmentFile() {
+					requestEnvPath.value = '';
+					requestEnvOpen.disabled = true;
+					requestEnvError.textContent = '';
+					vscode.postMessage({ type: 'getEnvironmentFile', requestId: ++environmentFileRequestId });
+				}
+
 				// Switches between request configuration tabs.
 				function showRequestTab(tabName) {
 					const showParams = tabName === 'params';
 					const showAuthorization = tabName === 'authorization';
 					const showHeaders = tabName === 'headers';
 					const showBody = tabName === 'body';
+                    const showSettings = tabName === 'settings';
+                    requestSettingsTab.classList.toggle('active', showSettings);
+                    requestSettingsTab.setAttribute('aria-selected', String(showSettings));
+                    requestSettingsPanel.classList.toggle('hidden', !showSettings);
 
 					requestParamsTab.classList.toggle('active', showParams);
 					requestAuthorizationTab.classList.toggle('active', showAuthorization);
