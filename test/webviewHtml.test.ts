@@ -34,7 +34,7 @@ suite('Webview HTML', () => {
 			oauthRequestId: 1, oauthPending: true, oauthGetToken: { disabled: true },
             setOAuthSecretVisible: () => {}, setBasicPasswordVisible: () => {}, vscode: { postMessage: () => {} }, bearerToken: { value: '' },
             oauthStoreToken: { checked: false }, oauthTokenVariable: { value: 'ACCESS_TOKEN' },
-			oauthStatus: { textContent: 'Getting token' }, oauthToken: 'old', retrievedOAuthToken: 'old',
+			oauthStatus: { textContent: 'Getting token' }, oauthToken: 'old', displayedOAuthToken: 'old',
 			activeAuthorizationType: 'none', oauthGrantType: { value: '' }, authorizationType,
 			readAuthorizationFromHeaders: () => { authorizationType.value = 'none'; },
 			readHeaderValue: (headers: Record<string, string>, name: string) => headers[name] || '',
@@ -53,7 +53,7 @@ suite('Webview HTML', () => {
 			assert.strictEqual(fields['oauth-client-secret'].value, '{{SECRET}}');
 			assert.strictEqual(fields['oauth-scope'].value, 'api');
 			assert.strictEqual(context.oauthToken, 'saved');
-            assert.strictEqual(context.retrievedOAuthToken, '', 'Reopening must clear the token output');
+            assert.strictEqual(context.displayedOAuthToken, '', 'Reopening must clear the token output');
 			assert.strictEqual(context.oauthPending, false);
 		}
 		context.message.request = { headers: {} };
@@ -70,7 +70,7 @@ suite('Webview HTML', () => {
 		const context = {
 			authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
 			oauthStoreToken: { checked: true }, oauthTokenVariable: { value: 'MY_TOKEN' }, oauthToken: 'sensitive-token',
-			activeAuthorizationType: 'oauth2', updateOAuthTokenDisplay: () => {},
+			activeAuthorizationType: 'oauth2', updateOAuthTokenDisplay: () => {}, refreshConfiguredOAuthToken: () => {},
 			setHeaderValue: (name: string, value: string) => { headers[name] = value; },
 			removeHeaderValue: (name: string) => { delete headers[name]; },
 		};
@@ -83,17 +83,17 @@ suite('Webview HTML', () => {
 		runInNewContext('syncAuthorizationHeader();', context);
 		assert.strictEqual(headers.Authorization, 'Bearer sensitive-token');
 	});
-	test('token output shows only a token retrieved in the current editor session', () => {
+	test('token output renders resolved display state independently of the saved header', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function updateOAuthTokenDisplay()');
 		const end = html.indexOf('// Hides or shows an authorization field', start);
 		const context = { authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
-			oauthToken: 'saved-token', retrievedOAuthToken: '', oauthAccessToken: { value: '' },
+			oauthToken: 'saved-token', displayedOAuthToken: '', oauthAccessToken: { value: '' },
             oauthDecodedToken: { value: '' }, TextDecoder, atob,
 			oauthTokenPanel: { classList: { toggle: () => {} } }, authorizationLayout: { classList: { toggle: () => {} } } };
 		runInNewContext(html.slice(start, end) + '; updateOAuthTokenDisplay();', context);
 		assert.strictEqual(context.oauthAccessToken.value, '');
-		context.retrievedOAuthToken = 'new-token';
+		context.displayedOAuthToken = 'new-token';
 		runInNewContext('updateOAuthTokenDisplay();', context);
 		assert.strictEqual(context.oauthAccessToken.value, 'new-token');
 	});
@@ -238,5 +238,35 @@ suite('Webview HTML', () => {
 		context.message.path = '/old/.env';
 		runInNewContext(code, context);
 		assert.strictEqual(context.requestEnvPath.value, '');
+	});
+	test('configured token results refresh the output without persisting a resolved token', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf("if (message.type === 'configuredOAuthToken')");
+		const end = html.indexOf("if (message.type === 'environmentFileSelected')", start);
+		let displayed = '';
+		const context = { configuredOAuthTokenRequestId: 2, displayedOAuthToken: '', oauthStatus: { textContent: 'Choose an environment file in Request Settings.' },
+			message: { type: 'configuredOAuthToken', requestId: 2, token: 'resolved-env-token' },
+			updateOAuthTokenDisplay: () => { displayed = context.displayedOAuthToken; } };
+		const code = '(function () {' + html.slice(start, end) + '})();';
+		runInNewContext(code, context);
+		assert.strictEqual(displayed, 'resolved-env-token');
+		assert.strictEqual(context.oauthStatus.textContent, '', 'A successful nearest-env lookup clears manual-mode errors');
+		assert.ok(!html.slice(start, end).includes('notifyRequestChanged'));
+		context.message.requestId = 1;
+		context.message.token = 'stale-token';
+		runInNewContext(code, context);
+		assert.strictEqual(displayed, 'resolved-env-token');
+	});
+	test('refreshing OAuth output clears old environment errors even without a token', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function refreshConfiguredOAuthToken()');
+		const end = html.indexOf('// Displays the current OAuth token', start);
+		const context = { configuredOAuthTokenRequestId: 1, displayedOAuthToken: '',
+			oauthStatus: { textContent: 'Choose an environment file in Request Settings.' },
+			authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
+			readAuthorizationHeaderValue: () => '' };
+		runInNewContext(html.slice(start, end) + '; refreshConfiguredOAuthToken();', context);
+		assert.strictEqual(context.oauthStatus.textContent, '');
+		assert.strictEqual(context.configuredOAuthTokenRequestId, 2);
 	});
 });

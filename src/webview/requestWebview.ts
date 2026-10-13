@@ -100,6 +100,12 @@ export function initializeRequestWebview(
 			return;
 		}
 
+        if (isRecord(message) && message.type === 'getConfiguredOAuthToken'
+            && typeof message.requestId === 'number' && Number.isSafeInteger(message.requestId)
+            && typeof message.authorization === 'string') {
+            void postConfiguredOAuthToken(webview, handlers.onGetRequestUri?.(), message.requestId, message.authorization);
+            return;
+        }
         if (isRecord(message) && message.type === 'getEnvironmentFile'
             && typeof message.requestId === 'number' && Number.isSafeInteger(message.requestId)
             && (message.environment === undefined || isEnvironmentFileSettings(message.environment))) {
@@ -855,5 +861,24 @@ async function chooseEnvironmentFile(webview: vscode.Webview, requestUri: vscode
 	} catch (error) {
 		await webview.postMessage({ type: 'environmentFileSelected', requestId,
 			error: error instanceof Error ? error.message : 'Unable to choose an environment file.' });
+	}
+}
+
+/** Resolves the effective Bearer token for display only, without updating request files. */
+export async function resolveConfiguredOAuthToken(authorization: string, requestUri: vscode.Uri | undefined): Promise<string> {
+	if (!vscode.workspace.isTrusted) { throw new Error('Showing access tokens requires a trusted workspace.'); }
+	if (!authorization.startsWith('Bearer ')) { return ''; }
+	const variables = authorization.includes('{{') && requestUri ? await readEnvironmentVariables(requestUri) : {};
+	const resolved = resolveRequestVariables({ method: 'GET', url: 'https://localhost/', headers: { Authorization: authorization } }, variables);
+	return resolved.headers!.Authorization.slice(7);
+}
+
+async function postConfiguredOAuthToken(webview: vscode.Webview, requestUri: vscode.Uri | undefined, requestId: number, authorization: string): Promise<void> {
+	try {
+		await webview.postMessage({ type: 'configuredOAuthToken', requestId,
+			token: await resolveConfiguredOAuthToken(authorization, requestUri) });
+	} catch (error) {
+		await webview.postMessage({ type: 'configuredOAuthToken', requestId, token: '',
+			error: error instanceof Error ? error.message : 'Unable to resolve configured access token.' });
 	}
 }

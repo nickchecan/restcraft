@@ -176,8 +176,9 @@ reopening it. Empty fields are supported while configuring the request. Older
 files without this object continue to infer authentication from their headers.
 When **Save token to .env** is unchecked, retrieved tokens persist directly
 in the request's `Authorization` header and are restored when reopened.
-The read-only **Access Token** field shows only tokens retrieved in the current
-editor session and clears when the request is reopened. The saved Authorization
+The read-only **Access Token** field shows the token configured for the request,
+resolving environment references from its selected `.env`. This output is never
+saved as an additional field in the request file. The saved Authorization
 header remains available for sending requests. The output area has **Access Token**
 and **Decoded Token** radio buttons. JWT header and payload decoding happens locally;
 signatures are not verified. Opaque or malformed tokens show an explanatory message.
