@@ -1,0 +1,30 @@
+{
+  "name": "Testing Authorization Code",
+  "method": "GET",
+  "url": "https://api.example.com/resource",
+  "params": [],
+  "headerState": [
+    {
+      "name": "Authorization",
+      "value": "Bearer {{ACCESS_TOKEN}}",
+      "enabled": true
+    }
+  ],
+  "body": null,
+  "authorization": {
+    "type": "oauth2",
+    "grantType": "authorization_code",
+    "accessTokenUrl": "https://demo.duendesoftware.com/connect/token",
+    "clientId": "interactive.confidential",
+    "clientSecret": "secret",
+    "scope": "openid profile email api",
+    "authorizationUrl": "https://demo.duendesoftware.com/connect/authorize",
+    "clientAuthentication": "basic",
+    "state": "4fbc2b2c8c558dd03d2d81ec8e65e30b79846d26c0d6477455a3dbbc5e1f1109",
+    "usePkce": true,
+    "updateAuthorizationHeader": true,
+    "storeAccessToken": true,
+    "accessTokenVariable": "ACCESS_TOKEN"
+  },
+  "description": "Credentials - user: bob / password: bob"
+}

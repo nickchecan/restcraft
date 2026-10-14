@@ -2,10 +2,11 @@ import * as vscode from 'vscode';
 
 import { createAndOpenRequestFile } from './commands/createRequestFile';
 import { readPackageVersion } from './extensionVersion';
+import { registerOAuthCallback } from './webview/oauthCallback';
 import { RequestEditorProvider } from './webview/requestEditorProvider';
 
 /**
- * Registers RestCraft commands and the custom request editor.
+ * Registers RestCraft commands, the custom request editor, and OAuth callback handler.
  *
  * Activation intentionally does only lightweight setup. Work that reads files,
  * opens panels, or parses requests is deferred until the user invokes a command
@@ -16,14 +17,14 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const createRequestFile = vscode.commands.registerCommand('restcraft.createRequestFile', createAndOpenRequestFile);
 
-	context.subscriptions.push(createRequestFile, RequestEditorProvider.register(context, extensionVersion));
+	context.subscriptions.push(registerOAuthCallback(context.extension.id), createRequestFile, RequestEditorProvider.register(context, extensionVersion));
 }
 
 /**
  * VS Code calls this when the extension is deactivated.
  *
- * RestCraft currently registers disposable commands/providers only, so VS Code
- * can clean them up through `context.subscriptions` without explicit teardown.
+ * VS Code disposes commands, providers, and pending OAuth callbacks through
+ * `context.subscriptions`.
  */
 export function deactivate() {}
 

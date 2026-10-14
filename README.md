@@ -204,8 +204,48 @@ Example OAuth configuration (alongside the existing request properties):
 ```
 
 `grantType` accepts `client_credentials` or `authorization_code`. Tokens are not
-refreshed automatically. **Authorization Code** is a placeholder for future work;
-selecting it hides the token fields and retrieval button.
+refreshed automatically. **Authorization Code** opens your browser for login,
+receives the VS Code callback, and exchanges the returned code for an access token.
+
+For Authorization Code, configure **Authorization URL**, **Access Token URL**,
+**Client ID**, **Scope**, and **Client Authentication** (None, HTTP Basic, or
+credentials in the body). Client Secret is shown when authentication is selected. Switching authentication
+to **None** clears the saved client secret. Editable OAuth text fields accept
+`{{VARIABLE_NAME}}` references and show the same variable highlighting and
+hover previews as other request fields. References are saved as entered; both
+grant types resolve them from the selected environment before retrieval. The
+generated Redirect URL remains read-only.
+**Use PKCE** defaults to enabled with S256. **State** is editable and saved with the request. Click **Generate** (wand icon)
+to replace it with a fresh cryptographically random value. The State field is generated only
+when you click **Generate**; an empty field stays empty. The generated
+**Redirect URL** is read-only and has a **Copy** button for registering it with
+your provider. The provider must support the generated callback URL, normally
+`vscode://nickchecan.restcraft/oauth/callback` on desktop VS Code (Insiders and
+remote environments may use a different address). Use the complete generated URL.
+
+Click **Get new access token**, finish login/consent in your browser, and allow
+it to open VS Code when prompted. RestCraft displays the returned token and
+honors **Update header** and **Save token to .env**. **Cancel** immediately stops the attempt and ignores late browser callbacks.
+You can retry immediately with the same State field;
+waiting for browser authorization times out after five minutes. The token
+exchange uses the extension's request timeout. Codes and PKCE verifiers stay in
+memory and are discarded when the attempt ends.
+
+With PKCE enabled, the State field may be empty. Each attempt adds a unique
+internal identifier to the OAuth state sent to the provider. This identifier
+is never saved and does not change the State field; it prevents late callbacks
+from cancelled attempts matching a retry.
+When PKCE is disabled, enter State or click **Generate** before retrieval. State
+accepts URL-safe letters, numbers, dots, underscores, tildes, and hyphens.
+Simultaneous attempts can use the same State field, including an empty field. Token requests support no client authentication,
+HTTP Basic, and credentials in the request body. Only HTTPS authorization and
+token endpoints are supported. Refresh tokens and automatic renewal are not
+implemented.
+
+The optional authorization properties `authorizationUrl` (string),
+`clientAuthentication` (`none`, `basic`, or `body`), `state` (string), and `usePkce` (boolean) are
+saved with the request. Older files default to no client authentication and PKCE
+enabled. Redirect URLs and PKCE verifiers are not persisted.
 
 ### Request Settings
 

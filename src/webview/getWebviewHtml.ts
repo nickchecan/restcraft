@@ -253,7 +253,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			min-width: 0;
 		}
 
-		#request-env-open:disabled {
+		#request-env-open:disabled,
+		#oauth-get-token:disabled,
+		#oauth-cancel-token:disabled {
 			cursor: default;
 		}
 
@@ -326,6 +328,19 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 		button.request-cancel:hover {
 			background: var(--vscode-inputValidation-errorBorder, #c72e0f);
 		}
+
+        #oauth-cancel-token,
+        #oauth-cancel-token:hover {
+            color: #fff;
+            background: #e02424;
+        }
+
+        #oauth-cancel-token:disabled,
+        #oauth-cancel-token:disabled:hover {
+            color: var(--vscode-inputValidation-errorForeground, #fff);
+            background: var(--vscode-inputValidation-errorBackground, #a1260d);
+            opacity: 1;
+        }
 
 			button:disabled {
 				opacity: 0.7;
@@ -518,7 +533,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			.oauth-token-options input[type="radio"],
-			#oauth-store-token, #oauth-update-header {
+			#oauth-store-token, #oauth-update-header, #oauth-pkce {
 				width: 16px;
 				height: 16px;
 				padding: 0;
@@ -532,17 +547,24 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				margin-top: 8px;
 			}
 
-			#oauth-get-token,
-			#oauth-status {
-				margin-top: 12px;
-			}
+            .oauth-token-actions {
+                grid-column: 1 / -1;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+                width: max-content;
+                margin-top: 12px;
+                justify-self: start;
+            }
 
-			#oauth-get-token {
-				grid-column: 1 / -1;
-				justify-self: start;
-				width: max-content;
-				white-space: nowrap;
-			}
+            .oauth-token-actions > button {
+                width: 100%;
+                white-space: nowrap;
+            }
+
+            #oauth-status {
+                margin-top: 12px;
+            }
 
 			#oauth-status {
 				grid-column: 1 / -1;
@@ -1148,8 +1170,21 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						<option value="client_credentials">Client Credentials</option>
 						<option value="authorization_code">Authorization Code</option>
 					</select>
+                    <label class="oauth-code-field hidden" for="oauth-redirect-url">Redirect URL</label>
+                    <div class="authorization-secret-control oauth-code-field hidden">
+                        <input class="authorization-input" id="oauth-redirect-url" type="text" readonly placeholder="Preparing callback URL…">
+                        <button id="oauth-copy-redirect" type="button" disabled>${buttonIcons.copy}<span>Copy</span></button>
+                    </div>
+                    <label class="oauth-code-field hidden" for="oauth-authorization-url">Authorization URL</label>
+                    <input class="authorization-input oauth-code-field hidden" id="oauth-authorization-url" type="text" autocomplete="off">
 					<label class="oauth-client-field hidden" for="oauth-url">Access Token URL</label>
 					<input class="authorization-input oauth-client-field hidden" id="oauth-url" type="text" autocomplete="off">
+                    <label class="oauth-code-field hidden" for="oauth-client-authentication">Client Authentication</label>
+                    <select class="oauth-code-field hidden" id="oauth-client-authentication">
+                        <option value="none">None (public client)</option>
+                        <option value="basic">HTTP Basic</option>
+                        <option value="body">Send credentials in body</option>
+                    </select>
 					<label class="oauth-client-field hidden" for="oauth-client-id">Client ID</label>
 					<input class="authorization-input oauth-client-field hidden" id="oauth-client-id" type="text" autocomplete="off">
 					<label class="oauth-client-field hidden" for="oauth-client-secret">Client Secret</label>
@@ -1159,6 +1194,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					</div>
 					<label class="oauth-client-field hidden" for="oauth-scope">Scope</label>
 					<input class="authorization-input oauth-client-field hidden" id="oauth-scope" type="text" autocomplete="off">
+                    <label class="oauth-code-field hidden" for="oauth-state">State</label>
+                    <div class="authorization-secret-control oauth-code-field hidden">
+                        <input class="authorization-input" id="oauth-state" type="text" autocomplete="off" spellcheck="false">
+                        <button id="oauth-generate-state" type="button" aria-label="Generate a new state">${buttonIcons.wand}<span>Generate</span></button>
+                    </div>
+                    <label class="oauth-code-field hidden" for="oauth-pkce">Use PKCE</label>
+                    <input class="oauth-code-field hidden" id="oauth-pkce" type="checkbox" checked aria-describedby="oauth-pkce-description">
+                    <span class="oauth-code-field oauth-storage-description hidden" id="oauth-pkce-description">Uses S256 with a new verifier for each authorization attempt.</span>
 					<div class="authorization-divider oauth-client-field hidden" role="separator" aria-hidden="true"></div>
 					<label class="oauth-client-field hidden" for="oauth-update-header">Update header</label>
 					<input class="oauth-client-field hidden" id="oauth-update-header" type="checkbox" aria-describedby="oauth-update-header-description" checked>
@@ -1169,7 +1212,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<label class="oauth-storage-field hidden" for="oauth-token-variable">Variable Name</label>
 					<input class="authorization-input oauth-storage-field hidden" id="oauth-token-variable" aria-describedby="oauth-token-variable-description" type="text" value="ACCESS_TOKEN" placeholder="ACCESS_TOKEN" autocomplete="off" spellcheck="false">
 					<span class="oauth-storage-field oauth-storage-description hidden" id="oauth-token-variable-description">If this variable does not exist, it will be created in .env when you get a new access token.</span>
-					<button class="oauth-client-field hidden" id="oauth-get-token" type="button">${buttonIcons.key}<span>Get new access token</span></button>
+                    <div class="oauth-token-actions oauth-client-field hidden">
+                        <button id="oauth-get-token" type="button">${buttonIcons.key}<span>Get new access token</span></button>
+                        <button class="request-cancel" id="oauth-cancel-token" type="button" disabled>Cancel</button>
+                    </div>
 					<span class="oauth-client-field hidden" id="oauth-status" role="status" aria-live="polite"></span>
 					<label class="bearer-authorization-field hidden" for="bearer-token">Token</label>
 					<input class="authorization-input bearer-authorization-field hidden" id="bearer-token" name="bearer-token" type="text" autocomplete="off">
@@ -1476,8 +1522,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     applyAuthorizationType();
                     notifyRequestChanged();
                 });
-                ['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope'].forEach((id) => {
+                ['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope', 'oauth-authorization-url', 'oauth-state'].forEach((id) => {
                     document.getElementById(id).addEventListener('input', () => {
+                        updateSecretReferenceState(document.getElementById(id));
                         vscode.postMessage({ type: 'cancelOAuthToken' });
                         oauthRequestId++;
                         oauthPending = false;
@@ -1491,11 +1538,52 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                         notifyRequestChanged();
                     });
                 });
+                document.getElementById('oauth-client-authentication').addEventListener('change', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = '';
+                    if (document.getElementById('oauth-client-authentication').value === 'none') {
+                        document.getElementById('oauth-client-secret').value = '';
+                    }
+                    setOAuthSecretVisible(false);
+                    applyAuthorizationType();
+                    scheduleEnvironmentVariableCheck();
+                    notifyRequestChanged();
+                });
+                document.getElementById('oauth-generate-state').addEventListener('click', () => {
+                    const bytes = crypto.getRandomValues(new Uint8Array(32));
+                    document.getElementById('oauth-state').value = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+                    document.getElementById('oauth-state').dispatchEvent(new Event('input', { bubbles: true }));
+                });
+                document.getElementById('oauth-pkce').addEventListener('change', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = '';
+                    notifyRequestChanged();
+                });
+                document.getElementById('oauth-copy-redirect').addEventListener('click', () => vscode.postMessage({ type: 'copyOAuthRedirect' }));
+                document.getElementById('oauth-cancel-token').addEventListener('click', () => {
+                    if (!oauthPending) { return; }
+                    // Invalidate queued results immediately, before the host receives cancellation.
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = 'Token request cancelled.';
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                });
+                const oauthCancelObserver = new MutationObserver(() => {
+                    document.getElementById('oauth-cancel-token').disabled = !oauthPending;
+                });
+                oauthCancelObserver.observe(oauthGetToken, { attributes: true, attributeFilter: ['disabled'] });
                 oauthGetToken.addEventListener('click', () => {
-                    if (oauthPending || authorizationType.value !== 'oauth2' || oauthGrantType.value !== 'client_credentials') { return; }
+                    if (oauthPending || authorizationType.value !== 'oauth2') { return; }
                     oauthPending = true;
                     oauthGetToken.disabled = true;
-                    oauthStatus.textContent = 'Getting access token…';
+                    oauthStatus.textContent = oauthGrantType.value === 'authorization_code' ? 'Complete authorization in your browser…' : 'Getting access token…';
                     vscode.postMessage({
                         type: 'getOAuthToken', requestId: ++oauthRequestId,
                         storeAccessToken: oauthStoreToken.checked,
@@ -1504,6 +1592,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                         clientId: document.getElementById('oauth-client-id').value,
                         clientSecret: document.getElementById('oauth-client-secret').value,
                         scope: document.getElementById('oauth-scope').value,
+                        grantType: oauthGrantType.value,
+                        authorizationUrl: document.getElementById('oauth-authorization-url').value,
+                        clientAuthentication: document.getElementById('oauth-client-authentication').value,
+                        state: document.getElementById('oauth-state').value,
+                        usePkce: document.getElementById('oauth-pkce').checked,
                     });
                 });
 
@@ -1806,7 +1899,13 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 		window.addEventListener('message', (event) => {
 			const message = event.data;
-                if (message.type === 'tokenViewSetting') {
+                if (message.type === 'oauthRedirect') {
+                        document.getElementById('oauth-redirect-url').value = message.url || '';
+                        document.getElementById('oauth-redirect-url').placeholder = message.error || 'Callback URL unavailable';
+                        document.getElementById('oauth-copy-redirect').disabled = !message.url;
+                        return;
+                    }
+                    if (message.type === 'tokenViewSetting') {
                     defaultTokenView = ['raw', 'decoded', 'hidden'].includes(message.value) ? message.value : 'raw';
                     return;
                 }
@@ -1848,7 +1947,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     oauthGetToken.disabled = false;
                     oauthStatus.textContent = message.error || (message.stored ? 'Access token saved to .env.' : 'Access token ready.');
                     if (message.stored) { refreshEnvironmentFile(); }
-                    if (typeof message.token === 'string' && authorizationType.value === 'oauth2' && oauthGrantType.value === 'client_credentials') {
+                    if (typeof message.token === 'string' && authorizationType.value === 'oauth2') {
                         displayedOAuthToken = message.token;
                         configuredOAuthTokenRequestId++;
                         if (oauthUpdateHeader.checked) {
@@ -1994,6 +2093,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                         oauthStoreToken.checked = savedAuthorization?.storeAccessToken === true;
                         oauthTokenVariable.value = savedAuthorization?.accessTokenVariable ?? 'ACCESS_TOKEN';
                         oauthGrantType.value = savedAuthorization?.grantType || 'client_credentials';
+                        document.getElementById('oauth-authorization-url').value = savedAuthorization?.authorizationUrl || '';
+                        document.getElementById('oauth-client-authentication').value = savedAuthorization?.clientAuthentication || 'none';
+                        document.getElementById('oauth-pkce').checked = savedAuthorization?.usePkce !== false;
+                        document.getElementById('oauth-state').value = savedAuthorization?.state || '';
                         document.getElementById('oauth-url').value = savedAuthorization?.accessTokenUrl || '';
                         document.getElementById('oauth-client-id').value = savedAuthorization?.clientId || '';
                         document.getElementById('oauth-client-secret').value = savedAuthorization?.clientSecret || '';
@@ -2803,10 +2906,23 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					const showBearerToken = authorizationType.value === 'bearer';
 					const showBasicAuth = authorizationType.value === 'basic';
                     const showOAuth = authorizationType.value === 'oauth2';
+                    ['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope', 'oauth-authorization-url', 'oauth-state'].forEach((id) => {
+                        updateSecretReferenceState(document.getElementById(id));
+                    });
                     updateOAuthTokenDisplay();
-                    document.querySelectorAll('.oauth-storage-field').forEach((field) => setAuthorizationFieldHidden(field, !showOAuth || oauthGrantType.value !== 'client_credentials' || !oauthStoreToken.checked));
+                    document.querySelectorAll('.oauth-storage-field').forEach((field) => setAuthorizationFieldHidden(field, !showOAuth || !oauthStoreToken.checked));
                     document.querySelectorAll('.oauth-authorization-field').forEach((field) => setAuthorizationFieldHidden(field, !showOAuth));
-                    document.querySelectorAll('.oauth-client-field').forEach((field) => setAuthorizationFieldHidden(field, !showOAuth || oauthGrantType.value !== 'client_credentials'));
+                    document.querySelectorAll('.oauth-client-field').forEach((field) => setAuthorizationFieldHidden(field, !showOAuth));
+                    const showCode = showOAuth && oauthGrantType.value === 'authorization_code';
+                    document.querySelectorAll('.oauth-code-field').forEach((field) => setAuthorizationFieldHidden(field, !showCode));
+                    const hideSecret = showCode && document.getElementById('oauth-client-authentication').value === 'none';
+                    setAuthorizationFieldHidden(document.querySelector('label[for="oauth-client-secret"]'), !showOAuth || hideSecret);
+                    setAuthorizationFieldHidden(document.getElementById('oauth-client-secret').closest('.authorization-secret-control'), !showOAuth || hideSecret);
+                    oauthGetToken.disabled = oauthPending;
+                    if (showCode && !oauthPending) {
+                        vscode.postMessage({ type: 'getOAuthRedirect' });
+                    }
+
 
 					bearerAuthorizationFields.forEach((field) => {
 						setAuthorizationFieldHidden(field, !showBearerToken);
@@ -2830,7 +2946,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					const requestId = ++configuredOAuthTokenRequestId;
 					displayedOAuthToken = '';
 					oauthStatus.textContent = '';
-					if (authorizationType.value !== 'oauth2' || oauthGrantType.value !== 'client_credentials') { return; }
+					if (authorizationType.value !== 'oauth2') { return; }
 					const row = !oauthUpdateHeader.checked ? findHeaderRow('Authorization') : undefined;
 					const authorization = row ? row.querySelectorAll('.request-header-input')[1].value : readAuthorizationHeaderValue();
 					if (!authorization) { return; }
@@ -2839,7 +2955,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 				// Displays the current OAuth token without treating it as HTML.
 				function updateOAuthTokenDisplay() {
-					const visible = authorizationType.value === 'oauth2' && oauthGrantType.value === 'client_credentials';
+					const visible = authorizationType.value === 'oauth2';
 					oauthTokenPanel.classList.toggle('hidden', !visible);
 					authorizationLayout.classList.toggle('has-oauth-token-panel', visible);
 					oauthAccessToken.value = visible ? displayedOAuthToken : '';
@@ -3382,6 +3498,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                             clientId: document.getElementById('oauth-client-id').value,
                             clientSecret: document.getElementById('oauth-client-secret').value,
                             scope: document.getElementById('oauth-scope').value,
+                            authorizationUrl: document.getElementById('oauth-authorization-url').value,
+                            clientAuthentication: document.getElementById('oauth-client-authentication').value,
+                            usePkce: document.getElementById('oauth-pkce').checked,
+                            state: document.getElementById('oauth-state').value,
                             updateAuthorizationHeader: oauthUpdateHeader.checked,
                             storeAccessToken: oauthStoreToken.checked,
                             accessTokenVariable: oauthTokenVariable.value.trim(),

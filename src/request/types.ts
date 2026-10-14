@@ -33,6 +33,10 @@ export interface OAuthAuthorizationDefinition {
 	clientId: string;
 	clientSecret: string;
 	scope: string;
+	authorizationUrl?: string;
+	clientAuthentication?: 'none' | 'basic' | 'body';
+	usePkce?: boolean;
+	state?: string;
 	updateAuthorizationHeader?: boolean;
 	storeAccessToken?: boolean;
 	accessTokenVariable?: string;

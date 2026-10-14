@@ -3,8 +3,10 @@ import { isAbsolute, posix } from 'path';
 import { isEnvironmentFileSettings, copyEnvironmentFileSettings, isTokenView } from '../request/environmentSettings';
 
 import { parseEnvFile, resolveRequestVariables, updateEnvValue } from '../request/environment';
-import { buildOAuthTokenRequest, readOAuthAccessToken, OAuthTokenFields, isOAuthAuthorization } from '../request/oauth';
+import { buildOAuthTokenRequest, readOAuthAccessToken, isOAuthAuthorization } from '../request/oauth';
 import { executeRequest } from '../request/requestRunner';
+import { AuthorizationCodeFields } from '../request/authorizationCode';
+import { getAuthorizationCodeToken, getOAuthRedirectUri } from './oauthCallback';
 import { ApiResponse, EnvironmentFileSettings, OAuthAuthorizationDefinition, RequestFileDefinition, RequestHeaderDefinition, RequestParamDefinition } from '../request/types';
 import { isRecord, isStringRecord } from '../shared/object';
 import { getWebviewHtml } from './getWebviewHtml';
@@ -87,6 +89,8 @@ export function initializeRequestWebview(
 		? { onReady: handlersOrOnReady }
 		: handlersOrOnReady ?? {};
 	const activeRequests = new Map<number, AbortController>();
+    let oauthRedirectUrl = '';
+    let preparingOAuthRedirect = false;
 
 	webview.html = getWebviewHtml(webview, handlers.extensionVersion ?? '0.0.0');
 
@@ -101,6 +105,27 @@ export function initializeRequestWebview(
 			handlers.onReady?.();
 			return;
 		}
+
+        if (isRecord(message) && message.type === 'getOAuthRedirect') {
+            if (!preparingOAuthRedirect) {
+                preparingOAuthRedirect = true;
+                void getOAuthRedirectUri().then(
+                    (uri) => {
+                        oauthRedirectUrl = uri;
+                        return webview.postMessage({ type: 'oauthRedirect', url: oauthRedirectUrl });
+                    },
+                    () => {
+                        oauthRedirectUrl = '';
+                        return webview.postMessage({ type: 'oauthRedirect', error: 'Unable to prepare the callback URL.' });
+                    },
+                ).then(() => { preparingOAuthRedirect = false; });
+            }
+            return;
+        }
+        if (isRecord(message) && message.type === 'copyOAuthRedirect') {
+            if (oauthRedirectUrl) { void vscode.env.clipboard.writeText(oauthRedirectUrl); }
+            return;
+        }
 
         if (isRecord(message) && message.type === 'getConfiguredOAuthToken'
             && typeof message.requestId === 'number' && Number.isSafeInteger(message.requestId)
@@ -176,9 +201,18 @@ export function initializeRequestWebview(
             if (!Number.isSafeInteger(message.requestId) || typeof message.requestId !== 'number' || message.requestId < 0
                 || typeof message.url !== 'string' || typeof message.clientId !== 'string'
                 || typeof message.clientSecret !== 'string' || typeof message.scope !== 'string'
+                || (message.grantType !== undefined && message.grantType !== 'client_credentials' && message.grantType !== 'authorization_code')
+                || (message.authorizationUrl !== undefined && typeof message.authorizationUrl !== 'string')
+                || (message.state !== undefined && typeof message.state !== 'string')
+                || (message.usePkce !== undefined && typeof message.usePkce !== 'boolean')
+                || (message.clientAuthentication !== undefined && !['none', 'basic', 'body'].includes(message.clientAuthentication as string))
                 || (message.storeAccessToken !== undefined && typeof message.storeAccessToken !== 'boolean')
                 || (message.accessTokenVariable !== undefined && typeof message.accessTokenVariable !== 'string')) { return; }
-            void handleOAuthToken(webview, { url: message.url, clientId: message.clientId, clientSecret: message.clientSecret, scope: message.scope }, message.requestId, handlers, activeRequests, message.storeAccessToken === true, typeof message.accessTokenVariable === 'string' ? message.accessTokenVariable : 'ACCESS_TOKEN');
+            void handleOAuthToken(webview, { url: message.url, clientId: message.clientId, clientSecret: message.clientSecret, scope: message.scope,
+                grantType: message.grantType === 'authorization_code' ? 'authorization_code' : 'client_credentials',
+                authorizationUrl: typeof message.authorizationUrl === 'string' ? message.authorizationUrl : '',
+                clientAuthentication: message.clientAuthentication === 'basic' || message.clientAuthentication === 'body' ? message.clientAuthentication : 'none',
+                state: typeof message.state === 'string' ? message.state : '', usePkce: message.usePkce !== false }, message.requestId, handlers, activeRequests, message.storeAccessToken === true, typeof message.accessTokenVariable === 'string' ? message.accessTokenVariable : 'ACCESS_TOKEN', uri => { oauthRedirectUrl = uri; });
             return;
         }
 		void handleMessage(webview, message, handlers, activeRequests);
@@ -758,9 +792,9 @@ function isRequestHeaderState(value: unknown): value is RequestHeaderDefinition 
 
 /** Retrieves a token only in response to the explicit webview button action. */
 async function handleOAuthToken(
-    webview: vscode.Webview, fields: OAuthTokenFields, requestId: number,
+    webview: vscode.Webview, fields: AuthorizationCodeFields & { grantType: 'client_credentials' | 'authorization_code' }, requestId: number,
     handlers: RequestWebviewHandlers, activeRequests: Map<number, AbortController>,
-    storeAccessToken = false, accessTokenVariable = 'ACCESS_TOKEN',
+    storeAccessToken = false, accessTokenVariable = 'ACCESS_TOKEN', onRedirect: (uri: string) => void = () => {},
 ): Promise<void> {
     // Negative IDs keep token retrieval separate from normal request cancellation IDs.
     const requestUri = handlers.onGetRequestUri?.();
@@ -774,19 +808,35 @@ async function handleOAuthToken(
             if (!requestUri) { throw new Error('Save or load a request file before storing an access token in .env.'); }
             if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(accessTokenVariable)) { throw new Error('Enter a valid access token variable name.'); }
         }
+        if (fields.grantType === 'authorization_code' && fields.clientAuthentication === 'none') { fields.clientSecret = ''; }
         const variables: Record<string, string> = requestUri ? await readEnvironmentVariables(requestUri) : {};
         for (const value of Object.values(fields)) {
+            if (typeof value !== 'string') { continue; }
             for (const match of value.matchAll(/\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}/g)) {
                 const resolved = requestUri ? variables[match[1]] : await handlers.onResolveEnvironmentVariable?.(match[1]);
                 if (resolved !== undefined) { variables[match[1]] = resolved; }
             }
         }
         const resolved = resolveRequestVariables({ method: 'POST', url: fields.url,
-            headers: { clientId: fields.clientId, clientSecret: fields.clientSecret, scope: fields.scope } }, variables);
-        const request = buildOAuthTokenRequest({ url: resolved.url, clientId: resolved.headers!.clientId,
-            clientSecret: resolved.headers!.clientSecret, scope: resolved.headers!.scope });
-        const response = await executeRequest(request, getRequestTimeout(), controller.signal, 'error');
-        const token = readOAuthAccessToken(response);
+            headers: { clientId: fields.clientId, clientSecret: fields.clientSecret, scope: fields.scope,
+                ...(fields.grantType === 'authorization_code' ? { authorizationUrl: fields.authorizationUrl, state: fields.state } : {}) } }, variables);
+        if (controller.signal.aborted) { throw new Error('Token request cancelled.'); }
+        const resolvedFields: AuthorizationCodeFields = { ...fields, url: resolved.url,
+            clientId: resolved.headers!.clientId, clientSecret: resolved.headers!.clientSecret, scope: resolved.headers!.scope,
+            authorizationUrl: resolved.headers!.authorizationUrl ?? '', state: resolved.headers!.state ?? '' };
+        let token: string;
+        if (fields.grantType === 'authorization_code') {
+            token = await getAuthorizationCodeToken(resolvedFields, controller.signal, getRequestTimeout(), async uri => {
+                onRedirect(uri);
+                await webview.postMessage({ type: 'oauthRedirect', url: uri });
+            });
+        } else {
+            const request = buildOAuthTokenRequest({ url: resolved.url, clientId: resolved.headers!.clientId,
+                clientSecret: resolved.headers!.clientSecret, scope: resolved.headers!.scope });
+            const response = await executeRequest(request, getRequestTimeout(), controller.signal, 'error');
+            token = readOAuthAccessToken(response);
+        }
+        if (controller.signal.aborted) { throw new Error('Token request cancelled.'); }
         if (storeAccessToken && requestUri) {
             await storeOAuthTokenInEnvironment(requestUri, accessTokenVariable, token, controller.signal);
         }
@@ -794,7 +844,7 @@ async function handleOAuthToken(
     } catch (error) {
         await webview.postMessage({ type: 'oauthTokenResult', requestId,
             error: error instanceof Error ? error.message : 'Unable to get an access token.' });
-    } finally { activeRequests.delete(key); }
+    } finally { controller.abort(); activeRequests.delete(key); }
 }
 
 // Serializes environment writes so token retrievals in different editors do not lose updates.

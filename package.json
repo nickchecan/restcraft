@@ -30,7 +30,8 @@
   ],
   "activationEvents": [
     "onCustomEditor:restcraft.requestEditor",
-    "onCommand:restcraft.createRequestFile"
+    "onCommand:restcraft.createRequestFile",
+    "onUri"
   ],
   "capabilities": {
     "untrustedWorkspaces": {

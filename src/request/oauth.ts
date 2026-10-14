@@ -52,6 +52,10 @@ export function isOAuthAuthorization(value: unknown): value is OAuthAuthorizatio
 		&& (value.grantType === 'client_credentials' || value.grantType === 'authorization_code')
 		&& typeof value.accessTokenUrl === 'string' && typeof value.clientId === 'string'
 		&& typeof value.clientSecret === 'string' && typeof value.scope === 'string'
+		&& (value.authorizationUrl === undefined || typeof value.authorizationUrl === 'string')
+		&& (value.clientAuthentication === undefined || ['none', 'basic', 'body'].includes(value.clientAuthentication as string))
+		&& (value.state === undefined || typeof value.state === 'string')
+		&& (value.usePkce === undefined || typeof value.usePkce === 'boolean')
 		&& (value.updateAuthorizationHeader === undefined || typeof value.updateAuthorizationHeader === 'boolean')
 		&& (value.storeAccessToken === undefined || typeof value.storeAccessToken === 'boolean')
 		&& (value.accessTokenVariable === undefined || typeof value.accessTokenVariable === 'string');
@@ -61,6 +65,10 @@ export function isOAuthAuthorization(value: unknown): value is OAuthAuthorizatio
 export function readOAuthAuthorization(value: OAuthAuthorizationDefinition): OAuthAuthorizationDefinition {
 	return { type: 'oauth2', grantType: value.grantType, accessTokenUrl: value.accessTokenUrl,
 		clientId: value.clientId, clientSecret: value.clientSecret, scope: value.scope,
+		...(value.authorizationUrl !== undefined ? { authorizationUrl: value.authorizationUrl } : {}),
+		...(value.clientAuthentication !== undefined ? { clientAuthentication: value.clientAuthentication } : {}),
+		...(value.state !== undefined ? { state: value.state } : {}),
+		...(value.usePkce !== undefined ? { usePkce: value.usePkce } : {}),
 		...(value.updateAuthorizationHeader !== undefined ? { updateAuthorizationHeader: value.updateAuthorizationHeader } : {}),
 		...(value.storeAccessToken !== undefined ? { storeAccessToken: value.storeAccessToken } : {}),
 		...(value.accessTokenVariable !== undefined ? { accessTokenVariable: value.accessTokenVariable } : {}) };

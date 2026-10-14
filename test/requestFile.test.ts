@@ -16,6 +16,19 @@ suite('Request file parser', () => {
 		});
 	}
 
+	test('round-trips Authorization Code options without transient callback values', () => {
+        const authorization = { type: 'oauth2', grantType: 'authorization_code',
+            accessTokenUrl: 'https://example.com/token', clientId: 'public-client', clientSecret: '', scope: 'api',
+            authorizationUrl: 'https://example.com/authorize', clientAuthentication: 'none', usePkce: true, state: 'my-custom-state' };
+        const request = { name: 'Code', method: 'GET', url: 'https://example.com/',
+            authorization: { ...authorization, redirectUrl: 'vscode://temporary', codeVerifier: 'temporary' } };
+        assert.deepStrictEqual(parseRequestFile(JSON.stringify(request)).authorization, authorization);
+        assert.deepStrictEqual(parseRequestFile(JSON.stringify(parseRequestFile(JSON.stringify(request)))).authorization, authorization);
+        for (const invalid of [{ authorizationUrl: 12 }, { clientAuthentication: 'invalid' }, { usePkce: 'true' }, { state: 123 }]) {
+            assert.throws(() => parseRequestFile(JSON.stringify({ ...request, authorization: { ...authorization, ...invalid } })), /authorization/);
+        }
+    });
+
 	test('rejects malformed OAuth settings', () => {
 		const authorization = { type: 'oauth2', grantType: 'client_credentials', accessTokenUrl: '',
 			clientId: '', clientSecret: '', scope: '' };

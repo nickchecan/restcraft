@@ -1,3 +1,4 @@
+import { webcrypto } from 'node:crypto';
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { runInNewContext } from 'vm';
@@ -20,13 +21,113 @@ suite('Webview HTML', () => {
         assert.ok(script);
         assert.doesNotThrow(() => new Function(script));
     });
+    test('OAuth text edits highlight environment references and preserve their literal values', () => {
+        const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+        const start = html.indexOf("['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope', 'oauth-authorization-url', 'oauth-state'].forEach");
+        const end = html.indexOf("document.getElementById('oauth-client-authentication').addEventListener", start);
+        const listeners: Record<string, () => void> = {};
+        const fields: Record<string, { value: string; addEventListener: (event: string, callback: () => void) => void }> = {};
+        for (const id of ['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope', 'oauth-authorization-url', 'oauth-state']) {
+            fields[id] = { value: '{{TEST_VARIABLE}}', addEventListener: (_event, callback) => { listeners[id] = callback; } };
+        }
+        const highlighted: unknown[] = [];
+        let changes = 0;
+        const context = { document: { getElementById: (id: string) => fields[id] },
+            updateSecretReferenceState: (field: unknown) => { highlighted.push(field); },
+            vscode: { postMessage: () => {} }, oauthRequestId: 0, oauthPending: false,
+            oauthGetToken: { disabled: false }, oauthToken: '', displayedOAuthToken: '', oauthStatus: { textContent: '' },
+            authorizationType: { value: 'oauth2' }, notifyRequestChanged: () => { changes++; } };
+        runInNewContext(html.slice(start, end), context);
+        for (const [id, listener] of Object.entries(listeners)) {
+            listener();
+            assert.strictEqual(highlighted.at(-1), fields[id]);
+            assert.strictEqual(fields[id].value, '{{TEST_VARIABLE}}');
+        }
+        assert.strictEqual(changes, 6);
+    });
+    test('changing client authentication to None clears the secret before saving', () => {
+        const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+        const start = html.indexOf("document.getElementById('oauth-client-authentication').addEventListener");
+        const end = html.indexOf("document.getElementById('oauth-generate-state').addEventListener", start);
+        let change = () => {};
+        const authentication = { value: 'body', addEventListener: (_event: string, callback: () => void) => { change = callback; } };
+        const secret = { value: '{{CLIENT_SECRET}}' };
+        let savedSecret = '';
+        const context = { document: { getElementById: (id: string) => id === 'oauth-client-authentication' ? authentication : secret },
+            vscode: { postMessage: () => {} }, oauthRequestId: 0, oauthPending: false, oauthGetToken: { disabled: false }, oauthStatus: { textContent: '' },
+            setOAuthSecretVisible: () => {}, applyAuthorizationType: () => {}, scheduleEnvironmentVariableCheck: () => {},
+            notifyRequestChanged: () => { savedSecret = secret.value; } };
+        runInNewContext(html.slice(start, end), context);
+        change();
+        assert.strictEqual(savedSecret, '{{CLIENT_SECRET}}');
+        authentication.value = 'none';
+        change();
+        assert.strictEqual(secret.value, '');
+        assert.strictEqual(savedSecret, '');
+        authentication.value = 'basic';
+        change();
+        assert.strictEqual(secret.value, '');
+    });
+    test('Cancel immediately invalidates a queued token result without updating the header', () => {
+        const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+        const start = html.indexOf("document.getElementById('oauth-cancel-token').addEventListener");
+        const end = html.indexOf('const oauthCancelObserver', start);
+        let cancel = () => {};
+        const messages: unknown[] = [];
+        const context = { document: { getElementById: () => ({ addEventListener: (_event: string, callback: () => void) => { cancel = callback; } }) },
+            oauthRequestId: 4, oauthPending: true, oauthGetToken: { disabled: true }, oauthStatus: { textContent: '' },
+            vscode: { postMessage: (message: unknown) => { messages.push(message); } },
+            message: { type: 'oauthTokenResult', requestId: 4, token: 'cancelled-token', stored: true },
+            displayedOAuthToken: 'previous-token', oauthToken: 'previous-token',
+            refreshEnvironmentFile: () => { assert.fail('Must not refresh a cancelled token'); },
+            applyRetrievedOAuthHeader: () => { assert.fail('Must not apply a cancelled token'); } };
+        runInNewContext(html.slice(start, end), context);
+        cancel();
+        assert.strictEqual(context.oauthPending, false);
+        assert.strictEqual(context.oauthGetToken.disabled, false);
+        assert.strictEqual(context.oauthRequestId, 5);
+        assert.strictEqual(context.oauthStatus.textContent, 'Token request cancelled.');
+        assert.strictEqual(messages.length, 1);
+        const resultStart = html.indexOf("if (message.type === 'oauthTokenResult')");
+        const resultEnd = html.indexOf("if (message.type === 'requestComplete')", resultStart);
+        runInNewContext('(function () {' + html.slice(resultStart, resultEnd) + '})();', context);
+        assert.strictEqual(context.displayedOAuthToken, 'previous-token');
+        assert.strictEqual(context.oauthToken, 'previous-token');
+        assert.strictEqual(context.oauthStatus.textContent, 'Token request cancelled.');
+        cancel();
+        assert.strictEqual(messages.length, 1);
+    });
+    test('Generate State creates a fresh random value and notifies the input listener', () => {
+        const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+        const start = html.indexOf("document.getElementById('oauth-generate-state').addEventListener");
+        const end = html.indexOf("document.getElementById('oauth-pkce').addEventListener", start);
+        let generate = () => {};
+        let changes = 0;
+        const state = { value: 'manually-entered', dispatchEvent: (event: Event) => {
+            assert.strictEqual(event.type, 'input');
+            assert.strictEqual(event.bubbles, true);
+            changes++;
+        } };
+        const context = { crypto: webcrypto, Uint8Array, Event,
+            document: { getElementById: (id: string) => id === 'oauth-state' ? state
+                : { addEventListener: (_event: string, callback: () => void) => { generate = callback; } } } };
+        runInNewContext(html.slice(start, end), context);
+        generate();
+        const first = state.value;
+        assert.match(first, /^[a-f0-9]{64}$/);
+        generate();
+        assert.match(state.value, /^[a-f0-9]{64}$/);
+        assert.notStrictEqual(state.value, first);
+        assert.strictEqual(changes, 2);
+        assert.ok(html.includes(buttonIcons.wand));
+    });
 	test('restores saved OAuth controls and clears them when loading a legacy request', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('// Loading another request invalidates pending token results');
 		const end = html.indexOf('setRequestBodyContent(message.request.body', start);
 		assert.ok(start >= 0 && end > start);
-		const fields: Record<string, { value: string }> = {};
-		for (const id of ['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope']) {
+		const fields: Record<string, { value: string; checked?: boolean }> = {};
+		for (const id of ['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope', 'oauth-authorization-url', 'oauth-client-authentication', 'oauth-pkce', 'oauth-state']) {
 			fields[id] = { value: 'previous request' };
 		}
 		const authorizationType = { value: 'none' };
@@ -47,7 +148,7 @@ suite('Webview HTML', () => {
 		for (const grantType of ['client_credentials', 'authorization_code']) {
 			context.message.request = { authorization: { type: 'oauth2', grantType,
 				accessTokenUrl: 'https://example.com/token', clientId: 'client',
-				clientSecret: '{{SECRET}}', scope: 'api' }, headers: { Authorization: 'Bearer saved' } };
+				clientSecret: '{{SECRET}}', scope: 'api', authorizationUrl: 'https://example.com/authorize', clientAuthentication: 'body', usePkce: false, state: 'custom-state' }, headers: { Authorization: 'Bearer saved' } };
 			runInNewContext('{ ' + html.slice(start, end) + ' }', context);
 			assert.strictEqual(authorizationType.value, 'oauth2');
 			assert.strictEqual(context.oauthGrantType.value, grantType);
@@ -55,6 +156,10 @@ suite('Webview HTML', () => {
 			assert.strictEqual(fields['oauth-client-id'].value, 'client');
 			assert.strictEqual(fields['oauth-client-secret'].value, '{{SECRET}}');
 			assert.strictEqual(fields['oauth-scope'].value, 'api');
+            assert.strictEqual(fields['oauth-authorization-url'].value, 'https://example.com/authorize');
+            assert.strictEqual(fields['oauth-client-authentication'].value, 'body');
+            assert.strictEqual(fields['oauth-pkce'].checked, false);
+            assert.strictEqual(fields['oauth-state'].value, 'custom-state');
 			assert.strictEqual(context.oauthToken, 'saved');
             assert.strictEqual(context.displayedOAuthToken, '', 'Reopening must clear the token output');
 			assert.strictEqual(context.oauthPending, false);
@@ -64,7 +169,13 @@ suite('Webview HTML', () => {
 		runInNewContext('{ ' + html.slice(start, end) + ' }', context);
 		assert.strictEqual(authorizationType.value, 'none');
 		assert.strictEqual(context.oauthToken, '');
-		assert.ok(Object.values(fields).every(field => field.value === ''));
+		assert.strictEqual(fields['oauth-authorization-url'].value, '');
+        assert.strictEqual(fields['oauth-client-authentication'].value, 'none');
+        assert.strictEqual(fields['oauth-pkce'].checked, true);
+        assert.strictEqual(fields['oauth-state'].value, '');
+        for (const id of ['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope']) {
+            assert.strictEqual(fields[id].value, '');
+        }
 	});
 	test('token output renders resolved display state independently of the saved header', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
@@ -284,6 +395,15 @@ suite('Webview HTML', () => {
 		context.oauthUpdateHeader.checked = true;
 		runInNewContext(code, context);
 		assert.strictEqual(headerUpdates, 1);
+        context.oauthGrantType.value = 'authorization_code';
+        context.oauthUpdateHeader.checked = false;
+        context.displayedOAuthToken = '';
+        runInNewContext(code, context);
+        assert.strictEqual(context.displayedOAuthToken, 'new-token');
+        assert.strictEqual(headerUpdates, 1);
+        context.oauthUpdateHeader.checked = true;
+        runInNewContext(code, context);
+        assert.strictEqual(headerUpdates, 2);
 		assert.strictEqual(context.oauthToken, 'new-token');
 	});
 	test('explains that a missing token variable will be created on retrieval', () => {
@@ -356,7 +476,7 @@ suite('Webview HTML', () => {
 				vscode: { postMessage: (message: { type: string; authorization?: string }) => { messages.push(message); } } };
 			runInNewContext(html.slice(refreshStart, refreshEnd) + html.slice(listenerStart, listenerEnd), context);
 			change();
-			assert.strictEqual(messages.filter(message => message.type === 'getConfiguredOAuthToken').length, 0);
+			assert.strictEqual(messages.filter(message => message.type === 'getConfiguredOAuthToken').length, 1);
 			context.oauthGrantType.value = 'client_credentials';
 			change();
 			assert.strictEqual(messages.find(message => message.type === 'getConfiguredOAuthToken')?.authorization, header);
