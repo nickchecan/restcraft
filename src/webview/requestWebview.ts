@@ -7,7 +7,14 @@ import { buildOAuthTokenRequest, readOAuthAccessToken, isOAuthAuthorization } fr
 import { executeRequest } from '../request/requestRunner';
 import { AuthorizationCodeFields } from '../request/authorizationCode';
 import { getAuthorizationCodeToken, getOAuthRedirectUri } from './oauthCallback';
-import { ApiResponse, EnvironmentFileSettings, OAuthAuthorizationDefinition, RequestFileDefinition, RequestHeaderDefinition, RequestParamDefinition } from '../request/types';
+import {
+	ApiResponse,
+	EnvironmentFileSettings,
+	OAuthAuthorizationDefinition,
+	RequestFileDefinition,
+	RequestHeaderDefinition,
+	RequestParamDefinition,
+} from '../request/types';
 import { isRecord, isStringRecord } from '../shared/object';
 import { getWebviewHtml } from './getWebviewHtml';
 
@@ -20,7 +27,10 @@ export interface SendRequestMessage {
 	body?: string;
 }
 
-interface CancelRequestMessage { type: 'cancelRequest'; requestId: number; }
+interface CancelRequestMessage {
+	type: 'cancelRequest';
+	requestId: number;
+}
 
 interface WebviewReadyMessage {
 	type: 'webviewReady';
@@ -86,12 +96,10 @@ export function initializeRequestWebview(
 	webview: vscode.Webview,
 	handlersOrOnReady?: RequestWebviewHandlers | (() => void),
 ): vscode.Disposable {
-	const handlers = typeof handlersOrOnReady === 'function'
-		? { onReady: handlersOrOnReady }
-		: handlersOrOnReady ?? {};
+	const handlers = typeof handlersOrOnReady === 'function' ? { onReady: handlersOrOnReady } : (handlersOrOnReady ?? {});
 	const activeRequests = new Map<number, AbortController>();
-    let oauthRedirectUrl = '';
-    let preparingOAuthRedirect = false;
+	let oauthRedirectUrl = '';
+	let preparingOAuthRedirect = false;
 
 	webview.html = getWebviewHtml(webview, handlers.extensionVersion ?? '0.0.0');
 
@@ -102,74 +110,98 @@ export function initializeRequestWebview(
 				isTrusted: vscode.workspace.isTrusted,
 			});
 			void postEnvironmentTooltipSetting(webview);
-            void postTokenViewSetting(webview);
-            void postAutoGenerateStateSetting(webview);
+			void postTokenViewSetting(webview);
+			void postAutoGenerateStateSetting(webview);
 			handlers.onReady?.();
 			return;
 		}
 
-        if (isRecord(message) && message.type === 'getOAuthRedirect') {
-            if (!preparingOAuthRedirect) {
-                preparingOAuthRedirect = true;
-                void getOAuthRedirectUri().then(
-                    (uri) => {
-                        oauthRedirectUrl = uri;
-                        return webview.postMessage({ type: 'oauthRedirect', url: oauthRedirectUrl });
-                    },
-                    () => {
-                        oauthRedirectUrl = '';
-                        return webview.postMessage({ type: 'oauthRedirect', error: 'Unable to prepare the callback URL.' });
-                    },
-                ).then(() => { preparingOAuthRedirect = false; });
-            }
-            return;
-        }
-        if (isRecord(message) && message.type === 'copyOAuthToken') {
-            if (typeof message.token === 'string' && message.token.length > 0) {
-                void vscode.env.clipboard.writeText(message.token);
-            }
-            return;
-        }
-        if (isRecord(message) && message.type === 'copyOAuthRedirect') {
-            if (oauthRedirectUrl) { void vscode.env.clipboard.writeText(oauthRedirectUrl); }
-            return;
-        }
+		if (isRecord(message) && message.type === 'getOAuthRedirect') {
+			if (!preparingOAuthRedirect) {
+				preparingOAuthRedirect = true;
+				void getOAuthRedirectUri()
+					.then(
+						(uri) => {
+							oauthRedirectUrl = uri;
+							return webview.postMessage({ type: 'oauthRedirect', url: oauthRedirectUrl });
+						},
+						() => {
+							oauthRedirectUrl = '';
+							return webview.postMessage({ type: 'oauthRedirect', error: 'Unable to prepare the callback URL.' });
+						},
+					)
+					.then(() => {
+						preparingOAuthRedirect = false;
+					});
+			}
+			return;
+		}
+		if (isRecord(message) && message.type === 'copyOAuthToken') {
+			if (typeof message.token === 'string' && message.token.length > 0) {
+				void vscode.env.clipboard.writeText(message.token);
+			}
+			return;
+		}
+		if (isRecord(message) && message.type === 'copyOAuthRedirect') {
+			if (oauthRedirectUrl) {
+				void vscode.env.clipboard.writeText(oauthRedirectUrl);
+			}
+			return;
+		}
 
-        if (isRecord(message) && message.type === 'getConfiguredOAuthToken'
-            && typeof message.requestId === 'number' && Number.isSafeInteger(message.requestId)
-            && typeof message.authorization === 'string') {
-            void postConfiguredOAuthToken(webview, handlers.onGetRequestUri?.(), message.requestId, message.authorization);
-            return;
-        }
-        if (isRecord(message) && message.type === 'getEnvironmentFile'
-            && typeof message.requestId === 'number' && Number.isSafeInteger(message.requestId)
-            && (message.environment === undefined || isEnvironmentFileSettings(message.environment))) {
-            const uri = handlers.onGetRequestUri?.();
-            if (uri) { environmentSelections.set(uri.toString(), message.environment as EnvironmentFileSettings | undefined); }
-            void postEnvironmentFile(webview, handlers.onGetRequestUri?.(), message.requestId);
-            return;
-        }
-        if (isRecord(message) && message.type === 'chooseEnvironmentFile'
-            && typeof message.requestId === 'number' && Number.isSafeInteger(message.requestId)) {
-            void chooseEnvironmentFile(webview, handlers.onGetRequestUri?.(), message.requestId);
-            return;
-        }
-        if (isRecord(message) && message.type === 'openEnvironmentFile') {
-            void openEnvironmentFile(handlers.onGetRequestUri?.());
-            return;
-        }
+		if (
+			isRecord(message) &&
+			message.type === 'getConfiguredOAuthToken' &&
+			typeof message.requestId === 'number' &&
+			Number.isSafeInteger(message.requestId) &&
+			typeof message.authorization === 'string'
+		) {
+			void postConfiguredOAuthToken(webview, handlers.onGetRequestUri?.(), message.requestId, message.authorization);
+			return;
+		}
+		if (
+			isRecord(message) &&
+			message.type === 'getEnvironmentFile' &&
+			typeof message.requestId === 'number' &&
+			Number.isSafeInteger(message.requestId) &&
+			(message.environment === undefined || isEnvironmentFileSettings(message.environment))
+		) {
+			const uri = handlers.onGetRequestUri?.();
+			if (uri) {
+				environmentSelections.set(uri.toString(), message.environment as EnvironmentFileSettings | undefined);
+			}
+			void postEnvironmentFile(webview, handlers.onGetRequestUri?.(), message.requestId);
+			return;
+		}
+		if (
+			isRecord(message) &&
+			message.type === 'chooseEnvironmentFile' &&
+			typeof message.requestId === 'number' &&
+			Number.isSafeInteger(message.requestId)
+		) {
+			void chooseEnvironmentFile(webview, handlers.onGetRequestUri?.(), message.requestId);
+			return;
+		}
+		if (isRecord(message) && message.type === 'openEnvironmentFile') {
+			void openEnvironmentFile(handlers.onGetRequestUri?.());
+			return;
+		}
 		if (isRequestChangedMessage(message)) {
-            const uri = handlers.onGetRequestUri?.();
-            if (uri) { environmentSelections.set(uri.toString(), message.environment); }
+			const uri = handlers.onGetRequestUri?.();
+			if (uri) {
+				environmentSelections.set(uri.toString(), message.environment);
+			}
 			handlers.onRequestChanged?.(message);
 			return;
 		}
-        if (isRecord(message) && message.type === 'cancelOAuthToken') {
-            for (const [key, controller] of activeRequests) {
-                if (key < 0) { controller.abort(); }
-            }
-            return;
-        }
+		if (isRecord(message) && message.type === 'cancelOAuthToken') {
+			for (const [key, controller] of activeRequests) {
+				if (key < 0) {
+					controller.abort();
+				}
+			}
+			return;
+		}
 		if (isCancelRequestMessage(message)) {
 			activeRequests.get(message.requestId)?.abort();
 			return;
@@ -205,24 +237,55 @@ export function initializeRequestWebview(
 			return;
 		}
 
-        if (isRecord(message) && message.type === 'getOAuthToken') {
-            if (!Number.isSafeInteger(message.requestId) || typeof message.requestId !== 'number' || message.requestId < 0
-                || typeof message.url !== 'string' || typeof message.clientId !== 'string'
-                || typeof message.clientSecret !== 'string' || typeof message.scope !== 'string'
-                || (message.grantType !== undefined && message.grantType !== 'client_credentials' && message.grantType !== 'authorization_code')
-                || (message.authorizationUrl !== undefined && typeof message.authorizationUrl !== 'string')
-                || (message.state !== undefined && typeof message.state !== 'string')
-                || (message.usePkce !== undefined && typeof message.usePkce !== 'boolean')
-                || (message.clientAuthentication !== undefined && !['none', 'basic', 'body'].includes(message.clientAuthentication as string))
-                || (message.storeAccessToken !== undefined && typeof message.storeAccessToken !== 'boolean')
-                || (message.accessTokenVariable !== undefined && typeof message.accessTokenVariable !== 'string')) { return; }
-            void handleOAuthToken(webview, { url: message.url, clientId: message.clientId, clientSecret: message.clientSecret, scope: message.scope,
-                grantType: message.grantType === 'authorization_code' ? 'authorization_code' : 'client_credentials',
-                authorizationUrl: typeof message.authorizationUrl === 'string' ? message.authorizationUrl : '',
-                clientAuthentication: message.clientAuthentication === 'basic' || message.clientAuthentication === 'body' ? message.clientAuthentication : 'none',
-                state: typeof message.state === 'string' ? message.state : '', usePkce: message.usePkce !== false }, message.requestId, handlers, activeRequests, message.storeAccessToken === true, typeof message.accessTokenVariable === 'string' ? message.accessTokenVariable : 'ACCESS_TOKEN', uri => { oauthRedirectUrl = uri; });
-            return;
-        }
+		if (isRecord(message) && message.type === 'getOAuthToken') {
+			if (
+				!Number.isSafeInteger(message.requestId) ||
+				typeof message.requestId !== 'number' ||
+				message.requestId < 0 ||
+				typeof message.url !== 'string' ||
+				typeof message.clientId !== 'string' ||
+				typeof message.clientSecret !== 'string' ||
+				typeof message.scope !== 'string' ||
+				(message.grantType !== undefined &&
+					message.grantType !== 'client_credentials' &&
+					message.grantType !== 'authorization_code') ||
+				(message.authorizationUrl !== undefined && typeof message.authorizationUrl !== 'string') ||
+				(message.state !== undefined && typeof message.state !== 'string') ||
+				(message.usePkce !== undefined && typeof message.usePkce !== 'boolean') ||
+				(message.clientAuthentication !== undefined &&
+					!['none', 'basic', 'body'].includes(message.clientAuthentication as string)) ||
+				(message.storeAccessToken !== undefined && typeof message.storeAccessToken !== 'boolean') ||
+				(message.accessTokenVariable !== undefined && typeof message.accessTokenVariable !== 'string')
+			) {
+				return;
+			}
+			void handleOAuthToken(
+				webview,
+				{
+					url: message.url,
+					clientId: message.clientId,
+					clientSecret: message.clientSecret,
+					scope: message.scope,
+					grantType: message.grantType === 'authorization_code' ? 'authorization_code' : 'client_credentials',
+					authorizationUrl: typeof message.authorizationUrl === 'string' ? message.authorizationUrl : '',
+					clientAuthentication:
+						message.clientAuthentication === 'basic' || message.clientAuthentication === 'body'
+							? message.clientAuthentication
+							: 'none',
+					state: typeof message.state === 'string' ? message.state : '',
+					usePkce: message.usePkce !== false,
+				},
+				message.requestId,
+				handlers,
+				activeRequests,
+				message.storeAccessToken === true,
+				typeof message.accessTokenVariable === 'string' ? message.accessTokenVariable : 'ACCESS_TOKEN',
+				(uri) => {
+					oauthRedirectUrl = uri;
+				},
+			);
+			return;
+		}
 		void handleMessage(webview, message, handlers, activeRequests);
 	});
 	const trustSubscription = vscode.workspace.onDidGrantWorkspaceTrust(() => {
@@ -232,9 +295,9 @@ export function initializeRequestWebview(
 		});
 	});
 	const settingsSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration('restcraft.autoGenerateAuthorizationCodeState')) {
-            void postAutoGenerateStateSetting(webview);
-        }
+		if (event.affectsConfiguration('restcraft.autoGenerateAuthorizationCodeState')) {
+			void postAutoGenerateStateSetting(webview);
+		}
 		if (event.affectsConfiguration('restcraft.defaultTokenView')) {
 			void postTokenViewSetting(webview);
 		}
@@ -243,17 +306,25 @@ export function initializeRequestWebview(
 		}
 	});
 
-	return vscode.Disposable.from(messageSubscription, trustSubscription, settingsSubscription, new vscode.Disposable(() => {
-		for (const controller of activeRequests.values()) { controller.abort(); }
-		activeRequests.clear();
-	}));
+	return vscode.Disposable.from(
+		messageSubscription,
+		trustSubscription,
+		settingsSubscription,
+		new vscode.Disposable(() => {
+			for (const controller of activeRequests.values()) {
+				controller.abort();
+			}
+			activeRequests.clear();
+		}),
+	);
 }
-
 
 /** Updates the preference without changing an already-open request's State. */
 async function postAutoGenerateStateSetting(webview: vscode.Webview): Promise<void> {
-    const value = vscode.workspace.getConfiguration('restcraft').get<boolean>('autoGenerateAuthorizationCodeState', false);
-    await webview.postMessage({ type: 'autoGenerateStateSetting', value: value === true });
+	const value = vscode.workspace
+		.getConfiguration('restcraft')
+		.get<boolean>('autoGenerateAuthorizationCodeState', false);
+	await webview.postMessage({ type: 'autoGenerateStateSetting', value: value === true });
 }
 
 /** Sends the extension-wide token output preference to each open webview. */
@@ -313,11 +384,15 @@ async function handleCheckEnvironmentVariables(
 			throw new Error('Environment values are only available in a trusted workspace.');
 		}
 		if (!vscode.workspace.getConfiguration('restcraft').get<boolean>('showEnvironmentVariableValues', true)) {
-			await webview.postMessage({ type: 'environmentVariablesChecked', requestId: message.requestId, definedNames: [] });
+			await webview.postMessage({
+				type: 'environmentVariablesChecked',
+				requestId: message.requestId,
+				definedNames: [],
+			});
 			return;
 		}
 
-		const definedNames = await handlers.onCheckEnvironmentVariables?.(message.names) ?? [];
+		const definedNames = (await handlers.onCheckEnvironmentVariables?.(message.names)) ?? [];
 		await webview.postMessage({
 			type: 'environmentVariablesChecked',
 			requestId: message.requestId,
@@ -377,12 +452,18 @@ async function handleMessage(
 
 		controller = new AbortController();
 		activeRequests.set(message.requestId, controller);
-		const response = handlers.onSendRequest ? await handlers.onSendRequest(message, controller.signal) : await executeRequest({
-			method: message.method,
-			url: message.url,
-			headers: message.headers,
-			body: message.body,
-		}, getRequestTimeout(), controller.signal);
+		const response = handlers.onSendRequest
+			? await handlers.onSendRequest(message, controller.signal)
+			: await executeRequest(
+					{
+						method: message.method,
+						url: message.url,
+						headers: message.headers,
+						body: message.body,
+					},
+					getRequestTimeout(),
+					controller.signal,
+				);
 
 		await webview.postMessage({
 			type: 'requestComplete',
@@ -415,12 +496,15 @@ export async function executeRequestWithEnvironment(
 	}
 
 	const variables = requestUri ? await readEnvironmentVariables(requestUri) : {};
-	const request = resolveRequestVariables({
-		method: message.method,
-		url: message.url,
-		headers: message.headers,
-		body: message.body,
-	}, variables);
+	const request = resolveRequestVariables(
+		{
+			method: message.method,
+			url: message.url,
+			headers: message.headers,
+			body: message.body,
+		},
+		variables,
+	);
 	await confirmInsecureCredentialRequest(request.url, request.headers);
 
 	return executeRequest(request, getRequestTimeout(), signal);
@@ -457,7 +541,10 @@ export async function findDefinedEnvironmentVariables(
 }
 
 /** Warns before credentials are sent to a remote host over plain HTTP. */
-async function confirmInsecureCredentialRequest(url: string, headers: Record<string, string> | undefined): Promise<void> {
+async function confirmInsecureCredentialRequest(
+	url: string,
+	headers: Record<string, string> | undefined,
+): Promise<void> {
 	if (vscode.workspace.getConfiguration('restcraft').get<boolean>('suppressInsecureCredentialWarning', false)) {
 		return;
 	}
@@ -469,7 +556,11 @@ async function confirmInsecureCredentialRequest(url: string, headers: Record<str
 		return;
 	}
 
-	if (parsedUrl.protocol !== 'http:' || isLocalHost(parsedUrl.hostname) || !hasAuthenticationCredentials(headers, parsedUrl)) {
+	if (
+		parsedUrl.protocol !== 'http:' ||
+		isLocalHost(parsedUrl.hostname) ||
+		!hasAuthenticationCredentials(headers, parsedUrl)
+	) {
 		return;
 	}
 
@@ -483,11 +574,9 @@ async function confirmInsecureCredentialRequest(url: string, headers: Record<str
 	);
 
 	if (choice === dontShowAgain) {
-		await vscode.workspace.getConfiguration('restcraft').update(
-			'suppressInsecureCredentialWarning',
-			true,
-			vscode.ConfigurationTarget.Global,
-		);
+		await vscode.workspace
+			.getConfiguration('restcraft')
+			.update('suppressInsecureCredentialWarning', true, vscode.ConfigurationTarget.Global);
 		return;
 	}
 
@@ -504,13 +593,14 @@ function hasAuthenticationCredentials(headers: Record<string, string> | undefine
 
 	return Object.entries(headers ?? {}).some(([name, value]) => {
 		const normalizedName = name.toLowerCase();
-		return value.length > 0 && (
-			normalizedName === 'authorization'
-			|| normalizedName === 'proxy-authorization'
-			|| normalizedName === 'cookie'
-			|| normalizedName === 'x-api-key'
-			|| normalizedName === 'api-key'
-			|| normalizedName === 'x-auth-token'
+		return (
+			value.length > 0 &&
+			(normalizedName === 'authorization' ||
+				normalizedName === 'proxy-authorization' ||
+				normalizedName === 'cookie' ||
+				normalizedName === 'x-api-key' ||
+				normalizedName === 'api-key' ||
+				normalizedName === 'x-auth-token')
 		);
 	});
 }
@@ -518,10 +608,7 @@ function hasAuthenticationCredentials(headers: Record<string, string> | undefine
 /** Keeps loopback and local development hosts warning-free. */
 function isLocalHost(hostname: string): boolean {
 	const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
-	return host === 'localhost'
-		|| host.endsWith('.localhost')
-		|| host === '::1'
-		|| /^127(?:\.\d{1,3}){3}$/.test(host);
+	return host === 'localhost' || host.endsWith('.localhost') || host === '::1' || /^127(?:\.\d{1,3}){3}$/.test(host);
 }
 
 /** Reads the user's configured request timeout, in milliseconds. */
@@ -539,29 +626,42 @@ async function readEnvironmentVariables(requestUri: vscode.Uri): Promise<Record<
 	return parseEnvFile(file.content);
 }
 
-
 const environmentSelections = new Map<string, EnvironmentFileSettings | undefined>();
 
 async function readEnvironmentSelection(requestUri: vscode.Uri): Promise<EnvironmentFileSettings | undefined> {
-	if (environmentSelections.has(requestUri.toString())) { return environmentSelections.get(requestUri.toString()); }
+	if (environmentSelections.has(requestUri.toString())) {
+		return environmentSelections.get(requestUri.toString());
+	}
 	try {
-		const document = vscode.workspace.textDocuments.find(document => document.uri.toString() === requestUri.toString());
+		const document = vscode.workspace.textDocuments.find(
+			(document) => document.uri.toString() === requestUri.toString(),
+		);
 		const content = document?.getText() ?? new TextDecoder().decode(await vscode.workspace.fs.readFile(requestUri));
 		const parsed: unknown = JSON.parse(content);
-		if (isRecord(parsed) && isEnvironmentFileSettings(parsed.environment)) { return copyEnvironmentFileSettings(parsed.environment); }
-	} catch (error) { if (!(error instanceof SyntaxError) && !isFileNotFoundError(error)) { throw error; } }
+		if (isRecord(parsed) && isEnvironmentFileSettings(parsed.environment)) {
+			return copyEnvironmentFileSettings(parsed.environment);
+		}
+	} catch (error) {
+		if (!(error instanceof SyntaxError) && !isFileNotFoundError(error)) {
+			throw error;
+		}
+	}
 	return undefined;
 }
 
 /** Uses the same closest-file lookup for reading and writing tokens. */
-async function findEnvironmentFile(requestUri: vscode.Uri): Promise<{ uri: vscode.Uri; content: string; exists: boolean }> {
-    const selection = await readEnvironmentSelection(requestUri);
-    if (selection?.mode === 'manual') {
-        if (!selection.path.trim()) { throw new Error('Choose an environment file in Request Settings.'); }
-        const uri = vscode.Uri.joinPath(readRequestDirectory(requestUri), selection.path);
-        const content = await vscode.workspace.fs.readFile(uri);
-        return { uri, content: new TextDecoder().decode(content), exists: true };
-    }
+async function findEnvironmentFile(
+	requestUri: vscode.Uri,
+): Promise<{ uri: vscode.Uri; content: string; exists: boolean }> {
+	const selection = await readEnvironmentSelection(requestUri);
+	if (selection?.mode === 'manual') {
+		if (!selection.path.trim()) {
+			throw new Error('Choose an environment file in Request Settings.');
+		}
+		const uri = vscode.Uri.joinPath(readRequestDirectory(requestUri), selection.path);
+		const content = await vscode.workspace.fs.readFile(uri);
+		return { uri, content: new TextDecoder().decode(content), exists: true };
+	}
 	const workspaceFolder = vscode.workspace.getWorkspaceFolder(requestUri);
 	const workspaceRoot = workspaceFolder?.uri ?? readRequestDirectory(requestUri);
 	let directory = readRequestDirectory(requestUri);
@@ -603,9 +703,7 @@ function readRequestDirectory(requestUri: vscode.Uri): vscode.Uri {
 /** Returns the parent directory URI without crossing URI authorities. */
 function readParentDirectory(directory: vscode.Uri): vscode.Uri {
 	const normalizedPath = normalizeDirectoryPath(directory.path);
-	const parentPath = normalizedPath === '/'
-		? '/'
-		: normalizedPath.slice(0, normalizedPath.lastIndexOf('/')) || '/';
+	const parentPath = normalizedPath === '/' ? '/' : normalizedPath.slice(0, normalizedPath.lastIndexOf('/')) || '/';
 
 	return directory.with({ path: parentPath });
 }
@@ -623,9 +721,11 @@ function isDirectoryWithinWorkspace(directory: vscode.Uri, workspaceRoot: vscode
 
 /** Compares two directory URIs after removing trailing path separators. */
 function sameDirectory(left: vscode.Uri, right: vscode.Uri): boolean {
-	return left.scheme === right.scheme
-		&& left.authority === right.authority
-		&& normalizeDirectoryPath(left.path) === normalizeDirectoryPath(right.path);
+	return (
+		left.scheme === right.scheme &&
+		left.authority === right.authority &&
+		normalizeDirectoryPath(left.path) === normalizeDirectoryPath(right.path)
+	);
 }
 
 function normalizeDirectoryPath(path: string): string {
@@ -654,21 +754,27 @@ function isSendRequestMessage(message: unknown): message is SendRequestMessage {
 
 	const candidate = message as Partial<SendRequestMessage>;
 
-	return candidate.type === 'sendRequest'
-		&& typeof candidate.requestId === 'number'
-		&& Number.isSafeInteger(candidate.requestId)
-		&& typeof candidate.method === 'string'
-		&& typeof candidate.url === 'string'
-		&& (candidate.body === undefined || typeof candidate.body === 'string')
-		&& (candidate.headers === undefined || isStringRecord(candidate.headers));
+	return (
+		candidate.type === 'sendRequest' &&
+		typeof candidate.requestId === 'number' &&
+		Number.isSafeInteger(candidate.requestId) &&
+		typeof candidate.method === 'string' &&
+		typeof candidate.url === 'string' &&
+		(candidate.body === undefined || typeof candidate.body === 'string') &&
+		(candidate.headers === undefined || isStringRecord(candidate.headers))
+	);
 }
 
 function isCancelRequestMessage(message: unknown): message is CancelRequestMessage {
-	if (!isRecord(message)) { return false; }
+	if (!isRecord(message)) {
+		return false;
+	}
 	const candidate = message as Partial<CancelRequestMessage>;
-	return candidate.type === 'cancelRequest'
-		&& typeof candidate.requestId === 'number'
-		&& Number.isSafeInteger(candidate.requestId);
+	return (
+		candidate.type === 'cancelRequest' &&
+		typeof candidate.requestId === 'number' &&
+		Number.isSafeInteger(candidate.requestId)
+	);
 }
 
 /**
@@ -730,11 +836,13 @@ function isResolveEnvironmentVariableMessage(message: unknown): message is Resol
 	}
 
 	const candidate = message as Partial<ResolveEnvironmentVariableMessage>;
-	return candidate.type === 'resolveEnvironmentVariable'
-		&& typeof candidate.requestId === 'number'
-		&& Number.isSafeInteger(candidate.requestId)
-		&& typeof candidate.name === 'string'
-		&& /^[A-Za-z_][A-Za-z0-9_]*$/.test(candidate.name);
+	return (
+		candidate.type === 'resolveEnvironmentVariable' &&
+		typeof candidate.requestId === 'number' &&
+		Number.isSafeInteger(candidate.requestId) &&
+		typeof candidate.name === 'string' &&
+		/^[A-Za-z_][A-Za-z0-9_]*$/.test(candidate.name)
+	);
 }
 
 /** Validates environment-variable presence checks sent from the webview. */
@@ -744,12 +852,14 @@ function isCheckEnvironmentVariablesMessage(message: unknown): message is CheckE
 	}
 
 	const candidate = message as Partial<CheckEnvironmentVariablesMessage>;
-	return candidate.type === 'checkEnvironmentVariables'
-		&& typeof candidate.requestId === 'number'
-		&& Number.isSafeInteger(candidate.requestId)
-		&& Array.isArray(candidate.names)
-		&& candidate.names.length <= 100
-		&& candidate.names.every((name) => typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name));
+	return (
+		candidate.type === 'checkEnvironmentVariables' &&
+		typeof candidate.requestId === 'number' &&
+		Number.isSafeInteger(candidate.requestId) &&
+		Array.isArray(candidate.names) &&
+		candidate.names.length <= 100 &&
+		candidate.names.every((name) => typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
+	);
 }
 
 /**
@@ -762,20 +872,22 @@ function isRequestChangedMessage(message: unknown): message is RequestChangedMes
 
 	const candidate = message as Partial<RequestChangedMessage>;
 
-	return (candidate.environment === undefined || isEnvironmentFileSettings(candidate.environment))
-		&& (candidate.authorization === undefined || isOAuthAuthorization(candidate.authorization))
-		&& candidate.type === 'requestChanged'
-		&& (candidate.authorizeBeforeSend === undefined || typeof candidate.authorizeBeforeSend === 'boolean')
-		&& (candidate.description === undefined || typeof candidate.description === 'string')
-		&& typeof candidate.name === 'string'
-		&& typeof candidate.method === 'string'
-		&& typeof candidate.url === 'string'
-		&& typeof candidate.body === 'string'
-		&& Array.isArray(candidate.params)
-		&& candidate.params.every(isRequestParamState)
-		&& Array.isArray(candidate.headerState)
-		&& candidate.headerState.every(isRequestHeaderState)
-		&& isStringRecord(candidate.headers);
+	return (
+		(candidate.environment === undefined || isEnvironmentFileSettings(candidate.environment)) &&
+		(candidate.authorization === undefined || isOAuthAuthorization(candidate.authorization)) &&
+		candidate.type === 'requestChanged' &&
+		(candidate.authorizeBeforeSend === undefined || typeof candidate.authorizeBeforeSend === 'boolean') &&
+		(candidate.description === undefined || typeof candidate.description === 'string') &&
+		typeof candidate.name === 'string' &&
+		typeof candidate.method === 'string' &&
+		typeof candidate.url === 'string' &&
+		typeof candidate.body === 'string' &&
+		Array.isArray(candidate.params) &&
+		candidate.params.every(isRequestParamState) &&
+		Array.isArray(candidate.headerState) &&
+		candidate.headerState.every(isRequestHeaderState) &&
+		isStringRecord(candidate.headers)
+	);
 }
 
 /**
@@ -788,9 +900,9 @@ function isRequestParamState(value: unknown): value is RequestParamDefinition {
 
 	const candidate = value as Partial<RequestParamDefinition>;
 
-	return typeof candidate.name === 'string'
-		&& typeof candidate.value === 'string'
-		&& typeof candidate.enabled === 'boolean';
+	return (
+		typeof candidate.name === 'string' && typeof candidate.value === 'string' && typeof candidate.enabled === 'boolean'
+	);
 }
 
 /**
@@ -803,107 +915,196 @@ function isRequestHeaderState(value: unknown): value is RequestHeaderDefinition 
 
 	const candidate = value as Partial<RequestHeaderDefinition>;
 
-	return typeof candidate.name === 'string'
-		&& typeof candidate.value === 'string'
-		&& typeof candidate.enabled === 'boolean';
+	return (
+		typeof candidate.name === 'string' && typeof candidate.value === 'string' && typeof candidate.enabled === 'boolean'
+	);
 }
 
 /** Retrieves a token only in response to the explicit webview button action. */
 async function handleOAuthToken(
-    webview: vscode.Webview, fields: AuthorizationCodeFields & { grantType: 'client_credentials' | 'authorization_code' }, requestId: number,
-    handlers: RequestWebviewHandlers, activeRequests: Map<number, AbortController>,
-    storeAccessToken = false, accessTokenVariable = 'ACCESS_TOKEN', onRedirect: (uri: string) => void = () => {},
+	webview: vscode.Webview,
+	fields: AuthorizationCodeFields & { grantType: 'client_credentials' | 'authorization_code' },
+	requestId: number,
+	handlers: RequestWebviewHandlers,
+	activeRequests: Map<number, AbortController>,
+	storeAccessToken = false,
+	accessTokenVariable = 'ACCESS_TOKEN',
+	onRedirect: (uri: string) => void = () => {},
 ): Promise<void> {
-    // Negative IDs keep token retrieval separate from normal request cancellation IDs.
-    const requestUri = handlers.onGetRequestUri?.();
-    const key = -requestId - 1;
-    if (activeRequests.has(key)) { return; }
-    const controller = new AbortController();
-    activeRequests.set(key, controller);
-    try {
-        if (!vscode.workspace.isTrusted) { throw new Error('Getting an access token requires a trusted workspace.'); }
-        if (storeAccessToken) {
-            if (!requestUri) { throw new Error('Save or load a request file before storing an access token in .env.'); }
-            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(accessTokenVariable)) { throw new Error('Enter a valid access token variable name.'); }
-        }
-        if (fields.grantType === 'authorization_code' && fields.clientAuthentication === 'none') { fields.clientSecret = ''; }
-        const variables: Record<string, string> = requestUri ? await readEnvironmentVariables(requestUri) : {};
-        for (const value of Object.values(fields)) {
-            if (typeof value !== 'string') { continue; }
-            for (const match of value.matchAll(/\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}/g)) {
-                const resolved = requestUri ? variables[match[1]] : await handlers.onResolveEnvironmentVariable?.(match[1]);
-                if (resolved !== undefined) { variables[match[1]] = resolved; }
-            }
-        }
-        const resolved = resolveRequestVariables({ method: 'POST', url: fields.url,
-            headers: { clientId: fields.clientId, clientSecret: fields.clientSecret, scope: fields.scope,
-                ...(fields.grantType === 'authorization_code' ? { authorizationUrl: fields.authorizationUrl, state: fields.state } : {}) } }, variables);
-        if (controller.signal.aborted) { throw new Error('Token request cancelled.'); }
-        const resolvedFields: AuthorizationCodeFields = { ...fields, url: resolved.url,
-            clientId: resolved.headers!.clientId, clientSecret: resolved.headers!.clientSecret, scope: resolved.headers!.scope,
-            authorizationUrl: resolved.headers!.authorizationUrl ?? '', state: resolved.headers!.state ?? '' };
-        let token: string;
-        if (fields.grantType === 'authorization_code') {
-            token = await getAuthorizationCodeToken(resolvedFields, controller.signal, getRequestTimeout(), async uri => {
-                onRedirect(uri);
-                await webview.postMessage({ type: 'oauthRedirect', url: uri });
-            });
-        } else {
-            const request = buildOAuthTokenRequest({ url: resolved.url, clientId: resolved.headers!.clientId,
-                clientSecret: resolved.headers!.clientSecret, scope: resolved.headers!.scope });
-            const response = await executeRequest(request, getRequestTimeout(), controller.signal, 'error');
-            token = readOAuthAccessToken(response);
-        }
-        if (controller.signal.aborted) { throw new Error('Token request cancelled.'); }
-        if (storeAccessToken && requestUri) {
-            await storeOAuthTokenInEnvironment(requestUri, accessTokenVariable, token, controller.signal);
-        }
-        await webview.postMessage({ type: 'oauthTokenResult', requestId, token, stored: storeAccessToken });
-    } catch (error) {
-        await webview.postMessage({ type: 'oauthTokenResult', requestId,
-            error: error instanceof Error ? error.message : 'Unable to get an access token.' });
-    } finally { controller.abort(); activeRequests.delete(key); }
+	// Negative IDs keep token retrieval separate from normal request cancellation IDs.
+	const requestUri = handlers.onGetRequestUri?.();
+	const key = -requestId - 1;
+	if (activeRequests.has(key)) {
+		return;
+	}
+	const controller = new AbortController();
+	activeRequests.set(key, controller);
+	try {
+		if (!vscode.workspace.isTrusted) {
+			throw new Error('Getting an access token requires a trusted workspace.');
+		}
+		if (storeAccessToken) {
+			if (!requestUri) {
+				throw new Error('Save or load a request file before storing an access token in .env.');
+			}
+			if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(accessTokenVariable)) {
+				throw new Error('Enter a valid access token variable name.');
+			}
+		}
+		if (fields.grantType === 'authorization_code' && fields.clientAuthentication === 'none') {
+			fields.clientSecret = '';
+		}
+		const variables: Record<string, string> = requestUri ? await readEnvironmentVariables(requestUri) : {};
+		for (const value of Object.values(fields)) {
+			if (typeof value !== 'string') {
+				continue;
+			}
+			for (const match of value.matchAll(/\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}/g)) {
+				const resolved = requestUri ? variables[match[1]] : await handlers.onResolveEnvironmentVariable?.(match[1]);
+				if (resolved !== undefined) {
+					variables[match[1]] = resolved;
+				}
+			}
+		}
+		const resolved = resolveRequestVariables(
+			{
+				method: 'POST',
+				url: fields.url,
+				headers: {
+					clientId: fields.clientId,
+					clientSecret: fields.clientSecret,
+					scope: fields.scope,
+					...(fields.grantType === 'authorization_code'
+						? { authorizationUrl: fields.authorizationUrl, state: fields.state }
+						: {}),
+				},
+			},
+			variables,
+		);
+		if (controller.signal.aborted) {
+			throw new Error('Token request cancelled.');
+		}
+		const resolvedFields: AuthorizationCodeFields = {
+			...fields,
+			url: resolved.url,
+			clientId: resolved.headers!.clientId,
+			clientSecret: resolved.headers!.clientSecret,
+			scope: resolved.headers!.scope,
+			authorizationUrl: resolved.headers!.authorizationUrl ?? '',
+			state: resolved.headers!.state ?? '',
+		};
+		let token: string;
+		if (fields.grantType === 'authorization_code') {
+			token = await getAuthorizationCodeToken(resolvedFields, controller.signal, getRequestTimeout(), async (uri) => {
+				onRedirect(uri);
+				await webview.postMessage({ type: 'oauthRedirect', url: uri });
+			});
+		} else {
+			const request = buildOAuthTokenRequest({
+				url: resolved.url,
+				clientId: resolved.headers!.clientId,
+				clientSecret: resolved.headers!.clientSecret,
+				scope: resolved.headers!.scope,
+			});
+			const response = await executeRequest(request, getRequestTimeout(), controller.signal, 'error');
+			token = readOAuthAccessToken(response);
+		}
+		if (controller.signal.aborted) {
+			throw new Error('Token request cancelled.');
+		}
+		if (storeAccessToken && requestUri) {
+			await storeOAuthTokenInEnvironment(requestUri, accessTokenVariable, token, controller.signal);
+		}
+		await webview.postMessage({ type: 'oauthTokenResult', requestId, token, stored: storeAccessToken });
+	} catch (error) {
+		await webview.postMessage({
+			type: 'oauthTokenResult',
+			requestId,
+			error: error instanceof Error ? error.message : 'Unable to get an access token.',
+		});
+	} finally {
+		controller.abort();
+		activeRequests.delete(key);
+	}
 }
 
 // Serializes environment writes so token retrievals in different editors do not lose updates.
 const environmentWrites = new Map<string, Promise<void>>();
 
 /** Stores a token in the exact environment selected by the request's lookup rules. */
-export async function storeOAuthTokenInEnvironment(requestUri: vscode.Uri, name: string, token: string, signal?: AbortSignal): Promise<void> {
-	if (!vscode.workspace.isTrusted) { throw new Error('Storing an access token requires a trusted workspace.'); }
+export async function storeOAuthTokenInEnvironment(
+	requestUri: vscode.Uri,
+	name: string,
+	token: string,
+	signal?: AbortSignal,
+): Promise<void> {
+	if (!vscode.workspace.isTrusted) {
+		throw new Error('Storing an access token requires a trusted workspace.');
+	}
 	const target = await findEnvironmentFile(requestUri);
 	const key = target.uri.toString();
 	const previous = environmentWrites.get(key) ?? Promise.resolve();
-	const write = previous.catch(() => {}).then(async () => {
-		if (!vscode.workspace.isTrusted) { throw new Error('Storing an access token requires a trusted workspace.'); }
-		const openDocument = vscode.workspace.textDocuments.find(document => document.uri.toString() === key);
-		if (openDocument?.isDirty) { throw new Error('Save the .env file before storing an access token.'); }
-		let content = '';
-		try { content = new TextDecoder().decode(await vscode.workspace.fs.readFile(target.uri)); }
-		catch (error) { if (!isFileNotFoundError(error)) { throw error; } }
-		if (signal?.aborted) { throw new Error('Token request cancelled.'); }
-		await vscode.workspace.fs.writeFile(target.uri, new TextEncoder().encode(updateEnvValue(content, name, token)));
-	});
+	const write = previous
+		.catch(() => {})
+		.then(async () => {
+			if (!vscode.workspace.isTrusted) {
+				throw new Error('Storing an access token requires a trusted workspace.');
+			}
+			const openDocument = vscode.workspace.textDocuments.find((document) => document.uri.toString() === key);
+			if (openDocument?.isDirty) {
+				throw new Error('Save the .env file before storing an access token.');
+			}
+			let content = '';
+			try {
+				content = new TextDecoder().decode(await vscode.workspace.fs.readFile(target.uri));
+			} catch (error) {
+				if (!isFileNotFoundError(error)) {
+					throw error;
+				}
+			}
+			if (signal?.aborted) {
+				throw new Error('Token request cancelled.');
+			}
+			await vscode.workspace.fs.writeFile(target.uri, new TextEncoder().encode(updateEnvValue(content, name, token)));
+		});
 	environmentWrites.set(key, write);
-	try { await write; } finally {
-		if (environmentWrites.get(key) === write) { environmentWrites.delete(key); }
+	try {
+		await write;
+	} finally {
+		if (environmentWrites.get(key) === write) {
+			environmentWrites.delete(key);
+		}
 	}
 }
 
 /** Returns the existing environment file selected by request execution, without exposing its contents. */
 export async function findRequestEnvironmentUri(requestUri: vscode.Uri | undefined): Promise<vscode.Uri | undefined> {
-	if (!requestUri) { return undefined; }
+	if (!requestUri) {
+		return undefined;
+	}
 	const file = await findEnvironmentFile(requestUri);
 	return file.exists ? file.uri : undefined;
 }
 
-async function postEnvironmentFile(webview: vscode.Webview, requestUri: vscode.Uri | undefined, requestId: number): Promise<void> {
+async function postEnvironmentFile(
+	webview: vscode.Webview,
+	requestUri: vscode.Uri | undefined,
+	requestId: number,
+): Promise<void> {
 	try {
 		const uri = await findRequestEnvironmentUri(requestUri);
-		await webview.postMessage({ type: 'environmentFile', requestId, path: uri ? (uri.scheme === 'file' ? uri.fsPath : uri.toString()) : '' });
+		await webview.postMessage({
+			type: 'environmentFile',
+			requestId,
+			path: uri ? (uri.scheme === 'file' ? uri.fsPath : uri.toString()) : '',
+		});
 	} catch (error) {
-		await webview.postMessage({ type: 'environmentFile', requestId, path: '',
-			error: error instanceof Error ? error.message : 'Unable to locate the environment file.' });
+		await webview.postMessage({
+			type: 'environmentFile',
+			requestId,
+			path: '',
+			error: error instanceof Error ? error.message : 'Unable to locate the environment file.',
+		});
 	}
 }
 
@@ -911,60 +1112,116 @@ async function postEnvironmentFile(webview: vscode.Webview, requestUri: vscode.U
 async function openEnvironmentFile(requestUri: vscode.Uri | undefined): Promise<void> {
 	try {
 		const uri = await findRequestEnvironmentUri(requestUri);
-		if (uri) { await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri)); }
+		if (uri) {
+			await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
+		}
 	} catch (error) {
-		void vscode.window.showErrorMessage(error instanceof Error ? error.message : 'Unable to open the environment file.');
+		void vscode.window.showErrorMessage(
+			error instanceof Error ? error.message : 'Unable to open the environment file.',
+		);
 	}
 }
 
-async function chooseEnvironmentFile(webview: vscode.Webview, requestUri: vscode.Uri | undefined, requestId: number): Promise<void> {
+async function chooseEnvironmentFile(
+	webview: vscode.Webview,
+	requestUri: vscode.Uri | undefined,
+	requestId: number,
+): Promise<void> {
 	try {
-		if (!requestUri) { throw new Error('Save or load a request file before choosing an environment file.'); }
+		if (!requestUri) {
+			throw new Error('Save or load a request file before choosing an environment file.');
+		}
 		const root = vscode.workspace.getWorkspaceFolder(requestUri)?.uri ?? readRequestDirectory(requestUri);
 		// VS Code's picker lists dotfiles independently of the native dialog's hidden-file setting.
 		const files = await vscode.workspace.findFiles(new vscode.RelativePattern(root, '**/{.env,.env.*}'), null, 500);
 		const items: (vscode.QuickPickItem & { uri?: vscode.Uri })[] = files
 			.sort((left, right) => left.path.localeCompare(right.path))
-			.map(uri => ({ label: posix.basename(uri.path), description: posix.relative(root.path, uri.path), uri }));
-		items.push({ label: 'Enter a file path…', description: 'Select a file outside this project or another environment file' });
-		const selected = await vscode.window.showQuickPick(items, { title: 'Choose environment file',
-			placeHolder: 'Select an .env file, including hidden files', matchOnDescription: true });
-		if (!selected) { return; }
+			.map((uri) => ({ label: posix.basename(uri.path), description: posix.relative(root.path, uri.path), uri }));
+		items.push({
+			label: 'Enter a file path…',
+			description: 'Select a file outside this project or another environment file',
+		});
+		const selected = await vscode.window.showQuickPick(items, {
+			title: 'Choose environment file',
+			placeHolder: 'Select an .env file, including hidden files',
+			matchOnDescription: true,
+		});
+		if (!selected) {
+			return;
+		}
 		let uri = selected.uri;
 		if (!uri) {
-			const entered = await vscode.window.showInputBox({ title: 'Environment file path',
-				prompt: 'Enter an existing file path, absolute or relative to the request folder.', placeHolder: '../config/.env' });
-			if (!entered?.trim()) { return; }
+			const entered = await vscode.window.showInputBox({
+				title: 'Environment file path',
+				prompt: 'Enter an existing file path, absolute or relative to the request folder.',
+				placeHolder: '../config/.env',
+			});
+			if (!entered?.trim()) {
+				return;
+			}
 			const path = entered.trim();
-			uri = requestUri.scheme === 'file' && isAbsolute(path) ? vscode.Uri.file(path)
-				: path.startsWith('/') ? requestUri.with({ path }) : vscode.Uri.joinPath(readRequestDirectory(requestUri), path.replace(/\\/g, '/'));
+			uri =
+				requestUri.scheme === 'file' && isAbsolute(path)
+					? vscode.Uri.file(path)
+					: path.startsWith('/')
+						? requestUri.with({ path })
+						: vscode.Uri.joinPath(readRequestDirectory(requestUri), path.replace(/\\/g, '/'));
 		}
 		const stat = await vscode.workspace.fs.stat(uri);
-		if (!(stat.type & vscode.FileType.File)) { throw new Error('Choose an existing environment file, rather than a folder.'); }
-		if (uri.scheme !== requestUri.scheme || uri.authority !== requestUri.authority) { throw new Error('Choose a file on the same filesystem as the request.'); }
+		if (!(stat.type & vscode.FileType.File)) {
+			throw new Error('Choose an existing environment file, rather than a folder.');
+		}
+		if (uri.scheme !== requestUri.scheme || uri.authority !== requestUri.authority) {
+			throw new Error('Choose a file on the same filesystem as the request.');
+		}
 		const path = posix.relative(readRequestDirectory(requestUri).path, uri.path);
 		await webview.postMessage({ type: 'environmentFileSelected', requestId, path });
 	} catch (error) {
-		await webview.postMessage({ type: 'environmentFileSelected', requestId,
-			error: error instanceof Error ? error.message : 'Unable to choose an environment file.' });
+		await webview.postMessage({
+			type: 'environmentFileSelected',
+			requestId,
+			error: error instanceof Error ? error.message : 'Unable to choose an environment file.',
+		});
 	}
 }
 
 /** Resolves the effective Bearer token for display only, without updating request files. */
-export async function resolveConfiguredOAuthToken(authorization: string, requestUri: vscode.Uri | undefined): Promise<string> {
-	if (!vscode.workspace.isTrusted) { throw new Error('Showing access tokens requires a trusted workspace.'); }
-	if (!authorization.startsWith('Bearer ')) { return ''; }
+export async function resolveConfiguredOAuthToken(
+	authorization: string,
+	requestUri: vscode.Uri | undefined,
+): Promise<string> {
+	if (!vscode.workspace.isTrusted) {
+		throw new Error('Showing access tokens requires a trusted workspace.');
+	}
+	if (!authorization.startsWith('Bearer ')) {
+		return '';
+	}
 	const variables = authorization.includes('{{') && requestUri ? await readEnvironmentVariables(requestUri) : {};
-	const resolved = resolveRequestVariables({ method: 'GET', url: 'https://localhost/', headers: { Authorization: authorization } }, variables);
+	const resolved = resolveRequestVariables(
+		{ method: 'GET', url: 'https://localhost/', headers: { Authorization: authorization } },
+		variables,
+	);
 	return resolved.headers!.Authorization.slice(7);
 }
 
-async function postConfiguredOAuthToken(webview: vscode.Webview, requestUri: vscode.Uri | undefined, requestId: number, authorization: string): Promise<void> {
+async function postConfiguredOAuthToken(
+	webview: vscode.Webview,
+	requestUri: vscode.Uri | undefined,
+	requestId: number,
+	authorization: string,
+): Promise<void> {
 	try {
-		await webview.postMessage({ type: 'configuredOAuthToken', requestId,
-			token: await resolveConfiguredOAuthToken(authorization, requestUri) });
+		await webview.postMessage({
+			type: 'configuredOAuthToken',
+			requestId,
+			token: await resolveConfiguredOAuthToken(authorization, requestUri),
+		});
 	} catch (error) {
-		await webview.postMessage({ type: 'configuredOAuthToken', requestId, token: '',
-			error: error instanceof Error ? error.message : 'Unable to resolve configured access token.' });
+		await webview.postMessage({
+			type: 'configuredOAuthToken',
+			requestId,
+			token: '',
+			error: error instanceof Error ? error.message : 'Unable to resolve configured access token.',
+		});
 	}
 }

@@ -17,7 +17,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const createRequestFile = vscode.commands.registerCommand('restcraft.createRequestFile', createAndOpenRequestFile);
 
-	context.subscriptions.push(registerOAuthCallback(context.extension.id), createRequestFile, RequestEditorProvider.register(context, extensionVersion));
+	context.subscriptions.push(
+		registerOAuthCallback(context.extension.id),
+		createRequestFile,
+		RequestEditorProvider.register(context, extensionVersion),
+	);
 }
 
 /**

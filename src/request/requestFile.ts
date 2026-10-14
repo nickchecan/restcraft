@@ -55,10 +55,16 @@ export function parseRequestFile(content: string): RequestFileDefinition {
 		url,
 		params: readParams(parsed, url),
 		headerState,
-		headers: Object.fromEntries(headerState.filter(header => header.enabled).map(header => [header.name, header.value])),
+		headers: Object.fromEntries(
+			headerState.filter((header) => header.enabled).map((header) => [header.name, header.value]),
+		),
 		body: parsed.body ?? null,
-		...(isEnvironmentFileSettings(parsed.environment) ? { environment: copyEnvironmentFileSettings(parsed.environment) } : {}),
-		...(isOAuthAuthorization(parsed.authorization) ? { authorization: readOAuthAuthorization(parsed.authorization) } : {}),
+		...(isEnvironmentFileSettings(parsed.environment)
+			? { environment: copyEnvironmentFileSettings(parsed.environment) }
+			: {}),
+		...(isOAuthAuthorization(parsed.authorization)
+			? { authorization: readOAuthAuthorization(parsed.authorization) }
+			: {}),
 	};
 }
 

@@ -1,30 +1,30 @@
 {
-  "name": "Authorize before sending",
-  "method": "GET",
-  "url": "https://api.example.com/resource",
-  "authorizeBeforeSend": true,
-  "params": [],
-  "headerState": [
-    {
-      "name": "Authorization",
-      "value": "Bearer {{ACCESS_TOKEN}}",
-      "enabled": true
-    }
-  ],
-  "body": null,
-  "authorization": {
-    "type": "oauth2",
-    "grantType": "authorization_code",
-    "accessTokenUrl": "https://demo.duendesoftware.com/connect/token",
-    "clientId": "interactive.public",
-    "clientSecret": "",
-    "scope": "api",
-    "authorizationUrl": "https://demo.duendesoftware.com/connect/authorize",
-    "clientAuthentication": "none",
-    "state": "",
-    "usePkce": true,
-    "updateAuthorizationHeader": true,
-    "storeAccessToken": true,
-    "accessTokenVariable": "ACCESS_TOKEN"
-  }
+	"name": "Authorize before sending",
+	"method": "GET",
+	"url": "https://api.example.com/resource",
+	"authorizeBeforeSend": true,
+	"params": [],
+	"headerState": [
+		{
+			"name": "Authorization",
+			"value": "Bearer {{ACCESS_TOKEN}}",
+			"enabled": true
+		}
+	],
+	"body": null,
+	"authorization": {
+		"type": "oauth2",
+		"grantType": "authorization_code",
+		"accessTokenUrl": "https://demo.duendesoftware.com/connect/token",
+		"clientId": "interactive.public",
+		"clientSecret": "",
+		"scope": "api",
+		"authorizationUrl": "https://demo.duendesoftware.com/connect/authorize",
+		"clientAuthentication": "none",
+		"state": "",
+		"usePkce": true,
+		"updateAuthorizationHeader": true,
+		"storeAccessToken": true,
+		"accessTokenVariable": "ACCESS_TOKEN"
+	}
 }

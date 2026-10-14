@@ -1,13 +1,13 @@
 {
-  "name": "Validating Variables",
-  "method": "GET",
-  "url": "{{DONT_EXIST}}/endpoint",
-  "body": "dsfdeas",
-  "headerState": [
-    {
-      "name": "Content-Type",
-      "value": "application/json",
-      "enabled": true
-    }
-  ]
+	"name": "Validating Variables",
+	"method": "GET",
+	"url": "{{DONT_EXIST}}/endpoint",
+	"body": "dsfdeas",
+	"headerState": [
+		{
+			"name": "Content-Type",
+			"value": "application/json",
+			"enabled": true
+		}
+	]
 }

@@ -1,24 +1,24 @@
 {
-  "name": "Testing Params",
-  "method": "GET",
-  "url": "https://postman-echo.com/get?foo=bar&page=1&limit=10",
-  "body": null,
-  "params": [
-    {
-      "name": "foo",
-      "value": "bar",
-      "enabled": true
-    },
-    {
-      "name": "page",
-      "value": "1",
-      "enabled": true
-    },
-    {
-      "name": "limit",
-      "value": "10",
-      "enabled": true
-    }
-  ],
-  "headerState": []
+	"name": "Testing Params",
+	"method": "GET",
+	"url": "https://postman-echo.com/get?foo=bar&page=1&limit=10",
+	"body": null,
+	"params": [
+		{
+			"name": "foo",
+			"value": "bar",
+			"enabled": true
+		},
+		{
+			"name": "page",
+			"value": "1",
+			"enabled": true
+		},
+		{
+			"name": "limit",
+			"value": "10",
+			"enabled": true
+		}
+	],
+	"headerState": []
 }

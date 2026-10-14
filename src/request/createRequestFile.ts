@@ -48,7 +48,5 @@ export function createDefaultRequestFileContent(fileName: string): string {
  * Converts a request file name back into the default display name.
  */
 function removeRequestFileExtension(fileName: string): string {
-	return fileName.endsWith(requestFileExtension)
-		? fileName.slice(0, -requestFileExtension.length)
-		: fileName;
+	return fileName.endsWith(requestFileExtension) ? fileName.slice(0, -requestFileExtension.length) : fileName;
 }

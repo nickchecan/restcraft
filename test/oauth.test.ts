@@ -3,7 +3,12 @@ import { buildOAuthTokenRequest, readOAuthAccessToken, headersForPersistence } f
 import { ApiResponse } from '../src/request/types';
 
 suite('OAuth client credentials', () => {
-	const fields = { url: 'https://example.com/token', clientId: 'client:+ ä', clientSecret: 'secret:&+', scope: 'read write' };
+	const fields = {
+		url: 'https://example.com/token',
+		clientId: 'client:+ ä',
+		clientSecret: 'secret:&+',
+		scope: 'read write',
+	};
 	const response = (body: string, status = 200): ApiResponse => ({ status, body, statusText: '', headers: {} });
 
 	test('encodes credentials separately and includes optional scope', () => {
@@ -26,19 +31,34 @@ suite('OAuth client credentials', () => {
 		assert.strictEqual(readOAuthAccessToken(response('{"access_token":"abc", "token_type":"Bearer"}')), 'abc');
 		assert.throws(() => readOAuthAccessToken(response('secret details', 401)), /HTTP 401/);
 		assert.throws(() => readOAuthAccessToken(response('not JSON')), /invalid JSON/);
-		for (const body of ['{}', '{"access_token":"", "token_type":"bearer"}', '{"access_token":"abc", "token_type":"mac"}']) {
+		for (const body of [
+			'{}',
+			'{"access_token":"", "token_type":"bearer"}',
+			'{"access_token":"abc", "token_type":"mac"}',
+		]) {
 			assert.throws(() => readOAuthAccessToken(response(body)), /access_token/);
 		}
 	});
 	test('preserves header rows while OAuth configuration changes', () => {
-		const authorization = { type: 'oauth2' as const, grantType: 'client_credentials' as const,
-			accessTokenUrl: '', clientId: '', clientSecret: '', scope: '' };
+		const authorization = {
+			type: 'oauth2' as const,
+			grantType: 'client_credentials' as const,
+			accessTokenUrl: '',
+			clientId: '',
+			clientSecret: '',
+			scope: '',
+		};
 		const headers = { authorization: 'Bearer private-token', Accept: 'application/json' };
 		const state = [{ name: 'AUTHORIZATION', value: 'Bearer private-token', enabled: true }];
 		assert.deepStrictEqual(headersForPersistence(headers, state, authorization), {
-			headers, headerState: state,
+			headers,
+			headerState: state,
 		});
-		const persisted = headersForPersistence(headers, state, { ...authorization, storeAccessToken: true, accessTokenVariable: 'MY_TOKEN' });
+		const persisted = headersForPersistence(headers, state, {
+			...authorization,
+			storeAccessToken: true,
+			accessTokenVariable: 'MY_TOKEN',
+		});
 		assert.strictEqual(persisted.headers.authorization, 'Bearer private-token');
 		assert.strictEqual(persisted.headerState[0].value, 'Bearer private-token');
 		assert.deepStrictEqual(persisted, { headers, headerState: state });

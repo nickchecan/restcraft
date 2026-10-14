@@ -90,10 +90,7 @@ function resolveBody(
 	const params = new URLSearchParams();
 
 	for (const [name, value] of new URLSearchParams(body).entries()) {
-		params.append(
-			resolveVariables(name, variables, missing),
-			resolveVariables(value, variables, missing),
-		);
+		params.append(resolveVariables(name, variables, missing), resolveVariables(value, variables, missing));
 	}
 
 	return params.toString();
@@ -184,21 +181,31 @@ function decodeBase64(value: string): string {
 
 /** Updates a single .env key, preserving unrelated lines and line endings. */
 export function updateEnvValue(content: string, name: string, value: string): string {
-	if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) { throw new Error('Enter a valid environment variable name (letters, numbers, and underscores).'); }
+	if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+		throw new Error('Enter a valid environment variable name (letters, numbers, and underscores).');
+	}
 	// Quoting must round-trip through our simple parser without newline injection.
-	if (!/^[\x21-\x7e]+$/.test(value)) { throw new Error('Access token contains unsupported characters.'); }
+	if (!/^[\x21-\x7e]+$/.test(value)) {
+		throw new Error('Access token contains unsupported characters.');
+	}
 	const quote = value.includes('"') ? "'" : '"';
-	if (value.includes(quote)) { throw new Error('Access token cannot be safely stored in .env.'); }
+	if (value.includes(quote)) {
+		throw new Error('Access token cannot be safely stored in .env.');
+	}
 	const assignment = `${name}=${quote}${value}${quote}`;
 	const eol = content.includes('\r\n') ? '\r\n' : '\n';
 	const lines = content.split(/\r?\n/);
 	let found = false;
-	const updated = lines.map(line => {
+	const updated = lines.map((line) => {
 		const trimmed = line.trim();
-		if (trimmed.startsWith('#') || trimmed.slice(0, trimmed.indexOf('=')).trim() !== name || !trimmed.includes('=')) { return line; }
+		if (trimmed.startsWith('#') || trimmed.slice(0, trimmed.indexOf('=')).trim() !== name || !trimmed.includes('=')) {
+			return line;
+		}
 		found = true;
 		return assignment;
 	});
-	if (found) { return updated.join(eol); }
+	if (found) {
+		return updated.join(eol);
+	}
 	return content + (content && !content.endsWith('\n') ? eol : '') + assignment + eol;
 }

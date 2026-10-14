@@ -7,7 +7,12 @@ import { ApiRequest, ApiResponse, isHttpMethod } from './types';
  * bridge, then normalizes method and URL before any network activity. Bodies are
  * omitted for GET and HEAD to match fetch/HTTP expectations.
  */
-export async function executeRequest(request: ApiRequest, timeoutMs = 30000, signal?: AbortSignal, redirect: 'follow' | 'error' = 'follow'): Promise<ApiResponse> {
+export async function executeRequest(
+	request: ApiRequest,
+	timeoutMs = 30000,
+	signal?: AbortSignal,
+	redirect: 'follow' | 'error' = 'follow',
+): Promise<ApiResponse> {
 	const method = normalizeMethod(request.method);
 	const url = normalizeUrl(request.url);
 	const controller = new AbortController();
@@ -18,7 +23,13 @@ export async function executeRequest(request: ApiRequest, timeoutMs = 30000, sig
 	} else {
 		signal?.addEventListener('abort', abortFromCaller, { once: true });
 	}
-	const timeout = timeoutMs > 0 ? setTimeout(() => { didTimeout = true; controller.abort(); }, timeoutMs) : undefined;
+	const timeout =
+		timeoutMs > 0
+			? setTimeout(() => {
+					didTimeout = true;
+					controller.abort();
+				}, timeoutMs)
+			: undefined;
 
 	try {
 		const response = await fetch(url, {
