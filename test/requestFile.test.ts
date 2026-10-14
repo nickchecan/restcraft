@@ -29,6 +29,17 @@ suite('Request file parser', () => {
         }
     });
 
+    test('round-trips the request authorization-before-send flag and rejects invalid values', () => {
+        const request = { name: 'Automatic auth', method: 'GET', url: 'https://example.com/' };
+        for (const authorizeBeforeSend of [true, false]) {
+            assert.strictEqual(parseRequestFile(JSON.stringify({ ...request, authorizeBeforeSend })).authorizeBeforeSend, authorizeBeforeSend);
+        }
+        assert.strictEqual(parseRequestFile(JSON.stringify(request)).authorizeBeforeSend, undefined);
+        for (const authorizeBeforeSend of ['true', 1, null]) {
+            assert.throws(() => parseRequestFile(JSON.stringify({ ...request, authorizeBeforeSend })), /authorizeBeforeSend/);
+        }
+    });
+
 	test('rejects malformed OAuth settings', () => {
 		const authorization = { type: 'oauth2', grantType: 'client_credentials', accessTokenUrl: '',
 			clientId: '', clientSecret: '', scope: '' };

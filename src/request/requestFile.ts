@@ -33,6 +33,9 @@ export function parseRequestFile(content: string): RequestFileDefinition {
 	}
 
 	const url = readUrl(parsed);
+	if (parsed.authorizeBeforeSend !== undefined && typeof parsed.authorizeBeforeSend !== 'boolean') {
+		throw new Error('Request file property "authorizeBeforeSend" must be a boolean.');
+	}
 	if (parsed.description !== undefined && typeof parsed.description !== 'string') {
 		throw new Error('Request file property "description" must be a string.');
 	}
@@ -46,6 +49,7 @@ export function parseRequestFile(content: string): RequestFileDefinition {
 	const headerState = readHeaderState(parsed);
 	return {
 		name: readRequiredString(parsed, 'name'),
+		...(typeof parsed.authorizeBeforeSend === 'boolean' ? { authorizeBeforeSend: parsed.authorizeBeforeSend } : {}),
 		...(typeof parsed.description === 'string' ? { description: parsed.description } : {}),
 		method: readMethod(parsed),
 		url,

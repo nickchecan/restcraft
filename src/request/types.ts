@@ -50,6 +50,7 @@ export interface EnvironmentFileSettings {
 export type TokenView = 'raw' | 'decoded' | 'hidden';
 
 export interface RequestFileDefinition {
+	authorizeBeforeSend?: boolean;
 	description?: string;
 	name: string;
 	method: HttpMethod;

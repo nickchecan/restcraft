@@ -179,6 +179,7 @@ function readDraftRequestDocument(content: string): RequestFileDefinition {
 		: 'GET';
 
 	return {
+		...(typeof parsed.authorizeBeforeSend === 'boolean' ? { authorizeBeforeSend: parsed.authorizeBeforeSend } : {}),
 		...(typeof parsed.description === 'string' ? { description: parsed.description } : {}),
 		name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : 'Untitled Request',
 		method,

@@ -77,6 +77,7 @@ suite('Webview HTML', () => {
         const context = { document: { getElementById: () => ({ addEventListener: (_event: string, callback: () => void) => { cancel = callback; } }) },
             oauthRequestId: 4, oauthPending: true, oauthGetToken: { disabled: true }, oauthStatus: { textContent: '' },
             vscode: { postMessage: (message: unknown) => { messages.push(message); } },
+            completeOAuthBeforeSend: () => {},
             message: { type: 'oauthTokenResult', requestId: 4, token: 'cancelled-token', stored: true },
             displayedOAuthToken: 'previous-token', oauthToken: 'previous-token',
             refreshEnvironmentFile: () => { assert.fail('Must not refresh a cancelled token'); },
@@ -189,7 +190,7 @@ suite('Webview HTML', () => {
 		const context = { document: { getElementById: (id: string) => fields[id] },
 			oauthRequestId: 1, oauthPending: true, oauthGetToken: { disabled: true },
             setOAuthSecretVisible: () => {}, setBasicPasswordVisible: () => {}, showOAuthTokenView: () => {}, vscode: { postMessage: () => {} }, bearerToken: { value: '' },
-            oauthUpdateHeader: { checked: true }, oauthStoreToken: { checked: false }, oauthTokenVariable: { value: 'ACCESS_TOKEN' },
+            authorizeBeforeSend: { checked: false }, oauthUpdateHeader: { checked: true }, oauthStoreToken: { checked: false }, oauthTokenVariable: { value: 'ACCESS_TOKEN' },
 			oauthStatus: { textContent: 'Getting token' }, oauthToken: 'old', displayedOAuthToken: 'old',
 			activeAuthorizationType: 'none', oauthGrantType: { value: '' }, authorizationType,
 			readAuthorizationFromHeaders: () => { authorizationType.value = 'none'; },
@@ -200,12 +201,13 @@ suite('Webview HTML', () => {
             updateRequestTabIndicators: () => {},
 			message: { request: {} as Record<string, unknown> } };
 		for (const grantType of ['client_credentials', 'authorization_code']) {
-			context.message.request = { authorization: { type: 'oauth2', grantType,
+			context.message.request = { authorizeBeforeSend: true, authorization: { type: 'oauth2', grantType,
 				accessTokenUrl: 'https://example.com/token', clientId: 'client',
 				clientSecret: '{{SECRET}}', scope: 'api', authorizationUrl: 'https://example.com/authorize', clientAuthentication: 'body', usePkce: false, state: 'custom-state' }, headers: { Authorization: 'Bearer saved' } };
 			runInNewContext('{ ' + html.slice(start, end) + ' }', context);
 			assert.strictEqual(authorizationType.value, 'oauth2');
 			assert.strictEqual(context.oauthGrantType.value, grantType);
+            assert.strictEqual(context.authorizeBeforeSend.checked, true);
 			assert.strictEqual(fields['oauth-url'].value, 'https://example.com/token');
 			assert.strictEqual(fields['oauth-client-id'].value, 'client');
 			assert.strictEqual(fields['oauth-client-secret'].value, '{{SECRET}}');
@@ -223,6 +225,7 @@ suite('Webview HTML', () => {
 		runInNewContext('{ ' + html.slice(start, end) + ' }', context);
 		assert.strictEqual(authorizationType.value, 'none');
 		assert.strictEqual(context.oauthToken, '');
+        assert.strictEqual(context.authorizeBeforeSend.checked, false);
 		assert.strictEqual(fields['oauth-authorization-url'].value, '');
         assert.strictEqual(fields['oauth-client-authentication'].value, 'none');
         assert.strictEqual(fields['oauth-pkce'].checked, true);
@@ -455,7 +458,7 @@ suite('Webview HTML', () => {
 		let headerUpdates = 0;
 		let renders = 0;
         let selectedView = '';
-		const context = { defaultTokenView: 'raw', showOAuthTokenView: (view: string) => { selectedView = view; }, message: { type: 'oauthTokenResult', requestId: 1, token: 'new-token', stored: true },
+		const context = { completeOAuthBeforeSend: () => {}, defaultTokenView: 'raw', showOAuthTokenView: (view: string) => { selectedView = view; }, message: { type: 'oauthTokenResult', requestId: 1, token: 'new-token', stored: true },
 			oauthRequestId: 1, configuredOAuthTokenRequestId: 0, oauthPending: true, oauthGetToken: { disabled: true },
 			oauthStatus: { textContent: '' }, authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
 			oauthUpdateHeader: { checked: false }, oauthToken: 'existing-token', displayedOAuthToken: '',

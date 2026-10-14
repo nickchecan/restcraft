@@ -259,6 +259,27 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			cursor: default;
 		}
 
+        .request-auto-authorize {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        #request-authorize-before-send {
+            width: 16px;
+            height: 16px;
+            flex: 0 0 16px;
+            margin: 0;
+            padding: 0;
+        }
+
+        .request-auto-authorize-description {
+            color: var(--vscode-descriptionForeground);
+            margin: 6px 0 0 24px;
+            font-size: 12px;
+        }
+
 		#request-env-error {
 			margin-top: 8px;
 			color: var(--vscode-errorForeground);
@@ -1314,6 +1335,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<button id="request-env-open" type="button" disabled>${buttonIcons.linkExternal}<span>Open</span></button>
 				</div>
 				<div id="request-env-error" role="status" aria-live="polite"></div>
+                <label class="request-auto-authorize" for="request-authorize-before-send">
+                    <input id="request-authorize-before-send" type="checkbox" aria-describedby="request-auto-authorize-description">
+                    Authorize before sending
+                </label>
+                <p class="request-auto-authorize-description" id="request-auto-authorize-description">Get a new OAuth 2.0 access token before sending this request. Uses the Update header and Save token to .env options.</p>
+
 
 			</div>
 			</div>
@@ -1440,6 +1467,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				const requestBodyTab = document.getElementById('request-body-tab');
                 const requestSettingsTab = document.getElementById('request-settings-tab');
                 const requestSettingsPanel = document.getElementById('request-settings-panel');
+                const authorizeBeforeSend = document.getElementById('request-authorize-before-send');
+                let authorizationBeforeSendPending = false;
+                let oauthSendWaiter;
+                authorizeBeforeSend.addEventListener('change', () => {
+                    if (authorizationBeforeSendPending) { document.getElementById('oauth-cancel-token').click(); }
+                    notifyRequestChanged();
+                });
+
                 const requestEnvPath = document.getElementById('request-env-path');
                 const requestEnvOpen = document.getElementById('request-env-open');
                 const requestEnvError = document.getElementById('request-env-error');
@@ -1880,8 +1915,43 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					clearHoverLine(responseRawContent);
 				});
 
-			form.addEventListener('submit', (event) => {
-				event.preventDefault();
+            // Wait for the existing token result handler to update output and header rows.
+            function authorizeForSend() {
+                return new Promise(resolve => {
+                    const requestId = oauthPending ? oauthRequestId : oauthRequestId + 1;
+                    oauthSendWaiter = { requestId, resolve };
+                    if (!oauthPending) { oauthGetToken.click(); }
+                });
+            }
+
+            function completeOAuthBeforeSend(message, error) {
+                if (oauthSendWaiter?.requestId !== message.requestId) { return; }
+                const waiter = oauthSendWaiter;
+                oauthSendWaiter = undefined;
+                waiter.resolve(error);
+            }
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (authorizationBeforeSendPending) {
+                    document.getElementById('oauth-cancel-token').click();
+                    return;
+                }
+                if (!requestInProgress && authorizeBeforeSend.checked && authorizationType.value === 'oauth2') {
+                    authorizationBeforeSendPending = true;
+                    send.textContent = 'Cancel';
+                    send.classList.add('request-cancel');
+                    setResponseStatus('Authorizing…');
+                    const error = await authorizeForSend();
+                    authorizationBeforeSendPending = false;
+                    send.innerHTML = buttonIcons.send + '<span>Send</span>';
+                    send.classList.remove('request-cancel');
+                    send.disabled = !workspaceTrusted;
+                    if (error || !workspaceTrusted) {
+                        setResponseStatus(error || 'Sending requests requires a trusted workspace.', error && error.includes('cancelled') ? '' : 'error');
+                        return;
+                    }
+                }
 				if (requestInProgress) {
 					send.disabled = true;
 					setResponseStatus('Cancelling...');
@@ -1961,7 +2031,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 }
 
 				if (message.type === 'oauthTokenResult') {
-                    if (message.requestId !== oauthRequestId) { return; }
+                    if (message.requestId !== oauthRequestId) {
+                        completeOAuthBeforeSend(message, 'Token request cancelled.');
+                        return;
+                    }
                     oauthPending = false;
                     oauthGetToken.disabled = false;
                     oauthStatus.textContent = message.error || (message.stored ? 'Access token saved to .env.' : 'Access token ready.');
@@ -1978,6 +2051,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                         }
                         notifyRequestChanged();
                     }
+                    completeOAuthBeforeSend(message, message.error || (typeof message.token === 'string' ? '' : 'Unable to get an access token.'));
                     return;
                 }
                 if (message.type === 'requestComplete') {
@@ -2107,6 +2181,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                         activeAuthorizationType = 'none';
                         setOAuthSecretVisible(false);
                         setBasicPasswordVisible(false);
+                        authorizeBeforeSend.checked = message.request.authorizeBeforeSend === true;
                         const savedAuthorization = message.request.authorization;
                         oauthUpdateHeader.checked = savedAuthorization?.updateAuthorizationHeader !== false;
                         oauthStoreToken.checked = savedAuthorization?.storeAccessToken === true;
@@ -3515,6 +3590,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					vscode.postMessage({
 						type: 'requestChanged',
                         description: requestDescription.value,
+                        authorizeBeforeSend: authorizeBeforeSend.checked,
                         environment: readEnvironmentSettings(),
                         authorization: authorizationType.value === 'oauth2' ? {
                             type: 'oauth2', grantType: oauthGrantType.value,

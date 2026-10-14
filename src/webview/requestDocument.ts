@@ -7,6 +7,8 @@ import type { RequestChangedMessage } from './requestWebview';
 export function createUpdatedRequestDocumentText(content: string, message: RequestChangedMessage, useCrLf = false): string {
 		const parsed = readDocumentObject(content);
 
+		if (message.authorizeBeforeSend === true) { parsed.authorizeBeforeSend = true; }
+		else { delete parsed.authorizeBeforeSend; }
 		parsed.name = message.name.trim() || 'Untitled Request';
 		if (message.description?.trim()) { parsed.description = message.description; }
 		else { delete parsed.description; }

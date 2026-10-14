@@ -12,6 +12,14 @@ suite('OAuth request document persistence', () => {
 			clientId: 'client', clientSecret: '{{SECRET}}', scope: 'api', storeAccessToken: true, accessTokenVariable: 'MY_TOKEN' },
 	};
 
+    test('persists authorization before sending and removes it when unchecked', () => {
+        const saved = createUpdatedRequestDocumentText('{}', { ...message, authorizeBeforeSend: true });
+        assert.strictEqual(parseRequestFile(saved).authorizeBeforeSend, true);
+        const unchecked = createUpdatedRequestDocumentText(saved, { ...message, authorizeBeforeSend: false });
+        assert.strictEqual(parseRequestFile(unchecked).authorizeBeforeSend, undefined);
+        assert.strictEqual(JSON.parse(unchecked).authorizeBeforeSend, undefined);
+    });
+
 	test('saves the env reference only in headerState and restores it after parsing', () => {
 		const text = createUpdatedRequestDocumentText('{"custom":"preserved"}', message);
 		const saved = JSON.parse(text);

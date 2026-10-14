@@ -251,6 +251,20 @@ The optional authorization properties `authorizationUrl` (string),
 saved with the request. Older files default to no client authentication and PKCE
 enabled. Redirect URLs and PKCE verifiers are not persisted.
 
+### Authorize before sending
+
+In the request's **Settings** tab, enable **Authorize before sending** to retrieve
+an OAuth 2.0 access token whenever you click **Send**. The option defaults to off
+and is saved as optional `authorizeBeforeSend: true` in the request file.
+It applies to both Client Credentials and Authorization Code; other authentication
+types send normally. Authorization Code opens browser login before the request.
+
+The API request sends only after authorization succeeds. Failed or cancelled
+authorization prevents sending. The Send button acts as Cancel while waiting;
+you can also cancel from the Authorization tab. The existing **Update header**
+and **Save token to .env** choices apply to the retrieved token. If Update header
+is unchecked, the existing Authorization header is retained when sending.
+
 ### Request Settings
 
 The **Settings** tab shows the path of the existing `.env` selected for the
