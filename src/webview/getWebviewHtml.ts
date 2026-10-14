@@ -608,6 +608,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				overflow-wrap: anywhere;
 			}
 
+            #oauth-decoded-token {
+                overflow: auto;
+                padding: 2px;
+            }
+
 			@media (max-width: 760px) {
 				.authorization-layout.has-oauth-token-panel {
 					grid-template-columns: minmax(0, 1fr);
@@ -1243,7 +1248,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					</div>
 					<div class="oauth-token-content hidden" id="oauth-decoded-panel" role="region" aria-label="Decoded Token">
 						<p>JWT header and payload. Signature is not verified.</p>
-						<textarea id="oauth-decoded-token" readonly spellcheck="false" aria-label="Decoded OAuth access token" placeholder="No access token configured."></textarea>
+						<pre class="response-content" id="oauth-decoded-token" tabindex="0" aria-label="Decoded OAuth access token">No access token configured.</pre>
 					</div>
 				</div>
 				</div>
@@ -2973,7 +2978,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					oauthTokenPanel.classList.toggle('hidden', !visible);
 					authorizationLayout.classList.toggle('has-oauth-token-panel', visible);
 					oauthAccessToken.value = visible ? displayedOAuthToken : '';
-					oauthDecodedToken.value = decodeOAuthToken(oauthAccessToken.value);
+                    const decoded = decodeOAuthToken(oauthAccessToken.value);
+                    if (decoded.startsWith('{')) {
+                        oauthDecodedToken.innerHTML = formatJsonHighlight(decoded);
+                    } else {
+                        oauthDecodedToken.textContent = decoded || 'No access token configured.';
+                    }
 				}
 
 				// Switches token views without changing request authorization.
@@ -2985,7 +2995,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					oauthDecodedPanel.classList.toggle('hidden', view !== 'decoded');
 				}
 
-				// Decodes locally; JSON is displayed as plain text and never executed.
+				// Decodes locally; JSON is escaped before syntax highlighting and never executed.
 				function decodeOAuthToken(token) {
 					if (!token) { return ''; }
 					const parts = token.split('.');

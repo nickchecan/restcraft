@@ -1,5 +1,5 @@
 {
-  "name": "Testing Authorization Code",
+  "name": "Testing Authorization Code - Public",
   "method": "GET",
   "url": "https://api.example.com/resource",
   "params": [],

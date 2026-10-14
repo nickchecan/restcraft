@@ -237,7 +237,7 @@ suite('Webview HTML', () => {
 		const end = html.indexOf('// Hides or shows an authorization field', start);
 		const context = { authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
 			oauthToken: 'saved-token', displayedOAuthToken: '', oauthAccessToken: { value: '' },
-            oauthDecodedToken: { value: '' }, TextDecoder, atob,
+            oauthDecodedToken: { textContent: '', innerHTML: '' }, TextDecoder, atob,
 			oauthTokenPanel: { classList: { toggle: () => {} } }, authorizationLayout: { classList: { toggle: () => {} } } };
 		runInNewContext(html.slice(start, end) + '; updateOAuthTokenDisplay();', context);
 		assert.strictEqual(context.oauthAccessToken.value, '');
@@ -245,6 +245,32 @@ suite('Webview HTML', () => {
 		runInNewContext('updateOAuthTokenDisplay();', context);
 		assert.strictEqual(context.oauthAccessToken.value, 'new-token');
 	});
+    test('decoded token output formats and highlights JSON while escaping token contents', () => {
+        const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+        const start = html.indexOf('function updateOAuthTokenDisplay()');
+        const end = html.indexOf('// Hides or shows an authorization field', start);
+        const highlightStart = html.indexOf('function formatJsonHighlight(content)');
+        const highlightEnd = html.indexOf('// Sets formatted response body text', highlightStart);
+        const token = [{ alg: 'RS256' }, { name: '<img src=x onerror=alert(1)>', count: 12, active: true, missing: null }]
+            .map(value => Buffer.from(JSON.stringify(value)).toString('base64url')).join('.') + '.signature';
+        const context = { authorizationType: { value: 'oauth2' }, displayedOAuthToken: token,
+            oauthAccessToken: { value: '' }, oauthDecodedToken: { innerHTML: '', textContent: '' }, TextDecoder, atob,
+            oauthTokenPanel: { classList: { toggle: () => {} } }, authorizationLayout: { classList: { toggle: () => {} } } };
+        runInNewContext(html.slice(highlightStart, highlightEnd) + html.slice(start, end) + '; updateOAuthTokenDisplay();', context);
+        const output = context.oauthDecodedToken.innerHTML;
+        assert.ok(output.includes('\n  <span class="json-token-key">"header":</span>'));
+        for (const type of ['key', 'string', 'number', 'literal']) {
+            assert.ok(output.includes('json-token-' + type));
+        }
+        assert.ok(output.includes('&lt;img'));
+        assert.ok(!output.includes('<img'));
+        context.displayedOAuthToken = 'opaque-token';
+        runInNewContext('updateOAuthTokenDisplay();', context);
+        assert.strictEqual(context.oauthDecodedToken.textContent, 'This access token is not a readable JWT.');
+        context.displayedOAuthToken = '';
+        runInNewContext('updateOAuthTokenDisplay();', context);
+        assert.strictEqual(context.oauthDecodedToken.textContent, 'No access token configured.');
+    });
 	test('keeps unchecked OAuth header rows saved but excludes them from sending', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function readRequestHeaders()');

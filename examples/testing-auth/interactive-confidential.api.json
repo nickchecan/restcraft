@@ -1,5 +1,5 @@
 {
-  "name": "Testing Authorization Code",
+  "name": "Testing Authorization Code - Confidential",
   "method": "GET",
   "url": "https://api.example.com/resource",
   "params": [],
@@ -25,6 +25,5 @@
     "updateAuthorizationHeader": true,
     "storeAccessToken": true,
     "accessTokenVariable": "ACCESS_TOKEN"
-  },
-  "description": "Credentials - user: bob / password: bob"
+  }
 }
