@@ -124,6 +124,12 @@ export function initializeRequestWebview(
             }
             return;
         }
+        if (isRecord(message) && message.type === 'copyOAuthToken') {
+            if (typeof message.token === 'string' && message.token.length > 0) {
+                void vscode.env.clipboard.writeText(message.token);
+            }
+            return;
+        }
         if (isRecord(message) && message.type === 'copyOAuthRedirect') {
             if (oauthRedirectUrl) { void vscode.env.clipboard.writeText(oauthRedirectUrl); }
             return;

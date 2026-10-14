@@ -32,7 +32,7 @@ suite('Webview HTML', () => {
         }
         const highlighted: unknown[] = [];
         let changes = 0;
-        const context = { document: { getElementById: (id: string) => fields[id] },
+        const context = { oauthCopyToken: { disabled: false }, document: { getElementById: (id: string) => fields[id] },
             updateSecretReferenceState: (field: unknown) => { highlighted.push(field); },
             vscode: { postMessage: () => {} }, oauthRequestId: 0, oauthPending: false,
             oauthGetToken: { disabled: false }, oauthToken: '', displayedOAuthToken: '', oauthStatus: { textContent: '' },
@@ -240,13 +240,15 @@ suite('Webview HTML', () => {
 		const end = html.indexOf('// Hides or shows an authorization field', start);
 		const context = { authorizationType: { value: 'oauth2' }, oauthGrantType: { value: 'client_credentials' },
 			oauthToken: 'saved-token', displayedOAuthToken: '', oauthAccessToken: { value: '' },
-            oauthDecodedToken: { textContent: '', innerHTML: '' }, TextDecoder, atob,
+            oauthCopyToken: { disabled: true }, oauthDecodedToken: { textContent: '', innerHTML: '' }, TextDecoder, atob,
 			oauthTokenPanel: { classList: { toggle: () => {} } }, authorizationLayout: { classList: { toggle: () => {} } } };
 		runInNewContext(html.slice(start, end) + '; updateOAuthTokenDisplay();', context);
 		assert.strictEqual(context.oauthAccessToken.value, '');
+        assert.strictEqual(context.oauthCopyToken.disabled, true);
 		context.displayedOAuthToken = 'new-token';
 		runInNewContext('updateOAuthTokenDisplay();', context);
 		assert.strictEqual(context.oauthAccessToken.value, 'new-token');
+        assert.strictEqual(context.oauthCopyToken.disabled, false);
 	});
     test('decoded token output formats and highlights JSON while escaping token contents', () => {
         const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
@@ -257,7 +259,7 @@ suite('Webview HTML', () => {
         const token = [{ alg: 'RS256' }, { name: '<img src=x onerror=alert(1)>', count: 12, active: true, missing: null }]
             .map(value => Buffer.from(JSON.stringify(value)).toString('base64url')).join('.') + '.signature';
         const context = { authorizationType: { value: 'oauth2' }, displayedOAuthToken: token,
-            oauthAccessToken: { value: '' }, oauthDecodedToken: { innerHTML: '', textContent: '' }, TextDecoder, atob,
+            oauthCopyToken: { disabled: true }, oauthAccessToken: { value: '' }, oauthDecodedToken: { innerHTML: '', textContent: '' }, TextDecoder, atob,
             oauthTokenPanel: { classList: { toggle: () => {} } }, authorizationLayout: { classList: { toggle: () => {} } } };
         runInNewContext(html.slice(highlightStart, highlightEnd) + html.slice(start, end) + '; updateOAuthTokenDisplay();', context);
         const output = context.oauthDecodedToken.innerHTML;
@@ -325,7 +327,7 @@ suite('Webview HTML', () => {
 				classList: { toggle: (name: string, value: boolean) => { classes[name] = value; } },
 				setAttribute: (name: string, value: string) => { attributes[name] = value; } };
 		};
-		const context = { oauthHiddenOption: element(), oauthRawOption: element(), oauthDecodedOption: element(), oauthRawPanel: element(), oauthDecodedPanel: element() };
+		const context = { oauthTokenPanel: element(), oauthHiddenOption: element(), oauthRawOption: element(), oauthDecodedOption: element(), oauthRawPanel: element(), oauthDecodedPanel: element() };
 		runInNewContext(html.slice(start, end) + "; showOAuthTokenView('decoded');", context);
 		assert.strictEqual(context.oauthRawPanel.classes.hidden, true);
 		assert.strictEqual(context.oauthDecodedPanel.classes.hidden, false);
@@ -336,9 +338,33 @@ suite('Webview HTML', () => {
 		assert.strictEqual(context.oauthDecodedPanel.classes.hidden, true);
         runInNewContext("showOAuthTokenView('hidden');", context);
         assert.strictEqual(context.oauthHiddenOption.checked, true);
+        assert.strictEqual(context.oauthTokenPanel.classes['is-token-hidden'], true);
+        runInNewContext("showOAuthTokenView('raw');", context);
+        assert.strictEqual(context.oauthTokenPanel.classes['is-token-hidden'], false);
+        runInNewContext("showOAuthTokenView('hidden');", context);
         assert.strictEqual(context.oauthRawPanel.classes.hidden, true);
         assert.strictEqual(context.oauthDecodedPanel.classes.hidden, true);
 	});
+    test('Copy uses the resolved access token and ignores empty output or other authentication types', () => {
+        const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+        const start = html.indexOf("oauthCopyToken.addEventListener('click'");
+        const end = html.indexOf('const authorizationLayout', start);
+        let copy = () => {};
+        const messages: { type: string; token: string }[] = [];
+        const context = { oauthCopyToken: { addEventListener: (_event: string, callback: () => void) => { copy = callback; } },
+            authorizationType: { value: 'oauth2' }, displayedOAuthToken: '',
+            vscode: { postMessage: (message: { type: string; token: string }) => { messages.push(message); } } };
+        runInNewContext(html.slice(start, end), context);
+        copy();
+        assert.strictEqual(messages.length, 0);
+        context.displayedOAuthToken = 'resolved-env-token';
+        copy();
+        assert.strictEqual(messages[0].type, 'copyOAuthToken');
+        assert.strictEqual(messages[0].token, 'resolved-env-token');
+        context.authorizationType.value = 'none';
+        copy();
+        assert.strictEqual(messages.length, 1);
+    });
 	test('toggles client secret visibility and accessible button labels', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function setOAuthSecretVisible(visible)');

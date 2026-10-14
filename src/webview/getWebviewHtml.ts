@@ -255,7 +255,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 		#request-env-open:disabled,
 		#oauth-get-token:disabled,
-		#oauth-cancel-token:disabled {
+		#oauth-cancel-token:disabled,
+        #oauth-copy-token:disabled {
 			cursor: default;
 		}
 
@@ -517,11 +518,29 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				min-height: 0;
 				align-self: stretch;
 				display: grid;
-				grid-template-rows: auto minmax(0, 1fr);
+				grid-template-rows: auto minmax(0, 1fr) auto;
 				border-left: 1px solid var(--vscode-panel-border);
 				padding-left: 24px;
+                padding-bottom: var(--oauth-actions-bottom, 0px);
+                box-sizing: border-box;
 				gap: 8px;
 			}
+
+            #oauth-copy-token {
+                grid-row: 3;
+                justify-self: start;
+                align-self: start;
+            }
+
+            .oauth-token-panel.is-token-hidden {
+                grid-template-rows: auto auto minmax(0, 1fr);
+                padding-bottom: 0;
+            }
+
+            .oauth-token-panel.is-token-hidden #oauth-copy-token {
+                grid-row: 2;
+                margin-top: var(--oauth-grant-gap, 0px);
+            }
 
 			.authorization-secret-control {
 				display: flex;
@@ -647,7 +666,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					padding-left: 0;
 					border-top: 1px solid var(--vscode-panel-border);
 					padding-top: 16px;
+                    padding-bottom: 0;
 				}
+                .oauth-token-panel.is-token-hidden #oauth-copy-token {
+                    margin-top: 0;
+                }
 			}
 
 			.authorization-field {
@@ -1271,6 +1294,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						<p>JWT header and payload. Signature is not verified.</p>
 						<pre class="response-content" id="oauth-decoded-token" tabindex="0" aria-label="Decoded OAuth access token">No access token configured.</pre>
 					</div>
+                    <button id="oauth-copy-token" type="button" disabled aria-label="Copy access token">${buttonIcons.copy}<span>Copy Access Token</span></button>
 				</div>
 				</div>
 			</div>
@@ -1529,7 +1553,27 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 oauthRawOption.addEventListener('change', () => showOAuthTokenView('raw'));
                 oauthDecodedOption.addEventListener('change', () => showOAuthTokenView('decoded'));
                 const oauthTokenPanel = document.getElementById('oauth-token-panel');
+                const oauthCopyToken = document.getElementById('oauth-copy-token');
+                oauthCopyToken.addEventListener('click', () => {
+                    if (authorizationType.value === 'oauth2' && displayedOAuthToken) {
+                        vscode.postMessage({ type: 'copyOAuthToken', token: displayedOAuthToken });
+                    }
+                });
+
                 const authorizationLayout = document.getElementById('authorization-layout');
+                const authorizationFields = document.querySelector('.authorization-field');
+                const oauthButtonAlignmentObserver = new ResizeObserver(() => {
+                    const fieldsRect = authorizationFields.getBoundingClientRect();
+                    const fieldsBottom = fieldsRect.bottom;
+                    const actionsBottom = oauthGetToken.getBoundingClientRect().bottom;
+                    oauthTokenPanel.style.setProperty('--oauth-actions-bottom', Math.max(0, fieldsBottom - actionsBottom) + 'px');
+                    const optionsHeight = document.querySelector('.oauth-token-options').getBoundingClientRect().height;
+                    const grantTop = oauthGrantType.getBoundingClientRect().top - fieldsRect.top;
+                    oauthTokenPanel.style.setProperty('--oauth-grant-gap', Math.max(0, grantTop - optionsHeight - 8) + 'px');
+                });
+                oauthButtonAlignmentObserver.observe(authorizationFields);
+                oauthButtonAlignmentObserver.observe(document.querySelector('.oauth-token-options'));
+
                 const oauthUpdateHeader = document.getElementById('oauth-update-header');
                 oauthUpdateHeader.addEventListener('change', () => notifyRequestChanged());
                 const oauthStoreToken = document.getElementById('oauth-store-token');
@@ -1574,6 +1618,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 ['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope', 'oauth-authorization-url', 'oauth-state'].forEach((id) => {
                     document.getElementById(id).addEventListener('input', () => {
                         updateSecretReferenceState(document.getElementById(id));
+                        oauthCopyToken.disabled = true;
                         vscode.postMessage({ type: 'cancelOAuthToken' });
                         oauthRequestId++;
                         oauthPending = false;
@@ -3053,6 +3098,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					oauthTokenPanel.classList.toggle('hidden', !visible);
 					authorizationLayout.classList.toggle('has-oauth-token-panel', visible);
 					oauthAccessToken.value = visible ? displayedOAuthToken : '';
+                    oauthCopyToken.disabled = !visible || !displayedOAuthToken;
                     const decoded = decodeOAuthToken(oauthAccessToken.value);
                     if (decoded.startsWith('{')) {
                         oauthDecodedToken.innerHTML = formatJsonHighlight(decoded);
@@ -3068,6 +3114,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					oauthDecodedOption.checked = view === 'decoded';
 					oauthRawPanel.classList.toggle('hidden', view !== 'raw');
 					oauthDecodedPanel.classList.toggle('hidden', view !== 'decoded');
+                    oauthTokenPanel.classList.toggle('is-token-hidden', view === 'hidden');
 				}
 
 				// Decodes locally; JSON is escaped before syntax highlighting and never executed.
