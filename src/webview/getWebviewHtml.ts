@@ -520,6 +520,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			.oauth-token-options {
+				min-height: 32px;
+				align-items: center;
 				display: flex;
 				flex-wrap: wrap;
 				gap: 16px;
