@@ -26,7 +26,32 @@ export interface RequestHeaderDefinition {
 	enabled: boolean;
 }
 
+export interface OAuthAuthorizationDefinition {
+	type: 'oauth2';
+	grantType: 'client_credentials' | 'authorization_code';
+	accessTokenUrl: string;
+	clientId: string;
+	clientSecret: string;
+	scope: string;
+	authorizationUrl?: string;
+	clientAuthentication?: 'none' | 'basic' | 'body';
+	usePkce?: boolean;
+	state?: string;
+	updateAuthorizationHeader?: boolean;
+	storeAccessToken?: boolean;
+	accessTokenVariable?: string;
+}
+
+export interface EnvironmentFileSettings {
+	mode: 'nearest' | 'manual';
+	path: string;
+}
+
+export type TokenView = 'raw' | 'decoded' | 'hidden';
+
 export interface RequestFileDefinition {
+	authorizeBeforeSend?: boolean;
+	description?: string;
 	name: string;
 	method: HttpMethod;
 	url: string;
@@ -34,6 +59,8 @@ export interface RequestFileDefinition {
 	headerState: RequestHeaderDefinition[];
 	headers: Record<string, string>;
 	body: unknown;
+	authorization?: OAuthAuthorizationDefinition;
+	environment?: EnvironmentFileSettings;
 }
 
 /**

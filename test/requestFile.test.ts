@@ -4,6 +4,75 @@ import { createDefaultRequestFileContent, createRequestFileName } from '../src/r
 import { isRequestFileName, parseRequestFile } from '../src/request/requestFile';
 
 suite('Request file parser', () => {
+	for (const grantType of ['client_credentials', 'authorization_code']) {
+		test(`round-trips OAuth settings for ${grantType}`, () => {
+			const authorization = { type: 'oauth2', grantType, accessTokenUrl: '',
+				clientId: 'm2m', clientSecret: '{{CLIENT_SECRET}}', scope: 'api',
+                storeAccessToken: true, accessTokenVariable: 'MY_TOKEN' };
+			const content = { name: 'OAuth', method: 'GET', url: 'https://example.com/', authorization };
+			const request = parseRequestFile(JSON.stringify(content));
+			assert.deepStrictEqual(request.authorization, authorization);
+			assert.deepStrictEqual(parseRequestFile(JSON.stringify(request)).authorization, authorization);
+		});
+	}
+
+	test('round-trips Authorization Code options without transient callback values', () => {
+        const authorization = { type: 'oauth2', grantType: 'authorization_code',
+            accessTokenUrl: 'https://example.com/token', clientId: 'public-client', clientSecret: '', scope: 'api',
+            authorizationUrl: 'https://example.com/authorize', clientAuthentication: 'none', usePkce: true, state: 'my-custom-state' };
+        const request = { name: 'Code', method: 'GET', url: 'https://example.com/',
+            authorization: { ...authorization, redirectUrl: 'vscode://temporary', codeVerifier: 'temporary' } };
+        assert.deepStrictEqual(parseRequestFile(JSON.stringify(request)).authorization, authorization);
+        assert.deepStrictEqual(parseRequestFile(JSON.stringify(parseRequestFile(JSON.stringify(request)))).authorization, authorization);
+        for (const invalid of [{ authorizationUrl: 12 }, { clientAuthentication: 'invalid' }, { usePkce: 'true' }, { state: 123 }]) {
+            assert.throws(() => parseRequestFile(JSON.stringify({ ...request, authorization: { ...authorization, ...invalid } })), /authorization/);
+        }
+    });
+
+    test('round-trips the request authorization-before-send flag and rejects invalid values', () => {
+        const request = { name: 'Automatic auth', method: 'GET', url: 'https://example.com/' };
+        for (const authorizeBeforeSend of [true, false]) {
+            assert.strictEqual(parseRequestFile(JSON.stringify({ ...request, authorizeBeforeSend })).authorizeBeforeSend, authorizeBeforeSend);
+        }
+        assert.strictEqual(parseRequestFile(JSON.stringify(request)).authorizeBeforeSend, undefined);
+        for (const authorizeBeforeSend of ['true', 1, null]) {
+            assert.throws(() => parseRequestFile(JSON.stringify({ ...request, authorizeBeforeSend })), /authorizeBeforeSend/);
+        }
+    });
+
+	test('rejects malformed OAuth settings', () => {
+		const authorization = { type: 'oauth2', grantType: 'client_credentials', accessTokenUrl: '',
+			clientId: '', clientSecret: '', scope: '' };
+		for (const invalid of [null, {}, { ...authorization, grantType: 'password' },
+			{ ...authorization, clientSecret: 123 }, { ...authorization, scope: null }]) {
+			assert.throws(() => parseRequestFile(JSON.stringify({ name: 'OAuth', method: 'GET',
+				url: 'https://example.com/', authorization: invalid })), /authorization/);
+		}
+	});
+
+	test('round-trips manual environment selection and rejects invalid settings', () => {
+		const request = { name: 'Manual env', method: 'GET', url: 'https://example.com/',
+			environment: { mode: 'manual', path: '../config/.env' } };
+		const parsed = parseRequestFile(JSON.stringify(request));
+		assert.deepStrictEqual(parsed.environment, request.environment);
+		assert.deepStrictEqual(parseRequestFile(JSON.stringify(parsed)).environment, request.environment);
+		for (const environment of [null, { mode: 'unknown', path: '' }, { mode: 'manual', path: 123 }]) {
+			assert.throws(() => parseRequestFile(JSON.stringify({ ...request, environment })), /environment/);
+		}
+	});
+
+	test('derives execution headers from enabled state and ignores redundant legacy values', () => {
+		const parsed = parseRequestFile(JSON.stringify({ name: 'Headers', method: 'GET', url: 'https://example.com/',
+			headers: { Authorization: 'outdated' }, headerState: [
+				{ name: 'Authorization', value: 'Bearer {{TOKEN}}', enabled: false },
+				{ name: 'Accept', value: 'application/json', enabled: true },
+			] }));
+		assert.deepStrictEqual(parsed.headers, { Accept: 'application/json' });
+		assert.strictEqual(parsed.headerState[0].value, 'Bearer {{TOKEN}}');
+		const content = createDefaultRequestFileContent('new.api.json');
+		assert.strictEqual(JSON.parse(content).headers, undefined);
+	});
+
 	test('parses a valid request file', () => {
 		const request = parseRequestFile(JSON.stringify({
 			name: 'Get Users',

@@ -6,13 +6,15 @@ import {
 	RequestParamDefinition,
 	supportedMethods,
 } from './types';
+import { isOAuthAuthorization, readOAuthAuthorization } from './oauth';
+import { isEnvironmentFileSettings, copyEnvironmentFileSettings } from './environmentSettings';
 import { isRecord } from '../shared/object';
 
 /**
  * Parses and validates the canonical `.api.json` request file format.
  *
  * The returned shape is normalized for the UI: methods are uppercase, URLs are
- * serialized through `URL`, missing headers become `{}`, missing body becomes
+ * serialized through `URL`, execution headers derive from enabled rows, missing body becomes
  * `null`, and query params/header state are derived for older files that only
  * contain `url` or `headers`.
  */
@@ -31,15 +33,32 @@ export function parseRequestFile(content: string): RequestFileDefinition {
 	}
 
 	const url = readUrl(parsed);
+	if (parsed.authorizeBeforeSend !== undefined && typeof parsed.authorizeBeforeSend !== 'boolean') {
+		throw new Error('Request file property "authorizeBeforeSend" must be a boolean.');
+	}
+	if (parsed.description !== undefined && typeof parsed.description !== 'string') {
+		throw new Error('Request file property "description" must be a string.');
+	}
+	if (parsed.environment !== undefined && !isEnvironmentFileSettings(parsed.environment)) {
+		throw new Error('Request file property "environment" must contain a nearest or manual mode and a string path.');
+	}
+	if (parsed.authorization !== undefined && !isOAuthAuthorization(parsed.authorization)) {
+		throw new Error('Request file property "authorization" must contain valid OAuth 2.0 settings.');
+	}
 
+	const headerState = readHeaderState(parsed);
 	return {
 		name: readRequiredString(parsed, 'name'),
+		...(typeof parsed.authorizeBeforeSend === 'boolean' ? { authorizeBeforeSend: parsed.authorizeBeforeSend } : {}),
+		...(typeof parsed.description === 'string' ? { description: parsed.description } : {}),
 		method: readMethod(parsed),
 		url,
 		params: readParams(parsed, url),
-		headerState: readHeaderState(parsed),
-		headers: readHeaders(parsed),
+		headerState,
+		headers: Object.fromEntries(headerState.filter(header => header.enabled).map(header => [header.name, header.value])),
 		body: parsed.body ?? null,
+		...(isEnvironmentFileSettings(parsed.environment) ? { environment: copyEnvironmentFileSettings(parsed.environment) } : {}),
+		...(isOAuthAuthorization(parsed.authorization) ? { authorization: readOAuthAuthorization(parsed.authorization) } : {}),
 	};
 }
 

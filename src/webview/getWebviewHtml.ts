@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { buttonIcons } from './buttonIcons';
 
 /**
  * Generates the complete API Workbench webview document.
@@ -46,7 +47,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			display: inline-flex;
 			align-items: center;
 			gap: 8px;
-			margin: 0 0 12px;
+			margin: 0 0 4px;
 			font-size: 20px;
 			font-weight: 600;
 			line-height: 1.3;
@@ -85,6 +86,58 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			opacity: 0.65;
 		}
 
+		.request-description-area { margin: 0 0 12px; }
+		.description-display {
+			display: flex;
+			align-items: flex-start;
+			width: fit-content;
+			max-width: 100%;
+			gap: 6px;
+		}
+		#request-description-text {
+			min-width: 0;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			line-height: 24px;
+			color: var(--vscode-descriptionForeground);
+			cursor: text;
+		}
+		.description-display.expanded #request-description-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+		.description-actions {
+			display: inline-flex;
+			align-items: center;
+			flex-shrink: 0;
+			gap: 4px;
+			opacity: 0;
+			pointer-events: none;
+		}
+		.request-description-area:hover .description-actions,
+		.request-description-area:focus-within .description-actions { opacity: 0.75; pointer-events: auto; }
+		.description-actions button {
+			height: 24px;
+			padding: 0 4px;
+			border: 0;
+			background: transparent;
+			color: var(--vscode-descriptionForeground);
+			white-space: nowrap;
+		}
+		#request-description-edit { width: 24px; }
+		#request-description-edit svg { width: 16px; height: 16px; vertical-align: middle; }
+		#request-description {
+			width: 100%;
+			min-height: 72px;
+			box-sizing: border-box;
+			padding: 0;
+			font: inherit;
+			line-height: 1.5;
+			resize: vertical;
+			color: var(--vscode-foreground);
+			background: transparent;
+			border: 0;
+			border-bottom: 1px solid var(--vscode-focusBorder);
+		}
+
 		.section-divider {
 			display: flex;
 			align-items: center;
@@ -96,6 +149,30 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			letter-spacing: 0;
 			line-height: 1;
 			text-transform: uppercase;
+		}
+
+		.section-collapse {
+			width: 24px;
+			height: 24px;
+			padding: 4px;
+			border: 0;
+			background: transparent;
+			color: var(--vscode-foreground);
+			cursor: pointer;
+			flex-shrink: 0;
+		}
+
+		.section-collapse:hover {
+			background: var(--vscode-toolbar-hoverBackground);
+		}
+
+		.section-collapse svg {
+			width: 16px;
+			height: 16px;
+		}
+
+		.section-collapse[aria-expanded="false"] svg {
+			transform: rotate(-90deg);
 		}
 
 		.section-divider::after {
@@ -131,6 +208,82 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			background: var(--vscode-input-background);
 			border: 1px solid var(--vscode-input-border);
 			padding: 0 8px;
+		}
+
+		#method {
+			color: var(--vscode-charts-yellow, #d7ba7d);
+			font-weight: 600;
+		}
+
+		.request-env-options {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 16px;
+			margin-bottom: 16px;
+		}
+
+		.request-env-options label {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+		}
+
+		.request-env-options input[type="radio"] {
+			width: 16px;
+			height: 16px;
+			padding: 0;
+			margin: 0;
+		}
+
+		.request-env-row {
+			display: grid;
+			grid-template-columns: minmax(100px, 180px) minmax(0, 1fr) max-content max-content;
+			align-items: center;
+			justify-content: start;
+			gap: 8px;
+		}
+
+		.request-env-row label,
+		#request-env-open {
+			flex-shrink: 0;
+		}
+
+		#request-env-path {
+			flex: 1;
+			min-width: 0;
+		}
+
+		#request-env-open:disabled,
+		#oauth-get-token:disabled,
+		#oauth-cancel-token:disabled,
+        #oauth-copy-token:disabled {
+			cursor: default;
+		}
+
+        .request-auto-authorize {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        #request-authorize-before-send {
+            width: 16px;
+            height: 16px;
+            flex: 0 0 16px;
+            margin: 0;
+            padding: 0;
+        }
+
+        .request-auto-authorize-description {
+            color: var(--vscode-descriptionForeground);
+            margin: 6px 0 0 24px;
+            font-size: 12px;
+        }
+
+		#request-env-error {
+			margin-top: 8px;
+			color: var(--vscode-errorForeground);
 		}
 
 		.variable-input-wrapper {
@@ -177,6 +330,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			cursor: pointer;
 		}
 
+		.button-icon {
+			width: 16px;
+			height: 16px;
+			vertical-align: middle;
+			margin-right: 6px;
+			flex-shrink: 0;
+		}
+
 		button:hover {
 			background: var(--vscode-button-hoverBackground);
 		}
@@ -190,6 +351,19 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			background: var(--vscode-inputValidation-errorBorder, #c72e0f);
 		}
 
+        #oauth-cancel-token,
+        #oauth-cancel-token:hover {
+            color: #fff;
+            background: #e02424;
+        }
+
+        #oauth-cancel-token:disabled,
+        #oauth-cancel-token:disabled:hover {
+            color: var(--vscode-inputValidation-errorForeground, #fff);
+            background: var(--vscode-inputValidation-errorBackground, #a1260d);
+            opacity: 1;
+        }
+
 			button:disabled {
 				opacity: 0.7;
 				cursor: wait;
@@ -199,6 +373,24 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				margin-top: 16px;
 				border: 1px solid var(--vscode-panel-border);
 				background: var(--vscode-editor-inactiveSelectionBackground);
+			}
+
+			.request-tabs-toolbar {
+				display: flex;
+				align-items: center;
+				background: var(--vscode-sideBarSectionHeader-background);
+				border-bottom: 1px solid var(--vscode-panel-border);
+			}
+
+			.request-tabs-toolbar .request-tabs {
+				flex: 1;
+				min-width: 0;
+				overflow-x: auto;
+				border-bottom: 0;
+			}
+
+			#request-config-collapse {
+				margin: 0 6px;
 			}
 
 			.request-tabs {
@@ -215,6 +407,17 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				border-right: 1px solid var(--vscode-panel-border);
 				padding: 0 14px;
 				cursor: pointer;
+			}
+
+			.request-tab.has-values::after {
+				content: '';
+				display: inline-block;
+				width: 5px;
+				height: 5px;
+				margin-left: 7px;
+				border-radius: 50%;
+				background: var(--vscode-textLink-foreground);
+				vertical-align: middle;
 			}
 
 			.request-tab:hover {
@@ -299,9 +502,180 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				color: var(--vscode-descriptionForeground);
 			}
 
+			.authorization-layout {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr);
+				gap: 24px;
+				align-items: start;
+			}
+
+			.authorization-layout.has-oauth-token-panel {
+				grid-template-columns: minmax(300px, 500px) minmax(240px, 1fr);
+			}
+
+			.oauth-token-panel {
+				min-width: 0;
+				min-height: 0;
+				align-self: stretch;
+				display: grid;
+				grid-template-rows: auto minmax(0, 1fr) auto;
+				border-left: 1px solid var(--vscode-panel-border);
+				padding-left: 24px;
+                padding-bottom: var(--oauth-actions-bottom, 0px);
+                box-sizing: border-box;
+				gap: 8px;
+			}
+
+            #oauth-copy-token {
+                grid-row: 3;
+                justify-self: start;
+                align-self: start;
+            }
+
+            .oauth-token-panel.is-token-hidden {
+                grid-template-rows: auto auto minmax(0, 1fr);
+                padding-bottom: 0;
+            }
+
+            .oauth-token-panel.is-token-hidden #oauth-copy-token {
+                grid-row: 2;
+                margin-top: var(--oauth-grant-gap, 0px);
+            }
+
+			.authorization-secret-control {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				min-width: 0;
+			}
+
+			.authorization-secret-control > input,
+			.authorization-secret-control > .variable-input-wrapper {
+				flex: 1;
+				min-width: 0;
+			}
+
+			#oauth-secret-toggle, #basic-password-toggle {
+				flex-shrink: 0;
+			}
+
+			.oauth-token-options {
+				min-height: 32px;
+				align-items: center;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 16px;
+			}
+
+			.oauth-token-options label {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				cursor: pointer;
+			}
+
+			.oauth-token-options input[type="radio"],
+			#oauth-store-token, #oauth-update-header, #oauth-pkce {
+				width: 16px;
+				height: 16px;
+				padding: 0;
+				margin: 0;
+				flex: 0 0 16px;
+				justify-self: start;
+			}
+
+			label[for="oauth-store-token"],
+			#oauth-store-token {
+				margin-top: 8px;
+			}
+
+            .oauth-token-actions {
+                grid-column: 1 / -1;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+                width: max-content;
+                margin-top: 12px;
+                justify-self: start;
+            }
+
+            .oauth-token-actions > button {
+                width: 100%;
+                white-space: nowrap;
+            }
+
+            #oauth-status {
+                margin-top: 12px;
+            }
+
+			#oauth-status {
+				grid-column: 1 / -1;
+			}
+
+			.oauth-storage-description {
+				grid-column: 1 / -1;
+				color: var(--vscode-descriptionForeground);
+				font-size: 12px;
+			}
+
+			.oauth-token-content {
+				grid-row: 2;
+				min-height: 0;
+				display: flex;
+				flex-direction: column;
+				padding: 12px 0 0;
+			}
+
+			.oauth-token-content p {
+				margin: 0 0 8px;
+				color: var(--vscode-descriptionForeground);
+			}
+
+			.oauth-token-panel label {
+				font-weight: 600;
+			}
+
+			#oauth-access-token, #oauth-decoded-token {
+				border: 0;
+				color: var(--vscode-editor-foreground);
+				background: var(--vscode-editor-background);
+				width: 100%;
+				box-sizing: border-box;
+				min-height: 0;
+				flex: 1 1 0;
+				resize: none;
+				font-family: var(--vscode-editor-font-family);
+				overflow-wrap: anywhere;
+			}
+
+            #oauth-decoded-token {
+                overflow: auto;
+                padding: 2px;
+            }
+
+			@media (max-width: 760px) {
+				.authorization-layout.has-oauth-token-panel {
+					grid-template-columns: minmax(0, 1fr);
+				}
+				.authorization-field {
+					grid-template-columns: minmax(100px, 140px) minmax(0, 1fr);
+				}
+				.oauth-token-panel {
+					min-height: 260px;
+					border-left: 0;
+					padding-left: 0;
+					border-top: 1px solid var(--vscode-panel-border);
+					padding-top: 16px;
+                    padding-bottom: 0;
+				}
+                .oauth-token-panel.is-token-hidden #oauth-copy-token {
+                    margin-top: 0;
+                }
+			}
+
 			.authorization-field {
 				display: grid;
-				grid-template-columns: minmax(120px, 180px) minmax(180px, 320px);
+				grid-template-columns: minmax(100px, 180px) minmax(0, 320px);
 				gap: 8px;
 				align-items: center;
 			}
@@ -588,7 +962,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			.response-body-content {
 				display: grid;
 				grid-template-columns: auto minmax(0, 1fr);
-				min-height: 160px;
+				min-height: 220px;
 				max-height: max(160px, var(--response-area-max-height, calc(100vh - 320px)));
 				overflow: auto;
 				position: relative;
@@ -621,7 +995,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			.response-headers-content {
-				min-height: 160px;
+				min-height: 220px;
 				max-height: max(160px, var(--response-area-max-height, calc(100vh - 320px)));
 				overflow: auto;
 				background: var(--vscode-editor-inactiveSelectionBackground);
@@ -639,7 +1013,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			.response-preview {
 				display: block;
 				width: 100%;
-				min-height: 160px;
+				min-height: 220px;
 				height: max(160px, var(--response-area-max-height, max(360px, calc(100vh - 260px))));
 				max-height: max(160px, var(--response-area-max-height, max(360px, calc(100vh - 260px))));
 				border: 0;
@@ -647,7 +1021,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			#response-preview-empty {
-				min-height: 160px;
+				min-height: 220px;
 				max-height: max(160px, var(--response-area-max-height, 360px));
 				overflow: auto;
 			}
@@ -774,7 +1148,21 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
 		</svg>
 	</h1>
-	<div class="section-divider">Request</div>
+	<div class="request-description-area">
+		<div class="description-display" id="description-display">
+			<div id="request-description-text">Add description…</div>
+			<div class="description-actions">
+				<button id="request-description-edit" type="button" aria-label="Edit description" title="Edit description"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
+				<button id="request-description-toggle" class="hidden" type="button" aria-expanded="false" aria-controls="request-description-text">Show more ▾</button>
+			</div>
+		</div>
+		<textarea class="hidden" id="request-description" aria-label="Request description" rows="3" placeholder="Add description…"></textarea>
+	</div>
+	<div class="section-divider">
+			<button class="section-collapse" id="request-collapse" type="button" aria-expanded="true" aria-controls="request-section" aria-label="Collapse request" title="Collapse request"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+			Request
+		</div>
+	<div id="request-section">
 	<form class="request-bar" id="request-form">
 		<label>
 			<span class="sr-only">HTTP method</span>
@@ -792,15 +1180,20 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			<span class="sr-only">Request URL</span>
 			<input id="url" name="url" type="text" placeholder="https://api.example.com/resource" aria-label="Request URL">
 		</label>
-		<button id="send" type="submit" disabled title="Checking workspace trust...">Send</button>
+		<button id="send" type="submit" disabled title="Checking workspace trust...">${buttonIcons.send}<span>Send</span></button>
 		</form>
 		<section class="request-panel" aria-label="Request configuration area">
+			<div class="request-tabs-toolbar">
 			<div class="request-tabs" role="tablist" aria-label="Request sections">
 				<button class="request-tab active" id="request-params-tab" type="button" role="tab" aria-selected="true" aria-controls="request-params-panel">Params</button>
 				<button class="request-tab" id="request-authorization-tab" type="button" role="tab" aria-selected="false" aria-controls="request-authorization-panel">Authorization</button>
 				<button class="request-tab" id="request-headers-tab" type="button" role="tab" aria-selected="false" aria-controls="request-headers-panel">Headers</button>
 				<button class="request-tab" id="request-body-tab" type="button" role="tab" aria-selected="false" aria-controls="request-body-panel">Body</button>
+				<button class="request-tab" id="request-settings-tab" type="button" role="tab" aria-selected="false" aria-controls="request-settings-panel">Settings</button>
 			</div>
+			<button class="section-collapse" id="request-config-collapse" type="button" aria-expanded="true" aria-controls="request-config-content" aria-label="Collapse request configuration" title="Collapse request configuration"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+			</div>
+			<div id="request-config-content">
 			<div class="request-panel-content" id="request-params-panel" role="tabpanel" aria-labelledby="request-params-tab">
 				<table class="request-headers-table" aria-label="Request query parameters">
 					<thead>
@@ -813,23 +1206,96 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					</thead>
 					<tbody id="request-params-table"></tbody>
 				</table>
-				<button class="request-header-add" id="add-request-param" type="button">Add Param</button>
+				<button class="request-header-add" id="add-request-param" type="button">${buttonIcons.add}<span>Add Param</span></button>
 			</div>
 			<div class="request-panel-content hidden" id="request-authorization-panel" role="tabpanel" aria-labelledby="request-authorization-tab">
+				<div class="authorization-layout" id="authorization-layout">
 				<div class="authorization-field">
 					<label for="authorization-type">Type</label>
 					<select id="authorization-type" name="authorization-type">
 						<option value="none" selected>None</option>
 						<option value="bearer">Bearer Token</option>
 						<option value="basic">Basic Auth</option>
+						<option value="oauth2">OAuth 2.0</option>
 					</select>
 					<div class="authorization-divider" role="separator" aria-hidden="true"></div>
+					<label class="oauth-authorization-field hidden" for="oauth-grant-type">Grant Type</label>
+					<select class="oauth-authorization-field hidden" id="oauth-grant-type">
+						<option value="client_credentials">Client Credentials</option>
+						<option value="authorization_code">Authorization Code</option>
+					</select>
+                    <label class="oauth-code-field hidden" for="oauth-redirect-url">Redirect URL</label>
+                    <div class="authorization-secret-control oauth-code-field hidden">
+                        <input class="authorization-input" id="oauth-redirect-url" type="text" readonly placeholder="Preparing callback URL…">
+                        <button id="oauth-copy-redirect" type="button" disabled>${buttonIcons.copy}<span>Copy</span></button>
+                    </div>
+                    <label class="oauth-code-field hidden" for="oauth-authorization-url">Authorization URL</label>
+                    <input class="authorization-input oauth-code-field hidden" id="oauth-authorization-url" type="text" autocomplete="off">
+					<label class="oauth-client-field hidden" for="oauth-url">Access Token URL</label>
+					<input class="authorization-input oauth-client-field hidden" id="oauth-url" type="text" autocomplete="off">
+                    <label class="oauth-code-field hidden" for="oauth-client-authentication">Client Authentication</label>
+                    <select class="oauth-code-field hidden" id="oauth-client-authentication">
+                        <option value="none">None (public client)</option>
+                        <option value="basic">HTTP Basic</option>
+                        <option value="body">Send credentials in body</option>
+                    </select>
+					<label class="oauth-client-field hidden" for="oauth-client-id">Client ID</label>
+					<input class="authorization-input oauth-client-field hidden" id="oauth-client-id" type="text" autocomplete="off">
+					<label class="oauth-client-field hidden" for="oauth-client-secret">Client Secret</label>
+					<div class="authorization-secret-control oauth-client-field hidden">
+						<input class="authorization-input" id="oauth-client-secret" type="password" autocomplete="off">
+						<button id="oauth-secret-toggle" type="button" aria-controls="oauth-client-secret" aria-label="Show client secret" aria-pressed="false">${buttonIcons.eye}<span>Show</span></button>
+					</div>
+					<label class="oauth-client-field hidden" for="oauth-scope">Scope</label>
+					<input class="authorization-input oauth-client-field hidden" id="oauth-scope" type="text" autocomplete="off">
+                    <label class="oauth-code-field hidden" for="oauth-state">State</label>
+                    <div class="authorization-secret-control oauth-code-field hidden">
+                        <input class="authorization-input" id="oauth-state" type="text" autocomplete="off" spellcheck="false">
+                        <button id="oauth-generate-state" type="button" aria-label="Generate a new state">${buttonIcons.wand}<span>Generate</span></button>
+                    </div>
+                    <label class="oauth-code-field hidden" for="oauth-pkce">Use PKCE</label>
+                    <input class="oauth-code-field hidden" id="oauth-pkce" type="checkbox" checked aria-describedby="oauth-pkce-description">
+                    <span class="oauth-code-field oauth-storage-description hidden" id="oauth-pkce-description">Uses S256 with a new verifier for each authorization attempt.</span>
+					<div class="authorization-divider oauth-client-field hidden" role="separator" aria-hidden="true"></div>
+					<label class="oauth-client-field hidden" for="oauth-update-header">Update header</label>
+					<input class="oauth-client-field hidden" id="oauth-update-header" type="checkbox" aria-describedby="oauth-update-header-description" checked>
+					<span class="oauth-client-field oauth-storage-description hidden" id="oauth-update-header-description">Getting a new access token will update the Authorization header value.</span>
+					<label class="oauth-client-field hidden" for="oauth-store-token">Save token to .env</label>
+					<input class="oauth-client-field hidden" id="oauth-store-token" type="checkbox" aria-describedby="oauth-store-token-description">
+					<span class="oauth-client-field oauth-storage-description hidden" id="oauth-store-token-description">Save each retrieved token to the selected environment variable.</span>
+					<label class="oauth-storage-field hidden" for="oauth-token-variable">Variable Name</label>
+					<input class="authorization-input oauth-storage-field hidden" id="oauth-token-variable" aria-describedby="oauth-token-variable-description" type="text" value="ACCESS_TOKEN" placeholder="ACCESS_TOKEN" autocomplete="off" spellcheck="false">
+					<span class="oauth-storage-field oauth-storage-description hidden" id="oauth-token-variable-description">If this variable does not exist, it will be created in .env when you get a new access token.</span>
+                    <div class="oauth-token-actions oauth-client-field hidden">
+                        <button id="oauth-get-token" type="button">${buttonIcons.key}<span>Get new access token</span></button>
+                        <button class="request-cancel" id="oauth-cancel-token" type="button" disabled>Cancel</button>
+                    </div>
+					<span class="oauth-client-field hidden" id="oauth-status" role="status" aria-live="polite"></span>
 					<label class="bearer-authorization-field hidden" for="bearer-token">Token</label>
 					<input class="authorization-input bearer-authorization-field hidden" id="bearer-token" name="bearer-token" type="text" autocomplete="off">
 					<label class="basic-authorization-field hidden" for="basic-auth-username">Username</label>
 					<input class="authorization-input basic-authorization-field hidden" id="basic-auth-username" name="basic-auth-username" type="text" autocomplete="off">
 					<label class="basic-authorization-field hidden" for="basic-auth-password">Password</label>
-					<input class="authorization-input basic-authorization-field hidden" id="basic-auth-password" name="basic-auth-password" type="text" autocomplete="off">
+					<div class="authorization-secret-control basic-authorization-field hidden">
+						<input class="authorization-input" id="basic-auth-password" name="basic-auth-password" type="password" autocomplete="off">
+						<button id="basic-password-toggle" type="button" aria-controls="basic-auth-password" aria-label="Show password" aria-pressed="false">${buttonIcons.eye}<span>Show</span></button>
+					</div>
+				</div>
+				<div class="oauth-token-panel hidden" id="oauth-token-panel">
+					<div class="oauth-token-options" role="group" aria-label="Access token views">
+						<label><input id="oauth-raw-option" type="radio" name="oauth-token-view" value="raw" aria-controls="oauth-raw-panel" checked> Access Token</label>
+						<label><input id="oauth-decoded-option" type="radio" name="oauth-token-view" value="decoded" aria-controls="oauth-decoded-panel"> Decoded Token</label>
+						<label><input id="oauth-hidden-option" type="radio" name="oauth-token-view" value="hidden"> Hidden</label>
+					</div>
+					<div class="oauth-token-content" id="oauth-raw-panel" role="region" aria-label="Access Token">
+						<textarea id="oauth-access-token" readonly spellcheck="false" aria-label="OAuth access token" placeholder="No access token configured."></textarea>
+					</div>
+					<div class="oauth-token-content hidden" id="oauth-decoded-panel" role="region" aria-label="Decoded Token">
+						<p>JWT header and payload. Signature is not verified.</p>
+						<pre class="response-content" id="oauth-decoded-token" tabindex="0" aria-label="Decoded OAuth access token">No access token configured.</pre>
+					</div>
+                    <button id="oauth-copy-token" type="button" disabled aria-label="Copy access token">${buttonIcons.copy}<span>Copy Access Token</span></button>
+				</div>
 				</div>
 			</div>
 			<div class="request-panel-content hidden" id="request-headers-panel" role="tabpanel" aria-labelledby="request-headers-tab">
@@ -844,7 +1310,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					</thead>
 					<tbody id="request-headers-table"></tbody>
 				</table>
-				<button class="request-header-add" id="add-request-header" type="button">Add Header</button>
+				<button class="request-header-add" id="add-request-header" type="button">${buttonIcons.add}<span>Add Header</span></button>
 			</div>
 			<div class="request-panel-content hidden" id="request-body-panel" role="tabpanel" aria-labelledby="request-body-tab">
 				<div class="request-body-toolbar">
@@ -878,12 +1344,37 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						</thead>
 						<tbody id="request-body-form-table"></tbody>
 					</table>
-					<button class="request-header-add" id="add-request-body-form-row" type="button">Add Pair</button>
+					<button class="request-header-add" id="add-request-body-form-row" type="button">${buttonIcons.add}<span>Add Pair</span></button>
 				</div>
 			</div>
+			<div class="request-panel-content hidden" id="request-settings-panel" role="tabpanel" aria-labelledby="request-settings-tab">
+				<div class="request-env-options" role="group" aria-label="Environment file selection">
+					<label><input id="request-env-nearest" type="radio" name="request-env-mode" value="nearest" checked> Use nearest .env</label>
+					<label><input id="request-env-manual" type="radio" name="request-env-mode" value="manual"> Set up .env manually</label>
+				</div>
+				<div class="request-env-row">
+					<label for="request-env-path">Environment File</label>
+					<input id="request-env-path" type="text" readonly aria-label="Environment file path">
+					<button id="request-env-choose" class="hidden" type="button">${buttonIcons.folder}<span>Browse…</span></button>
+					<button id="request-env-open" type="button" disabled>${buttonIcons.linkExternal}<span>Open</span></button>
+				</div>
+				<div id="request-env-error" role="status" aria-live="polite"></div>
+                <label class="request-auto-authorize" for="request-authorize-before-send">
+                    <input id="request-authorize-before-send" type="checkbox" aria-describedby="request-auto-authorize-description">
+                    Authorize before sending
+                </label>
+                <p class="request-auto-authorize-description" id="request-auto-authorize-description">Get a new OAuth 2.0 access token before sending this request. Uses the Update header and Save token to .env options.</p>
+
+
+			</div>
+			</div>
 		</section>
-		<div class="section-divider response-divider">Response</div>
-		<section class="response-panel" aria-label="Response area">
+		</div>
+		<div class="section-divider response-divider">
+			<button class="section-collapse" id="response-collapse" type="button" aria-expanded="true" aria-controls="response-section" aria-label="Collapse response" title="Collapse response"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+			Response
+		</div>
+		<section class="response-panel" id="response-section" aria-label="Response area">
 			<div class="response-tabs">
 				<div class="response-tab-list" role="tablist" aria-label="Response sections">
 					<button class="response-tab active" id="body-tab" type="button" role="tab" aria-selected="true" aria-controls="body-panel">Body</button>
@@ -929,6 +1420,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.6 7.6 0 0 1 8 3.86c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path>
 				</svg>
 			</button>
+			<button class="editor-footer-icon" id="footer-x-link" type="button" aria-label="Open Nick Checan on X" title="Nick Checan on X">
+				<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+					<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+				</svg>
+			</button>
 			<button class="editor-footer-icon" id="footer-issues-link" type="button" aria-label="Open RestCraft issues" title="Open RestCraft issues">
 				<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 					<path d="m8 2 1.88 1.88"></path>
@@ -949,7 +1445,37 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 	<script nonce="${nonce}">
 			const vscode = acquireVsCodeApi();
+            const buttonIcons = ${JSON.stringify(buttonIcons)};
 			const form = document.getElementById('request-form');
+            const requestDescription = document.getElementById('request-description');
+            const descriptionDisplay = document.getElementById('description-display');
+            const requestDescriptionText = document.getElementById('request-description-text');
+            const requestDescriptionEdit = document.getElementById('request-description-edit');
+            const requestDescriptionToggle = document.getElementById('request-description-toggle');
+            let descriptionExpanded = false;
+            requestDescriptionEdit.addEventListener('click', startDescriptionEdit);
+            requestDescriptionText.addEventListener('click', startDescriptionEdit);
+            requestDescriptionToggle.addEventListener('click', () => {
+                descriptionExpanded = !descriptionExpanded;
+                renderDescription();
+            });
+            requestDescription.addEventListener('input', () => { notifyRequestChanged(); updateResponseAreaBounds(); });
+            requestDescription.addEventListener('blur', finishDescriptionEdit);
+            requestDescription.addEventListener('keydown', event => {
+                if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+                    event.preventDefault();
+                    requestDescription.blur();
+                }
+            });
+            window.addEventListener('resize', renderDescription);
+            const requestConfigCollapse = document.getElementById('request-config-collapse');
+            const requestConfigContent = document.getElementById('request-config-content');
+            requestConfigCollapse.addEventListener('click', () => toggleRequestSection(requestConfigCollapse, requestConfigContent, 'request configuration'));
+            ['request', 'response'].forEach((name) => {
+                const button = document.getElementById(name + '-collapse');
+                const section = document.getElementById(name + '-section');
+                button.addEventListener('click', () => toggleRequestSection(button, section, name));
+            });
 			const requestTitleContainer = document.getElementById('request-title-container');
 			const requestTitle = document.getElementById('request-title');
 			const requestTitleInput = document.getElementById('request-title-input');
@@ -963,15 +1489,218 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				const requestAuthorizationTab = document.getElementById('request-authorization-tab');
 				const requestHeadersTab = document.getElementById('request-headers-tab');
 				const requestBodyTab = document.getElementById('request-body-tab');
+                const requestSettingsTab = document.getElementById('request-settings-tab');
+                const requestSettingsPanel = document.getElementById('request-settings-panel');
+                const authorizeBeforeSend = document.getElementById('request-authorize-before-send');
+                let authorizationBeforeSendPending = false;
+                let oauthSendWaiter;
+                authorizeBeforeSend.addEventListener('change', () => {
+                    if (authorizationBeforeSendPending) { document.getElementById('oauth-cancel-token').click(); }
+                    notifyRequestChanged();
+                });
+
+                const requestEnvPath = document.getElementById('request-env-path');
+                const requestEnvOpen = document.getElementById('request-env-open');
+                const requestEnvError = document.getElementById('request-env-error');
+                let defaultTokenView = 'raw';
+                let autoGenerateAuthorizationCodeState = false;
+                const requestEnvNearest = document.getElementById('request-env-nearest');
+                const requestEnvManual = document.getElementById('request-env-manual');
+                const requestEnvChoose = document.getElementById('request-env-choose');
+                let manualEnvironmentPath = '';
+                let environmentSelectionRequestId = 0;
+                [requestEnvNearest, requestEnvManual].forEach(option => option.addEventListener('change', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    environmentSelectionRequestId++;
+                    requestEnvChoose.classList.toggle('hidden', !requestEnvManual.checked);
+                    notifyRequestChanged();
+                    refreshEnvironmentFile();
+                    refreshConfiguredOAuthToken();
+                    updateOAuthTokenDisplay();
+                    scheduleEnvironmentVariableCheck();
+                }));
+                requestEnvChoose.addEventListener('click', () => {
+                    vscode.postMessage({ type: 'chooseEnvironmentFile', requestId: ++environmentSelectionRequestId });
+                });
+                let environmentFileRequestId = 0;
+                requestSettingsTab.addEventListener('click', () => {
+                    showRequestTab('settings');
+                    refreshEnvironmentFile();
+                });
+                requestEnvOpen.addEventListener('click', () => vscode.postMessage({ type: 'openEnvironmentFile' }));
 				const requestParamsPanel = document.getElementById('request-params-panel');
 				const requestAuthorizationPanel = document.getElementById('request-authorization-panel');
 				const requestHeadersPanel = document.getElementById('request-headers-panel');
 				const requestBodyPanel = document.getElementById('request-body-panel');
 				const authorizationType = document.getElementById('authorization-type');
+                const oauthGrantType = document.getElementById('oauth-grant-type');
+                const oauthGetToken = document.getElementById('oauth-get-token');
+                const oauthStatus = document.getElementById('oauth-status');
+                const oauthClientSecret = document.getElementById('oauth-client-secret');
+                const oauthSecretToggle = document.getElementById('oauth-secret-toggle');
+                oauthSecretToggle.addEventListener('click', () => setOAuthSecretVisible(oauthClientSecret.type === 'password'));
+                const oauthAccessToken = document.getElementById('oauth-access-token');
+                const oauthDecodedToken = document.getElementById('oauth-decoded-token');
+                const oauthHiddenOption = document.getElementById('oauth-hidden-option');
+                const oauthRawOption = document.getElementById('oauth-raw-option');
+                const oauthDecodedOption = document.getElementById('oauth-decoded-option');
+                const oauthRawPanel = document.getElementById('oauth-raw-panel');
+                const oauthDecodedPanel = document.getElementById('oauth-decoded-panel');
+                oauthHiddenOption.addEventListener('change', () => showOAuthTokenView('hidden'));
+                oauthRawOption.addEventListener('change', () => showOAuthTokenView('raw'));
+                oauthDecodedOption.addEventListener('change', () => showOAuthTokenView('decoded'));
+                const oauthTokenPanel = document.getElementById('oauth-token-panel');
+                const oauthCopyToken = document.getElementById('oauth-copy-token');
+                oauthCopyToken.addEventListener('click', () => {
+                    if (authorizationType.value === 'oauth2' && displayedOAuthToken) {
+                        vscode.postMessage({ type: 'copyOAuthToken', token: displayedOAuthToken });
+                    }
+                });
+
+                const authorizationLayout = document.getElementById('authorization-layout');
+                const authorizationFields = document.querySelector('.authorization-field');
+                const oauthButtonAlignmentObserver = new ResizeObserver(() => {
+                    const fieldsRect = authorizationFields.getBoundingClientRect();
+                    const fieldsBottom = fieldsRect.bottom;
+                    const actionsBottom = oauthGetToken.getBoundingClientRect().bottom;
+                    oauthTokenPanel.style.setProperty('--oauth-actions-bottom', Math.max(0, fieldsBottom - actionsBottom) + 'px');
+                    const optionsHeight = document.querySelector('.oauth-token-options').getBoundingClientRect().height;
+                    const grantTop = oauthGrantType.getBoundingClientRect().top - fieldsRect.top;
+                    oauthTokenPanel.style.setProperty('--oauth-grant-gap', Math.max(0, grantTop - optionsHeight - 8) + 'px');
+                });
+                oauthButtonAlignmentObserver.observe(authorizationFields);
+                oauthButtonAlignmentObserver.observe(document.querySelector('.oauth-token-options'));
+
+                const oauthUpdateHeader = document.getElementById('oauth-update-header');
+                oauthUpdateHeader.addEventListener('change', () => notifyRequestChanged());
+                const oauthStoreToken = document.getElementById('oauth-store-token');
+                const oauthTokenVariable = document.getElementById('oauth-token-variable');
+                oauthStoreToken.addEventListener('change', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = '';
+                    applyAuthorizationType();
+                    notifyRequestChanged();
+                });
+                oauthTokenVariable.addEventListener('input', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = '';
+                    notifyRequestChanged();
+                });
+                let oauthToken = '';
+                let displayedOAuthToken = '';
+                let configuredOAuthTokenRequestId = 0;
+                let oauthRequestId = 0;
+                let oauthPending = false;
+                oauthGrantType.addEventListener('change', () => {
+                    if (autoGenerateAuthorizationCodeState && authorizationType.value === 'oauth2' && oauthGrantType.value === 'authorization_code' && !document.getElementById('oauth-state').value) {
+                        generateOAuthState();
+                    }
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthToken = '';
+                    displayedOAuthToken = '';
+                    oauthStatus.textContent = '';
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    refreshConfiguredOAuthToken();
+                    applyAuthorizationType();
+                    notifyRequestChanged();
+                });
+                ['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope', 'oauth-authorization-url', 'oauth-state'].forEach((id) => {
+                    document.getElementById(id).addEventListener('input', () => {
+                        updateSecretReferenceState(document.getElementById(id));
+                        oauthCopyToken.disabled = true;
+                        vscode.postMessage({ type: 'cancelOAuthToken' });
+                        oauthRequestId++;
+                        oauthPending = false;
+                        oauthGetToken.disabled = false;
+                        oauthToken = '';
+                    displayedOAuthToken = '';
+                        oauthStatus.textContent = '';
+                        if (authorizationType.value !== 'oauth2') {
+                            syncAuthorizationHeader();
+                        }
+                        notifyRequestChanged();
+                    });
+                });
+                document.getElementById('oauth-client-authentication').addEventListener('change', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = '';
+                    if (document.getElementById('oauth-client-authentication').value === 'none') {
+                        document.getElementById('oauth-client-secret').value = '';
+                    }
+                    setOAuthSecretVisible(false);
+                    applyAuthorizationType();
+                    scheduleEnvironmentVariableCheck();
+                    notifyRequestChanged();
+                });
+                function generateOAuthState() {
+                    const bytes = crypto.getRandomValues(new Uint8Array(32));
+                    document.getElementById('oauth-state').value = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+                    document.getElementById('oauth-state').dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                document.getElementById('oauth-generate-state').addEventListener('click', generateOAuthState);
+                document.getElementById('oauth-pkce').addEventListener('change', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = '';
+                    notifyRequestChanged();
+                });
+                document.getElementById('oauth-copy-redirect').addEventListener('click', () => vscode.postMessage({ type: 'copyOAuthRedirect' }));
+                document.getElementById('oauth-cancel-token').addEventListener('click', () => {
+                    if (!oauthPending) { return; }
+                    // Invalidate queued results immediately, before the host receives cancellation.
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = 'Token request cancelled.';
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                });
+                const oauthCancelObserver = new MutationObserver(() => {
+                    document.getElementById('oauth-cancel-token').disabled = !oauthPending;
+                });
+                oauthCancelObserver.observe(oauthGetToken, { attributes: true, attributeFilter: ['disabled'] });
+                oauthGetToken.addEventListener('click', () => {
+                    if (oauthPending || authorizationType.value !== 'oauth2') { return; }
+                    oauthPending = true;
+                    oauthGetToken.disabled = true;
+                    oauthStatus.textContent = oauthGrantType.value === 'authorization_code' ? 'Complete authorization in your browser…' : 'Getting access token…';
+                    vscode.postMessage({
+                        type: 'getOAuthToken', requestId: ++oauthRequestId,
+                        storeAccessToken: oauthStoreToken.checked,
+                        accessTokenVariable: oauthTokenVariable.value.trim(),
+                        url: document.getElementById('oauth-url').value,
+                        clientId: document.getElementById('oauth-client-id').value,
+                        clientSecret: document.getElementById('oauth-client-secret').value,
+                        scope: document.getElementById('oauth-scope').value,
+                        grantType: oauthGrantType.value,
+                        authorizationUrl: document.getElementById('oauth-authorization-url').value,
+                        clientAuthentication: document.getElementById('oauth-client-authentication').value,
+                        state: document.getElementById('oauth-state').value,
+                        usePkce: document.getElementById('oauth-pkce').checked,
+                    });
+                });
+
 				const bearerToken = document.getElementById('bearer-token');
 				const bearerAuthorizationFields = Array.from(document.querySelectorAll('.bearer-authorization-field'));
 				const basicAuthUsername = document.getElementById('basic-auth-username');
 				const basicAuthPassword = document.getElementById('basic-auth-password');
+                const basicPasswordToggle = document.getElementById('basic-password-toggle');
+                basicPasswordToggle.addEventListener('click', () => setBasicPasswordVisible(basicAuthPassword.type === 'password'));
 				const basicAuthorizationFields = Array.from(document.querySelectorAll('.basic-authorization-field'));
 				const requestParamsTable = document.getElementById('request-params-table');
 				const requestHeadersTable = document.getElementById('request-headers-table');
@@ -1006,6 +1735,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			const responsePreviewEmpty = document.getElementById('response-preview-empty');
 			const footerRepositoryLink = document.getElementById('footer-repository-link');
 			const footerIssuesLink = document.getElementById('footer-issues-link');
+            const footerXLink = document.getElementById('footer-x-link');
 			const footerSettingsButton = document.getElementById('footer-settings-button');
 			const editorFooter = document.querySelector('.editor-footer');
 				const responseBodyContent = document.getElementById('response-body-content');
@@ -1040,6 +1770,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						type: 'openRepository',
 					});
 				});
+
+				footerXLink.addEventListener('click', () => vscode.postMessage({ type: 'openXProfile' }));
 
 				footerIssuesLink.addEventListener('click', () => {
 					vscode.postMessage({
@@ -1082,7 +1814,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				});
 
 				requestAuthorizationTab.addEventListener('click', () => {
+                    if (requestAuthorizationTab.getAttribute('aria-selected') !== 'true') {
+                        showOAuthTokenView(defaultTokenView);
+                    }
 					showRequestTab('authorization');
+                    refreshConfiguredOAuthToken();
+                    updateOAuthTokenDisplay();
 				});
 
 				requestHeadersTab.addEventListener('click', () => {
@@ -1104,6 +1841,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				});
 
 				authorizationType.addEventListener('change', () => {
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = '';
 					applyAuthorizationType();
 					syncAuthorizationHeader();
 					notifyRequestChanged();
@@ -1218,8 +1960,43 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					clearHoverLine(responseRawContent);
 				});
 
-			form.addEventListener('submit', (event) => {
-				event.preventDefault();
+            // Wait for the existing token result handler to update output and header rows.
+            function authorizeForSend() {
+                return new Promise(resolve => {
+                    const requestId = oauthPending ? oauthRequestId : oauthRequestId + 1;
+                    oauthSendWaiter = { requestId, resolve };
+                    if (!oauthPending) { oauthGetToken.click(); }
+                });
+            }
+
+            function completeOAuthBeforeSend(message, error) {
+                if (oauthSendWaiter?.requestId !== message.requestId) { return; }
+                const waiter = oauthSendWaiter;
+                oauthSendWaiter = undefined;
+                waiter.resolve(error);
+            }
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (authorizationBeforeSendPending) {
+                    document.getElementById('oauth-cancel-token').click();
+                    return;
+                }
+                if (!requestInProgress && authorizeBeforeSend.checked && authorizationType.value === 'oauth2') {
+                    authorizationBeforeSendPending = true;
+                    send.textContent = 'Cancel';
+                    send.classList.add('request-cancel');
+                    setResponseStatus('Authorizing…');
+                    const error = await authorizeForSend();
+                    authorizationBeforeSendPending = false;
+                    send.innerHTML = buttonIcons.send + '<span>Send</span>';
+                    send.classList.remove('request-cancel');
+                    send.disabled = !workspaceTrusted;
+                    if (error || !workspaceTrusted) {
+                        setResponseStatus(error || 'Sending requests requires a trusted workspace.', error && error.includes('cancelled') ? '' : 'error');
+                        return;
+                    }
+                }
 				if (requestInProgress) {
 					send.disabled = true;
 					setResponseStatus('Cancelling...');
@@ -1252,10 +2029,79 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 		window.addEventListener('message', (event) => {
 			const message = event.data;
+                if (message.type === 'oauthRedirect') {
+                        document.getElementById('oauth-redirect-url').value = message.url || '';
+                        document.getElementById('oauth-redirect-url').placeholder = message.error || 'Callback URL unavailable';
+                        document.getElementById('oauth-copy-redirect').disabled = !message.url;
+                        return;
+                    }
+                if (message.type === 'autoGenerateStateSetting') {
+                    autoGenerateAuthorizationCodeState = message.value === true;
+                    return;
+                }
+                    if (message.type === 'tokenViewSetting') {
+                    defaultTokenView = ['raw', 'decoded', 'hidden'].includes(message.value) ? message.value : 'raw';
+                    return;
+                }
+                if (message.type === 'configuredOAuthToken') {
+                    if (message.requestId !== configuredOAuthTokenRequestId) { return; }
+                    displayedOAuthToken = typeof message.token === 'string' ? message.token : '';
+                    oauthStatus.textContent = typeof message.error === 'string' ? formatConfiguredOAuthError(message.error) : '';
+                    updateOAuthTokenDisplay();
+                    return;
+                }
+                if (message.type === 'environmentFileSelected') {
+                    if (message.requestId !== environmentSelectionRequestId || !requestEnvManual.checked) { return; }
+                    if (typeof message.error === 'string') { requestEnvError.textContent = message.error; return; }
+                    if (typeof message.path !== 'string') { return; }
+                    vscode.postMessage({ type: 'cancelOAuthToken' });
+                    oauthRequestId++;
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    manualEnvironmentPath = message.path;
+                    notifyRequestChanged();
+                    refreshEnvironmentFile();
+                    refreshConfiguredOAuthToken();
+                    updateOAuthTokenDisplay();
+                    scheduleEnvironmentVariableCheck();
+                    return;
+                }
+                if (message.type === 'environmentFile') {
+                    if (message.requestId !== environmentFileRequestId) { return; }
+                    requestEnvPath.value = typeof message.path === 'string' ? message.path : '';
+                    requestEnvOpen.disabled = !requestEnvPath.value;
+                    requestEnvError.textContent = typeof message.error === 'string' ? message.error : '';
+                    updateRequestTabIndicators();
+                    return;
+                }
 
-				if (message.type === 'requestComplete') {
+				if (message.type === 'oauthTokenResult') {
+                    if (message.requestId !== oauthRequestId) {
+                        completeOAuthBeforeSend(message, 'Token request cancelled.');
+                        return;
+                    }
+                    oauthPending = false;
+                    oauthGetToken.disabled = false;
+                    oauthStatus.textContent = message.error || (message.stored ? 'Access token saved to .env.' : 'Access token ready.');
+                    if (message.stored) { refreshEnvironmentFile(); }
+                    if (typeof message.token === 'string' && authorizationType.value === 'oauth2') {
+                        displayedOAuthToken = message.token;
+                        configuredOAuthTokenRequestId++;
+                        if (oauthUpdateHeader.checked) {
+                            oauthToken = message.token;
+                            applyRetrievedOAuthHeader(message.token);
+                            updateOAuthTokenDisplay();
+                        } else {
+                            updateOAuthTokenDisplay();
+                        }
+                        notifyRequestChanged();
+                    }
+                    completeOAuthBeforeSend(message, message.error || (typeof message.token === 'string' ? '' : 'Unable to get an access token.'));
+                    return;
+                }
+                if (message.type === 'requestComplete') {
 				requestInProgress = false;
-				send.textContent = 'Send';
+				send.innerHTML = buttonIcons.send + '<span>Send</span>';
 				send.classList.remove('request-cancel');
 				send.disabled = !workspaceTrusted;
 				stopRequestTimer();
@@ -1266,7 +2112,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 				if (message.type === 'requestError') {
 				requestInProgress = false;
-				send.textContent = 'Send';
+				send.innerHTML = buttonIcons.send + '<span>Send</span>';
 				send.classList.remove('request-cancel');
 				send.disabled = !workspaceTrusted;
 					stopRequestTimer();
@@ -1345,6 +2191,15 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				}
 
 				if (message.type === 'loadRequest') {
+                        requestDescription.value = message.request.description || '';
+                        descriptionExpanded = false;
+                        finishDescriptionEdit();
+                        environmentSelectionRequestId++;
+                        requestEnvManual.checked = message.request.environment?.mode === 'manual';
+                        requestEnvNearest.checked = !requestEnvManual.checked;
+                        manualEnvironmentPath = message.request.environment?.path || '';
+                        requestEnvChoose.classList.toggle('hidden', !requestEnvManual.checked);
+                        refreshEnvironmentFile();
 						setRequestTitle(message.request.name);
 						method.value = message.request.method;
 						url.value = message.request.url;
@@ -1360,12 +2215,52 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						} else {
 							renderRequestHeaders(message.request.headers || {});
 						}
-						readAuthorizationFromHeaders(message.request.headers || {});
+                        // Loading another request invalidates pending token results and clears old credentials.
+                        vscode.postMessage({ type: 'cancelOAuthToken' });
+                        oauthRequestId++;
+                        oauthPending = false;
+                        oauthGetToken.disabled = false;
+                        oauthStatus.textContent = '';
+                        oauthToken = '';
+                    displayedOAuthToken = '';
+                        activeAuthorizationType = 'none';
+                        setOAuthSecretVisible(false);
+                        setBasicPasswordVisible(false);
+                        authorizeBeforeSend.checked = message.request.authorizeBeforeSend === true;
+                        const savedAuthorization = message.request.authorization;
+                        oauthUpdateHeader.checked = savedAuthorization?.updateAuthorizationHeader !== false;
+                        oauthStoreToken.checked = savedAuthorization?.storeAccessToken === true;
+                        oauthTokenVariable.value = savedAuthorization?.accessTokenVariable ?? 'ACCESS_TOKEN';
+                        oauthGrantType.value = savedAuthorization?.grantType || 'client_credentials';
+                        document.getElementById('oauth-authorization-url').value = savedAuthorization?.authorizationUrl || '';
+                        document.getElementById('oauth-client-authentication').value = savedAuthorization?.clientAuthentication || 'none';
+                        document.getElementById('oauth-pkce').checked = savedAuthorization?.usePkce !== false;
+                        document.getElementById('oauth-state').value = savedAuthorization?.state || '';
+                        document.getElementById('oauth-url').value = savedAuthorization?.accessTokenUrl || '';
+                        document.getElementById('oauth-client-id').value = savedAuthorization?.clientId || '';
+                        document.getElementById('oauth-client-secret').value = savedAuthorization?.clientSecret || '';
+                        document.getElementById('oauth-scope').value = savedAuthorization?.scope || '';
+                        const allHeaders = Array.isArray(message.request.headerState)
+                            ? Object.fromEntries(message.request.headerState.map(header => [header.name, header.value]))
+                            : message.request.headers || {};
+                        readAuthorizationFromHeaders(allHeaders);
+                        if (savedAuthorization?.type === 'oauth2') {
+                            authorizationType.value = 'oauth2';
+                            activeAuthorizationType = 'oauth2';
+                            const savedHeader = readHeaderValue(allHeaders, 'Authorization');
+                            oauthToken = !oauthStoreToken.checked && savedHeader.startsWith('Bearer ')
+                                ? savedHeader.slice(7) : '';
+                            bearerToken.value = '';
+                            applyAuthorizationType();
+                            syncAuthorizationHeader();
+                            refreshConfiguredOAuthToken();
+                        }
 						setRequestBodyContent(message.request.body === null || message.request.body === undefined
 							? ''
 							: formatBody(message.request.body));
 						renderRequestBodyFormRows(requestBody.value);
 						setRequestBodyType(inferRequestBodyType(message.request.headers || {}, requestBody.value, activeRequestBodyType));
+                        updateRequestTabIndicators();
 						scheduleEnvironmentVariableCheck();
 						updateResponseAreaBounds();
 				}
@@ -1538,6 +2433,17 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					updateResponseAreaBounds();
 				}
 
+				// Collapses content without discarding field values or request results.
+				function toggleRequestSection(button, section, name) {
+					const expanded = button.getAttribute('aria-expanded') !== 'true';
+					section.classList.toggle('hidden', !expanded);
+					button.setAttribute('aria-expanded', String(expanded));
+					const label = (expanded ? 'Collapse ' : 'Expand ') + name;
+					button.setAttribute('aria-label', label);
+					button.title = label;
+					updateResponseAreaBounds();
+				}
+
 				// Sizes the active response panel to fit above the fixed footer.
 				function updateResponseAreaBounds() {
 					const activeResponsePanel = readActiveResponsePanel();
@@ -1687,12 +2593,27 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					};
 				}
 
+				function readEnvironmentSettings() {
+					return requestEnvManual.checked ? { mode: 'manual', path: manualEnvironmentPath } : undefined;
+				}
+
+				function refreshEnvironmentFile() {
+					requestEnvPath.value = '';
+					requestEnvOpen.disabled = true;
+					requestEnvError.textContent = '';
+					vscode.postMessage({ type: 'getEnvironmentFile', requestId: ++environmentFileRequestId, environment: readEnvironmentSettings() });
+				}
+
 				// Switches between request configuration tabs.
 				function showRequestTab(tabName) {
 					const showParams = tabName === 'params';
 					const showAuthorization = tabName === 'authorization';
 					const showHeaders = tabName === 'headers';
 					const showBody = tabName === 'body';
+                    const showSettings = tabName === 'settings';
+                    requestSettingsTab.classList.toggle('active', showSettings);
+                    requestSettingsTab.setAttribute('aria-selected', String(showSettings));
+                    requestSettingsPanel.classList.toggle('hidden', !showSettings);
 
 					requestParamsTab.classList.toggle('active', showParams);
 					requestAuthorizationTab.classList.toggle('active', showAuthorization);
@@ -2085,8 +3006,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					const authorization = readHeaderValue(headers, 'Authorization');
 
 					if (authorization.startsWith('Bearer ')) {
-						authorizationType.value = 'bearer';
-						activeAuthorizationType = 'bearer';
+						authorizationType.value = activeAuthorizationType === 'oauth2' && authorization === 'Bearer ' + oauthToken ? 'oauth2' : 'bearer';
+						activeAuthorizationType = authorizationType.value;
 						bearerToken.value = authorization.slice('Bearer '.length);
 						basicAuthUsername.value = '';
 						basicAuthPassword.value = '';
@@ -2104,10 +3025,43 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					syncAuthorizationHeader();
 				}
 
+				// Secret visibility is temporary UI state and does not alter the request.
+				function setOAuthSecretVisible(visible) {
+					oauthClientSecret.type = visible ? 'text' : 'password';
+					oauthSecretToggle.innerHTML = (visible ? buttonIcons.eyeClosed : buttonIcons.eye) + '<span>' + (visible ? 'Hide' : 'Show') + '</span>';
+					oauthSecretToggle.setAttribute('aria-label', visible ? 'Hide client secret' : 'Show client secret');
+					oauthSecretToggle.setAttribute('aria-pressed', String(visible));
+				}
+
+				function setBasicPasswordVisible(visible) {
+					basicAuthPassword.type = visible ? 'text' : 'password';
+					basicPasswordToggle.innerHTML = (visible ? buttonIcons.eyeClosed : buttonIcons.eye) + '<span>' + (visible ? 'Hide' : 'Show') + '</span>';
+					basicPasswordToggle.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+					basicPasswordToggle.setAttribute('aria-pressed', String(visible));
+				}
+
 				// Shows the authorization inputs for the selected auth type.
 				function applyAuthorizationType() {
 					const showBearerToken = authorizationType.value === 'bearer';
 					const showBasicAuth = authorizationType.value === 'basic';
+                    const showOAuth = authorizationType.value === 'oauth2';
+                    ['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope', 'oauth-authorization-url', 'oauth-state'].forEach((id) => {
+                        updateSecretReferenceState(document.getElementById(id));
+                    });
+                    updateOAuthTokenDisplay();
+                    document.querySelectorAll('.oauth-storage-field').forEach((field) => setAuthorizationFieldHidden(field, !showOAuth || !oauthStoreToken.checked));
+                    document.querySelectorAll('.oauth-authorization-field').forEach((field) => setAuthorizationFieldHidden(field, !showOAuth));
+                    document.querySelectorAll('.oauth-client-field').forEach((field) => setAuthorizationFieldHidden(field, !showOAuth));
+                    const showCode = showOAuth && oauthGrantType.value === 'authorization_code';
+                    document.querySelectorAll('.oauth-code-field').forEach((field) => setAuthorizationFieldHidden(field, !showCode));
+                    const hideSecret = showCode && document.getElementById('oauth-client-authentication').value === 'none';
+                    setAuthorizationFieldHidden(document.querySelector('label[for="oauth-client-secret"]'), !showOAuth || hideSecret);
+                    setAuthorizationFieldHidden(document.getElementById('oauth-client-secret').closest('.authorization-secret-control'), !showOAuth || hideSecret);
+                    oauthGetToken.disabled = oauthPending;
+                    if (showCode && !oauthPending) {
+                        vscode.postMessage({ type: 'getOAuthRedirect' });
+                    }
+
 
 					bearerAuthorizationFields.forEach((field) => {
 						setAuthorizationFieldHidden(field, !showBearerToken);
@@ -2116,6 +3070,69 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					basicAuthorizationFields.forEach((field) => {
 						setAuthorizationFieldHidden(field, !showBasicAuth);
 					});
+				}
+
+				function formatConfiguredOAuthError(error) {
+					const name = oauthTokenVariable.value.trim();
+					if (oauthStoreToken.checked && error === 'Missing environment variable: ' + name) {
+						return error + '. It will be created in .env when you get a new access token.';
+					}
+					return error;
+				}
+
+				// This output is separate from header/configuration state and is never persisted.
+				function refreshConfiguredOAuthToken() {
+					const requestId = ++configuredOAuthTokenRequestId;
+					displayedOAuthToken = '';
+					oauthStatus.textContent = '';
+					if (authorizationType.value !== 'oauth2') { return; }
+					const row = !oauthUpdateHeader.checked ? findHeaderRow('Authorization') : undefined;
+					const authorization = row ? row.querySelectorAll('.request-header-input')[1].value : readAuthorizationHeaderValue();
+					if (!authorization) { return; }
+					vscode.postMessage({ type: 'getConfiguredOAuthToken', requestId, authorization });
+				}
+
+				// Displays the current OAuth token without treating it as HTML.
+				function updateOAuthTokenDisplay() {
+					const visible = authorizationType.value === 'oauth2';
+					oauthTokenPanel.classList.toggle('hidden', !visible);
+					authorizationLayout.classList.toggle('has-oauth-token-panel', visible);
+					oauthAccessToken.value = visible ? displayedOAuthToken : '';
+                    oauthCopyToken.disabled = !visible || !displayedOAuthToken;
+                    const decoded = decodeOAuthToken(oauthAccessToken.value);
+                    if (decoded.startsWith('{')) {
+                        oauthDecodedToken.innerHTML = formatJsonHighlight(decoded);
+                    } else {
+                        oauthDecodedToken.textContent = decoded || 'No access token configured.';
+                    }
+				}
+
+				// Switches token views without changing request authorization.
+				function showOAuthTokenView(view) {
+					oauthHiddenOption.checked = view === 'hidden';
+					oauthRawOption.checked = view === 'raw';
+					oauthDecodedOption.checked = view === 'decoded';
+					oauthRawPanel.classList.toggle('hidden', view !== 'raw');
+					oauthDecodedPanel.classList.toggle('hidden', view !== 'decoded');
+                    oauthTokenPanel.classList.toggle('is-token-hidden', view === 'hidden');
+				}
+
+				// Decodes locally; JSON is escaped before syntax highlighting and never executed.
+				function decodeOAuthToken(token) {
+					if (!token) { return ''; }
+					const parts = token.split('.');
+					if (parts.length !== 3) { return 'This access token is not a readable JWT.'; }
+					try {
+						const decodePart = (part) => {
+							if (!/^[A-Za-z0-9_-]+$/.test(part)) { throw new Error('Invalid JWT encoding'); }
+							const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+							const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
+							const value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+							if (!value || typeof value !== 'object' || Array.isArray(value)) { throw new Error('Invalid JWT JSON'); }
+							return value;
+						};
+						return JSON.stringify({ header: decodePart(parts[0]), payload: decodePart(parts[1]) }, null, 2);
+					} catch { return 'Unable to decode this access token. It may be opaque or malformed.'; }
 				}
 
 				// Hides or shows an authorization field and its variable wrapper.
@@ -2127,8 +3144,21 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					}
 				}
 
+				// Applies OAuth settings only after successful explicit token retrieval.
+				function applyRetrievedOAuthHeader(token) {
+					const value = oauthStoreToken.checked
+						? 'Bearer {{' + oauthTokenVariable.value.trim() + '}}' : 'Bearer ' + token;
+					setHeaderValue('Authorization', value);
+				}
+
 				// Writes authorization control state back to the header table.
 				function syncAuthorizationHeader() {
+                    if (authorizationType.value === 'oauth2') {
+                        updateOAuthTokenDisplay();
+                        return;
+                    }
+                    refreshConfiguredOAuthToken();
+                    updateOAuthTokenDisplay();
 					activeAuthorizationType = authorizationType.value;
 					const headerValue = readAuthorizationHeaderValue();
 
@@ -2142,7 +3172,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 				// Builds the executable Authorization header value.
 				function readAuthorizationHeaderValue() {
-					if (authorizationType.value === 'bearer' && bearerToken.value) {
+					if (authorizationType.value === 'oauth2') {
+                        const row = findHeaderRow('Authorization');
+                        return row ? row.querySelectorAll('.request-header-input')[1].value : '';
+                    }
+                    if (authorizationType.value === 'bearer' && bearerToken.value) {
 						return 'Bearer ' + bearerToken.value;
 					}
 
@@ -2153,12 +3187,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					return '';
 				}
 
-				// Masks variable-backed credentials in the visible header table.
+				// Preserves Bearer references and masks encoded variable-backed Basic credentials.
 				function readAuthorizationHeaderDisplayValue(headerValue) {
-					if (authorizationType.value === 'bearer' && hasVariableReference(bearerToken.value)) {
-						return 'Bearer ***';
-					}
-
 					if (
 						authorizationType.value === 'basic'
 						&& (hasVariableReference(basicAuthUsername.value) || hasVariableReference(basicAuthPassword.value))
@@ -2441,7 +3471,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 				// Reads all request headers from the editor rows.
 				function readRequestHeaders() {
-					return readHeaderRows(false);
+					const headers = readHeaderRows(false);
+					return persistedOAuthHeaders(headers);
 				}
 
 				// Reads header rows including enabled/disabled state for persistence.
@@ -2462,8 +3493,13 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						}
 					}
 
-					return values;
-				}
+                    return values;
+                }
+
+                // Persists a literal token unless environment storage is enabled.
+                function persistedOAuthHeaders(headers) {
+                    return headers;
+                }
 
 				// Reads only enabled headers for request execution.
 				function readEnabledRequestHeaders() {
@@ -2579,10 +3615,44 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					url.value = parsed.toString();
 				}
 
+				// Marks sections with values, including partial and disabled rows.
+				function updateRequestTabIndicators() {
+					const hasRowValues = table => Array.from(table.querySelectorAll('.request-header-input')).some(input => input.value.trim());
+					const states = [
+						[requestParamsTab, hasRowValues(requestParamsTable)],
+						[requestAuthorizationTab, authorizationType.value !== 'none'],
+						[requestHeadersTab, hasRowValues(requestHeadersTable)],
+						[requestBodyTab, Boolean(requestBody.value.trim()) || hasRowValues(requestBodyFormTable)],
+						[requestSettingsTab, requestEnvManual.checked && Boolean(manualEnvironmentPath.trim())],
+					];
+					for (const [tab, hasValues] of states) {
+						tab.classList.toggle('has-values', Boolean(hasValues));
+						tab.setAttribute('aria-label', tab.textContent.trim() + (hasValues ? ', contains values' : ''));
+					}
+				}
+
 				// Posts the current editor state to the extension host for syncing.
 				function notifyRequestChanged() {
+                    updateRequestTabIndicators();
 					vscode.postMessage({
 						type: 'requestChanged',
+                        description: requestDescription.value,
+                        authorizeBeforeSend: authorizeBeforeSend.checked,
+                        environment: readEnvironmentSettings(),
+                        authorization: authorizationType.value === 'oauth2' ? {
+                            type: 'oauth2', grantType: oauthGrantType.value,
+                            accessTokenUrl: document.getElementById('oauth-url').value,
+                            clientId: document.getElementById('oauth-client-id').value,
+                            clientSecret: document.getElementById('oauth-client-secret').value,
+                            scope: document.getElementById('oauth-scope').value,
+                            authorizationUrl: document.getElementById('oauth-authorization-url').value,
+                            clientAuthentication: document.getElementById('oauth-client-authentication').value,
+                            usePkce: document.getElementById('oauth-pkce').checked,
+                            state: document.getElementById('oauth-state').value,
+                            updateAuthorizationHeader: oauthUpdateHeader.checked,
+                            storeAccessToken: oauthStoreToken.checked,
+                            accessTokenVariable: oauthTokenVariable.value.trim(),
+                        } : undefined,
 						name: requestTitle.textContent || 'Untitled Request',
 						method: method.value,
 						url: url.value,
@@ -2591,6 +3661,34 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						headers: readRequestHeaders(),
 						body: readRequestBodyForSend(),
 					});
+				}
+
+				function renderDescription() {
+					const lines = requestDescription.value.split(/\\r?\\n/);
+					const preview = lines[0] + (lines.length > 1 ? '...' : '');
+					requestDescriptionText.textContent = (descriptionExpanded ? requestDescription.value : preview) || 'Add description…';
+					descriptionDisplay.classList.toggle('expanded', descriptionExpanded);
+					requestDescriptionToggle.textContent = descriptionExpanded ? 'Show less ▴' : 'Show more ▾';
+					requestDescriptionToggle.setAttribute('aria-expanded', String(descriptionExpanded));
+					requestAnimationFrame(() => {
+						const overflow = descriptionExpanded || lines.length > 1
+							|| requestDescriptionText.scrollWidth > requestDescriptionText.clientWidth;
+						requestDescriptionToggle.classList.toggle('hidden', !requestDescription.value.trim() || !overflow);
+						updateResponseAreaBounds();
+					});
+				}
+
+				function startDescriptionEdit() {
+					descriptionDisplay.classList.add('hidden');
+					requestDescription.classList.remove('hidden');
+					requestDescription.focus();
+					updateResponseAreaBounds();
+				}
+
+				function finishDescriptionEdit() {
+					requestDescription.classList.add('hidden');
+					descriptionDisplay.classList.remove('hidden');
+					renderDescription();
 				}
 
 				// Normalizes and renders the request title.

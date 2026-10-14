@@ -1,0 +1,28 @@
+{
+  "name": "Testing Custom Env",
+  "method": "GET",
+  "url": "",
+  "params": [],
+  "headerState": [
+    {
+      "name": "Authorization",
+      "value": "Bearer {{TEST_NEW_TOKEN}}",
+      "enabled": true
+    }
+  ],
+  "authorization": {
+    "type": "oauth2",
+    "grantType": "client_credentials",
+    "accessTokenUrl": "https://demo.duendesoftware.com/connect/token",
+    "clientId": "m2m",
+    "clientSecret": "secret",
+    "scope": "api",
+    "storeAccessToken": true,
+    "accessTokenVariable": "TEST_NEW_TOKEN"
+  },
+  "body": null,
+  "environment": {
+    "mode": "manual",
+    "path": "../testing-auth/.env"
+  }
+}

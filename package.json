@@ -30,7 +30,8 @@
   ],
   "activationEvents": [
     "onCustomEditor:restcraft.requestEditor",
-    "onCommand:restcraft.createRequestFile"
+    "onCommand:restcraft.createRequestFile",
+    "onUri"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -41,14 +42,6 @@
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      {
-        "command": "restcraft.openApiWorkbench",
-        "title": "RestCraft: Open API Workbench"
-      },
-      {
-        "command": "restcraft.loadRequestFile",
-        "title": "RestCraft: Load Request File"
-      },
       {
         "command": "restcraft.createRequestFile",
         "title": "RestCraft: Create Request File"
@@ -86,6 +79,33 @@
           "default": true,
           "scope": "application",
           "description": "Show resolved .env values in tooltips when hovering over {{VARIABLE}} references in request fields."
+        },
+        "restcraft.autoGenerateAuthorizationCodeState": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Automatically generate state for new authorization code flows when selecting Authorization Code in the Authorization tab, only if State is empty. Existing State values are preserved."
+        },
+        "restcraft.defaultTokenView": {
+          "type": "string",
+          "enum": [
+            "raw",
+            "decoded",
+            "hidden"
+          ],
+          "enumDescriptions": [
+            "Show the access token.",
+            "Show the decoded JWT header and payload.",
+            "Hide the token output."
+          ],
+          "default": "raw",
+          "scope": "application",
+          "description": "Token output view to select when opening the Authorization tab. Retrieving tokens preserves the selected view.",
+          "enumItemLabels": [
+            "Access Token",
+            "Decoded Token",
+            "Hidden"
+          ]
         }
       }
     }

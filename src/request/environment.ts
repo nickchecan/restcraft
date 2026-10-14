@@ -181,3 +181,24 @@ function encodeBase64(value: string): string {
 function decodeBase64(value: string): string {
 	return Buffer.from(value, 'base64').toString('utf8');
 }
+
+/** Updates a single .env key, preserving unrelated lines and line endings. */
+export function updateEnvValue(content: string, name: string, value: string): string {
+	if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) { throw new Error('Enter a valid environment variable name (letters, numbers, and underscores).'); }
+	// Quoting must round-trip through our simple parser without newline injection.
+	if (!/^[\x21-\x7e]+$/.test(value)) { throw new Error('Access token contains unsupported characters.'); }
+	const quote = value.includes('"') ? "'" : '"';
+	if (value.includes(quote)) { throw new Error('Access token cannot be safely stored in .env.'); }
+	const assignment = `${name}=${quote}${value}${quote}`;
+	const eol = content.includes('\r\n') ? '\r\n' : '\n';
+	const lines = content.split(/\r?\n/);
+	let found = false;
+	const updated = lines.map(line => {
+		const trimmed = line.trim();
+		if (trimmed.startsWith('#') || trimmed.slice(0, trimmed.indexOf('=')).trim() !== name || !trimmed.includes('=')) { return line; }
+		found = true;
+		return assignment;
+	});
+	if (found) { return updated.join(eol); }
+	return content + (content && !content.endsWith('\n') ? eol : '') + assignment + eol;
+}

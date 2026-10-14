@@ -2,8 +2,12 @@
   "name": "Testing Form URL Encoded",
   "method": "POST",
   "url": "https://jsonplaceholder.typicode.com/posts",
-  "headers": {
-    "Content-Type": "application/x-www-form-urlencoded"
-  },
-  "body": "name=Test&secret=%7B%7BSECRET%7D%7D"
+  "body": "name=Test&secret=%7B%7BSECRET%7D%7D",
+  "headerState": [
+    {
+      "name": "Content-Type",
+      "value": "application/x-www-form-urlencoded",
+      "enabled": true
+    }
+  ]
 }

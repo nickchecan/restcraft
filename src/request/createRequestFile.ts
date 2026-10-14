@@ -40,7 +40,8 @@ export function createDefaultRequestFileContent(fileName: string): string {
 		body: null,
 	};
 
-	return `${JSON.stringify(request, null, '\t')}\n`;
+	const { headers: _headers, ...persisted } = request;
+	return `${JSON.stringify(persisted, null, '\t')}\n`;
 }
 
 /**

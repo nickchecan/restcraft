@@ -2,12 +2,24 @@
   "name": "Get Users",
   "method": "GET",
   "url": "https://jsonplaceholder.typicode.com/users",
-  "headers": {
-    "Accept": "application/json",
-    "Content-Type": "application/json",
-    "Authorization": "Basic bmljazoxMjM0NQ=="
-  },
   "body": {
     "test": "test"
-  }
+  },
+  "headerState": [
+    {
+      "name": "Accept",
+      "value": "application/json",
+      "enabled": true
+    },
+    {
+      "name": "Content-Type",
+      "value": "application/json",
+      "enabled": true
+    },
+    {
+      "name": "Authorization",
+      "value": "Basic bmljazoxMjM0NQ==",
+      "enabled": true
+    }
+  ]
 }
