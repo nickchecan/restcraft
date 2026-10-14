@@ -581,7 +581,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				min-height: 0;
 				display: flex;
 				flex-direction: column;
-				padding: 12px;
+				padding: 12px 0 0;
 			}
 
 			.oauth-token-content p {
@@ -594,6 +594,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			#oauth-access-token, #oauth-decoded-token {
+				border: 0;
+				color: var(--vscode-editor-foreground);
+				background: var(--vscode-editor-background);
 				width: 100%;
 				box-sizing: border-box;
 				min-height: 0;
