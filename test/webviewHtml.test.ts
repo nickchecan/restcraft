@@ -429,4 +429,55 @@ suite('Webview HTML', () => {
 		click();
 		assert.strictEqual(selectedView, 'decoded');
 	});
+	test('description renders compact plain text and offers expansion only when needed', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function renderDescription()');
+		const end = html.indexOf('function startDescriptionEdit()', start);
+		let toggleHidden = true;
+		const attributes: Record<string, string> = {};
+		const context = { descriptionExpanded: false, requestDescription: { value: 'First line\nSecond line' },
+			requestDescriptionText: { textContent: '', scrollWidth: 10, clientWidth: 100 },
+			descriptionDisplay: { classList: { toggle: () => {} } },
+			requestDescriptionToggle: { textContent: '', setAttribute: (name: string, value: string) => { attributes[name] = value; },
+				classList: { toggle: (_name: string, value: boolean) => { toggleHidden = value; } } },
+			requestAnimationFrame: (callback: () => void) => callback(), updateResponseAreaBounds: () => {} };
+		runInNewContext(html.slice(start, end) + '; renderDescription();', context);
+		assert.strictEqual(toggleHidden, false);
+		assert.strictEqual(attributes['aria-expanded'], 'false');
+        assert.strictEqual(context.requestDescriptionText.textContent, 'First line...');
+		context.descriptionExpanded = true;
+		runInNewContext('renderDescription();', context);
+		assert.strictEqual(context.requestDescriptionToggle.textContent, 'Show less ▴');
+        assert.strictEqual(context.requestDescriptionText.textContent, 'First line\nSecond line');
+		context.descriptionExpanded = false;
+		context.requestDescription.value = 'First line\r\nSecond line';
+        runInNewContext('renderDescription();', context);
+        assert.strictEqual(context.requestDescriptionText.textContent, 'First line...');
+        assert.strictEqual(context.requestDescription.value, 'First line\r\nSecond line');
+		context.requestDescription.value = 'Short note';
+		runInNewContext('renderDescription();', context);
+		assert.strictEqual(toggleHidden, true);
+		context.requestDescription.value = '';
+		runInNewContext('renderDescription();', context);
+		assert.strictEqual(context.requestDescriptionText.textContent, 'Add description…');
+		assert.strictEqual(toggleHidden, true);
+	});
+	test('Enter finishes description editing while Shift+Enter preserves newline entry', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf("requestDescription.addEventListener('keydown'");
+		const end = html.indexOf("window.addEventListener('resize', renderDescription)", start);
+		let handler = (_event: { key: string; shiftKey: boolean; isComposing: boolean; preventDefault: () => void }) => {};
+		let blurred = false;
+		let prevented = false;
+		const context = { requestDescription: { addEventListener: (_name: string, callback: typeof handler) => { handler = callback; },
+			blur: () => { blurred = true; } } };
+		runInNewContext(html.slice(start, end), context);
+		for (const [shiftKey, isComposing, finish] of [[false, false, true], [true, false, false], [false, true, false]]) {
+			blurred = false;
+			prevented = false;
+			handler({ key: 'Enter', shiftKey, isComposing, preventDefault: () => { prevented = true; } });
+			assert.strictEqual(blurred, finish);
+			assert.strictEqual(prevented, finish);
+		}
+	});
 });

@@ -47,7 +47,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			display: inline-flex;
 			align-items: center;
 			gap: 8px;
-			margin: 0 0 12px;
+			margin: 0 0 4px;
 			font-size: 20px;
 			font-weight: 600;
 			line-height: 1.3;
@@ -84,6 +84,58 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 		.request-title:hover .request-title-icon,
 		.request-title:focus-within .request-title-icon {
 			opacity: 0.65;
+		}
+
+		.request-description-area { margin: 0 0 12px; }
+		.description-display {
+			display: flex;
+			align-items: flex-start;
+			width: fit-content;
+			max-width: 100%;
+			gap: 6px;
+		}
+		#request-description-text {
+			min-width: 0;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			line-height: 24px;
+			color: var(--vscode-descriptionForeground);
+			cursor: text;
+		}
+		.description-display.expanded #request-description-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+		.description-actions {
+			display: inline-flex;
+			align-items: center;
+			flex-shrink: 0;
+			gap: 4px;
+			opacity: 0;
+			pointer-events: none;
+		}
+		.request-description-area:hover .description-actions,
+		.request-description-area:focus-within .description-actions { opacity: 0.75; pointer-events: auto; }
+		.description-actions button {
+			height: 24px;
+			padding: 0 4px;
+			border: 0;
+			background: transparent;
+			color: var(--vscode-descriptionForeground);
+			white-space: nowrap;
+		}
+		#request-description-edit { width: 24px; }
+		#request-description-edit svg { width: 16px; height: 16px; vertical-align: middle; }
+		#request-description {
+			width: 100%;
+			min-height: 72px;
+			box-sizing: border-box;
+			padding: 0;
+			font: inherit;
+			line-height: 1.5;
+			resize: vertical;
+			color: var(--vscode-foreground);
+			background: transparent;
+			border: 0;
+			border-bottom: 1px solid var(--vscode-focusBorder);
 		}
 
 		.section-divider {
@@ -1020,6 +1072,16 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
 		</svg>
 	</h1>
+	<div class="request-description-area">
+		<div class="description-display" id="description-display">
+			<div id="request-description-text">Add description…</div>
+			<div class="description-actions">
+				<button id="request-description-edit" type="button" aria-label="Edit description" title="Edit description"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
+				<button id="request-description-toggle" class="hidden" type="button" aria-expanded="false" aria-controls="request-description-text">Show more ▾</button>
+			</div>
+		</div>
+		<textarea class="hidden" id="request-description" aria-label="Request description" rows="3" placeholder="Add description…"></textarea>
+	</div>
 	<div class="section-divider">
 			<button class="section-collapse" id="request-collapse" type="button" aria-expanded="true" aria-controls="request-section" aria-label="Collapse request" title="Collapse request"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
 			Request
@@ -1278,6 +1340,27 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			const vscode = acquireVsCodeApi();
             const buttonIcons = ${JSON.stringify(buttonIcons)};
 			const form = document.getElementById('request-form');
+            const requestDescription = document.getElementById('request-description');
+            const descriptionDisplay = document.getElementById('description-display');
+            const requestDescriptionText = document.getElementById('request-description-text');
+            const requestDescriptionEdit = document.getElementById('request-description-edit');
+            const requestDescriptionToggle = document.getElementById('request-description-toggle');
+            let descriptionExpanded = false;
+            requestDescriptionEdit.addEventListener('click', startDescriptionEdit);
+            requestDescriptionText.addEventListener('click', startDescriptionEdit);
+            requestDescriptionToggle.addEventListener('click', () => {
+                descriptionExpanded = !descriptionExpanded;
+                renderDescription();
+            });
+            requestDescription.addEventListener('input', () => { notifyRequestChanged(); updateResponseAreaBounds(); });
+            requestDescription.addEventListener('blur', finishDescriptionEdit);
+            requestDescription.addEventListener('keydown', event => {
+                if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+                    event.preventDefault();
+                    requestDescription.blur();
+                }
+            });
+            window.addEventListener('resize', renderDescription);
             const requestConfigCollapse = document.getElementById('request-config-collapse');
             const requestConfigContent = document.getElementById('request-config-content');
             requestConfigCollapse.addEventListener('click', () => toggleRequestSection(requestConfigCollapse, requestConfigContent, 'request configuration'));
@@ -1871,6 +1954,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				}
 
 				if (message.type === 'loadRequest') {
+                        requestDescription.value = message.request.description || '';
+                        descriptionExpanded = false;
+                        finishDescriptionEdit();
                         environmentSelectionRequestId++;
                         requestEnvManual.checked = message.request.environment?.mode === 'manual';
                         requestEnvNearest.checked = !requestEnvManual.checked;
@@ -3288,6 +3374,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     updateRequestTabIndicators();
 					vscode.postMessage({
 						type: 'requestChanged',
+                        description: requestDescription.value,
                         environment: readEnvironmentSettings(),
                         authorization: authorizationType.value === 'oauth2' ? {
                             type: 'oauth2', grantType: oauthGrantType.value,
@@ -3307,6 +3394,34 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						headers: readRequestHeaders(),
 						body: readRequestBodyForSend(),
 					});
+				}
+
+				function renderDescription() {
+					const lines = requestDescription.value.split(/\\r?\\n/);
+					const preview = lines[0] + (lines.length > 1 ? '...' : '');
+					requestDescriptionText.textContent = (descriptionExpanded ? requestDescription.value : preview) || 'Add description…';
+					descriptionDisplay.classList.toggle('expanded', descriptionExpanded);
+					requestDescriptionToggle.textContent = descriptionExpanded ? 'Show less ▴' : 'Show more ▾';
+					requestDescriptionToggle.setAttribute('aria-expanded', String(descriptionExpanded));
+					requestAnimationFrame(() => {
+						const overflow = descriptionExpanded || lines.length > 1
+							|| requestDescriptionText.scrollWidth > requestDescriptionText.clientWidth;
+						requestDescriptionToggle.classList.toggle('hidden', !requestDescription.value.trim() || !overflow);
+						updateResponseAreaBounds();
+					});
+				}
+
+				function startDescriptionEdit() {
+					descriptionDisplay.classList.add('hidden');
+					requestDescription.classList.remove('hidden');
+					requestDescription.focus();
+					updateResponseAreaBounds();
+				}
+
+				function finishDescriptionEdit() {
+					requestDescription.classList.add('hidden');
+					descriptionDisplay.classList.remove('hidden');
+					renderDescription();
 				}
 
 				// Normalizes and renders the request title.

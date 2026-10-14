@@ -8,6 +8,8 @@ export function createUpdatedRequestDocumentText(content: string, message: Reque
 		const parsed = readDocumentObject(content);
 
 		parsed.name = message.name.trim() || 'Untitled Request';
+		if (message.description?.trim()) { parsed.description = message.description; }
+		else { delete parsed.description; }
 		parsed.method = message.method;
 		parsed.url = message.url;
 		parsed.params = message.params;

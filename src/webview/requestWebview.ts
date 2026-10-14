@@ -49,6 +49,7 @@ interface CheckEnvironmentVariablesMessage {
 }
 
 export interface RequestChangedMessage {
+	description?: string;
 	type: 'requestChanged';
 	environment?: EnvironmentFileSettings;
 	authorization?: OAuthAuthorizationDefinition;
@@ -713,6 +714,7 @@ function isRequestChangedMessage(message: unknown): message is RequestChangedMes
 	return (candidate.environment === undefined || isEnvironmentFileSettings(candidate.environment))
 		&& (candidate.authorization === undefined || isOAuthAuthorization(candidate.authorization))
 		&& candidate.type === 'requestChanged'
+		&& (candidate.description === undefined || typeof candidate.description === 'string')
 		&& typeof candidate.name === 'string'
 		&& typeof candidate.method === 'string'
 		&& typeof candidate.url === 'string'

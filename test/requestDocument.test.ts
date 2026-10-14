@@ -86,4 +86,12 @@ suite('OAuth request document persistence', () => {
 		assert.strictEqual(JSON.parse(text).defaultTokenView, undefined);
 		assert.strictEqual(JSON.parse(text).displayedOAuthToken, undefined);
 	});
+	test('persists optional multiline descriptions and removes them when cleared', () => {
+		const description = 'API context\n<example> {{not_a_request_variable}}';
+		const text = createUpdatedRequestDocumentText('{}', { ...message, description });
+		assert.strictEqual(parseRequestFile(text).description, description);
+		assert.strictEqual(JSON.parse(createUpdatedRequestDocumentText(text, { ...message, description: '' })).description, undefined);
+		assert.throws(() => parseRequestFile(JSON.stringify({ name: 'Description', method: 'GET',
+			url: 'https://example.com/', description: 123 })), /description/);
+	});
 });

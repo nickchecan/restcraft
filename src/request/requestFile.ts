@@ -33,6 +33,9 @@ export function parseRequestFile(content: string): RequestFileDefinition {
 	}
 
 	const url = readUrl(parsed);
+	if (parsed.description !== undefined && typeof parsed.description !== 'string') {
+		throw new Error('Request file property "description" must be a string.');
+	}
 	if (parsed.environment !== undefined && !isEnvironmentFileSettings(parsed.environment)) {
 		throw new Error('Request file property "environment" must contain a nearest or manual mode and a string path.');
 	}
@@ -43,6 +46,7 @@ export function parseRequestFile(content: string): RequestFileDefinition {
 	const headerState = readHeaderState(parsed);
 	return {
 		name: readRequiredString(parsed, 'name'),
+		...(typeof parsed.description === 'string' ? { description: parsed.description } : {}),
 		method: readMethod(parsed),
 		url,
 		params: readParams(parsed, url),

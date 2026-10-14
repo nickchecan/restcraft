@@ -258,3 +258,19 @@ In VS Code **Settings**, set **RestCraft: Default Token View**
 Retrieving tokens preserves your current output selection. It is not stored in request files. Existing
 per-request `defaultTokenView` fields are removed the next time the request is
 edited and saved. Output radio options remain available for temporary changes.
+
+### Request description
+
+An optional plain-text description appears beneath the request title. It stays
+collapsed to one line; hover over the note or focus its controls to reveal the
+pencil and **Show more / Show less**. Short notes do not need an expand control.
+Empty requests show a subtle **Add description…** action.
+
+Click the note or pencil to edit. Click away or press Enter to finish. Press Shift+Enter to insert a new line.
+The text is saved in the optional `description` string in `.api.json`, preserving
+line breaks. Clearing it removes the property. Descriptions are not sent to the
+API and environment references are treated as plain text.
+
+```json
+"description": "Retrieves a demo access token.\nUse before calling the protected API."
+```

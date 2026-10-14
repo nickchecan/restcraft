@@ -46,6 +46,7 @@ export interface EnvironmentFileSettings {
 export type TokenView = 'raw' | 'decoded' | 'hidden';
 
 export interface RequestFileDefinition {
+	description?: string;
 	name: string;
 	method: HttpMethod;
 	url: string;
