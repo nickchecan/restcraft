@@ -216,8 +216,12 @@ hover previews as other request fields. References are saved as entered; both
 grant types resolve them from the selected environment before retrieval. The
 generated Redirect URL remains read-only.
 **Use PKCE** defaults to enabled with S256. **State** is editable and saved with the request. Click **Generate** (wand icon)
-to replace it with a fresh cryptographically random value. The State field is generated only
-when you click **Generate**; an empty field stays empty. The generated
+to replace it with a fresh cryptographically random value. By default, the State field is generated only
+when you click **Generate**; an empty field stays empty. Enable the global setting
+`restcraft.autoGenerateAuthorizationCodeState` to generate State when selecting
+the Authorization Code grant type if the field is empty. Switching grant types
+preserves existing State values, including saved values and environment references. This setting defaults to off and
+does not replace saved State values when reopening requests or opening the tab. The generated
 **Redirect URL** is read-only and has a **Copy** button for registering it with
 your provider. The provider must support the generated callback URL, normally
 `vscode://nickchecan.restcraft/oauth/callback` on desktop VS Code (Insiders and

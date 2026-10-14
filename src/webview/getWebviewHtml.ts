@@ -1437,6 +1437,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 const requestEnvOpen = document.getElementById('request-env-open');
                 const requestEnvError = document.getElementById('request-env-error');
                 let defaultTokenView = 'raw';
+                let autoGenerateAuthorizationCodeState = false;
                 const requestEnvNearest = document.getElementById('request-env-nearest');
                 const requestEnvManual = document.getElementById('request-env-manual');
                 const requestEnvChoose = document.getElementById('request-env-choose');
@@ -1514,6 +1515,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                 let oauthRequestId = 0;
                 let oauthPending = false;
                 oauthGrantType.addEventListener('change', () => {
+                    if (autoGenerateAuthorizationCodeState && authorizationType.value === 'oauth2' && oauthGrantType.value === 'authorization_code' && !document.getElementById('oauth-state').value) {
+                        generateOAuthState();
+                    }
                     vscode.postMessage({ type: 'cancelOAuthToken' });
                     oauthToken = '';
                     displayedOAuthToken = '';
@@ -1555,11 +1559,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     scheduleEnvironmentVariableCheck();
                     notifyRequestChanged();
                 });
-                document.getElementById('oauth-generate-state').addEventListener('click', () => {
+                function generateOAuthState() {
                     const bytes = crypto.getRandomValues(new Uint8Array(32));
                     document.getElementById('oauth-state').value = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
                     document.getElementById('oauth-state').dispatchEvent(new Event('input', { bubbles: true }));
-                });
+                }
+                document.getElementById('oauth-generate-state').addEventListener('click', generateOAuthState);
                 document.getElementById('oauth-pkce').addEventListener('change', () => {
                     vscode.postMessage({ type: 'cancelOAuthToken' });
                     oauthRequestId++;
@@ -1908,6 +1913,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                         document.getElementById('oauth-copy-redirect').disabled = !message.url;
                         return;
                     }
+                if (message.type === 'autoGenerateStateSetting') {
+                    autoGenerateAuthorizationCodeState = message.value === true;
+                    return;
+                }
                     if (message.type === 'tokenViewSetting') {
                     defaultTokenView = ['raw', 'decoded', 'hidden'].includes(message.value) ? message.value : 'raw';
                     return;

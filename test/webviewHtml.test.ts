@@ -97,9 +97,63 @@ suite('Webview HTML', () => {
         cancel();
         assert.strictEqual(messages.length, 1);
     });
+    test('automatic State generation runs only when selecting Authorization Code with the preference enabled', () => {
+        const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+        const start = html.indexOf("oauthGrantType.addEventListener('change'");
+        const end = html.indexOf("['oauth-url'", start);
+        let change = () => {};
+        let generations = 0;
+        const state = { value: '' };
+        const context = { document: { getElementById: () => state }, autoGenerateAuthorizationCodeState: false,
+            oauthGrantType: { value: 'authorization_code', addEventListener: (_event: string, callback: () => void) => { change = callback; } },
+            authorizationType: { value: 'oauth2' }, generateOAuthState: () => { generations++; state.value = 'generated-state'; },
+            vscode: { postMessage: () => {} }, oauthToken: '', displayedOAuthToken: '', oauthStatus: { textContent: '' },
+            oauthRequestId: 0, oauthPending: false, oauthGetToken: { disabled: false },
+            refreshConfiguredOAuthToken: () => {}, applyAuthorizationType: () => {}, notifyRequestChanged: () => {} };
+        runInNewContext(html.slice(start, end), context);
+        change();
+        assert.strictEqual(generations, 0);
+        context.autoGenerateAuthorizationCodeState = true;
+        change();
+        change();
+        assert.strictEqual(generations, 1);
+        context.oauthGrantType.value = 'client_credentials';
+        change();
+        assert.strictEqual(generations, 1);
+        context.oauthGrantType.value = 'authorization_code';
+        change();
+        assert.strictEqual(state.value, 'generated-state');
+        assert.strictEqual(generations, 1);
+        for (const savedState of ['saved-state', '{{OAUTH_STATE}}']) {
+            state.value = savedState;
+            context.oauthGrantType.value = 'client_credentials';
+            change();
+            context.oauthGrantType.value = 'authorization_code';
+            change();
+            assert.strictEqual(state.value, savedState);
+            assert.strictEqual(generations, 1);
+        }
+        state.value = '';
+        context.authorizationType.value = 'none';
+        change();
+        assert.strictEqual(generations, 1);
+    });
+
+    test('changing the global automatic State preference does not generate or overwrite existing State', () => {
+        const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+        const start = html.indexOf("if (message.type === 'autoGenerateStateSetting')");
+        const end = html.indexOf("if (message.type === 'tokenViewSetting')", start);
+        const context = { message: { type: 'autoGenerateStateSetting', value: true as unknown },
+            autoGenerateAuthorizationCodeState: false, generateOAuthState: () => { assert.fail('Must wait until grant selection'); } };
+        runInNewContext('(function () {' + html.slice(start, end) + '})();', context);
+        assert.strictEqual(context.autoGenerateAuthorizationCodeState, true);
+        context.message.value = 'true';
+        runInNewContext('(function () {' + html.slice(start, end) + '})();', context);
+        assert.strictEqual(context.autoGenerateAuthorizationCodeState, false);
+    });
     test('Generate State creates a fresh random value and notifies the input listener', () => {
         const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
-        const start = html.indexOf("document.getElementById('oauth-generate-state').addEventListener");
+        const start = html.indexOf('function generateOAuthState()');
         const end = html.indexOf("document.getElementById('oauth-pkce').addEventListener", start);
         let generate = () => {};
         let changes = 0;
@@ -468,7 +522,7 @@ suite('Webview HTML', () => {
 		for (const header of ['Bearer configured-token', 'Bearer {{ACCESS_TOKEN}}']) {
 			let change = () => {};
 			const messages: { type: string; authorization?: string }[] = [];
-			const context = { oauthGrantType: { value: 'authorization_code', addEventListener: (_event: string, callback: () => void) => { change = callback; } },
+			const context = { autoGenerateAuthorizationCodeState: false, oauthGrantType: { value: 'authorization_code', addEventListener: (_event: string, callback: () => void) => { change = callback; } },
 				authorizationType: { value: 'oauth2' }, oauthUpdateHeader: { checked: true }, oauthToken: '', displayedOAuthToken: '',
 				oauthStatus: { textContent: '' }, oauthRequestId: 0, configuredOAuthTokenRequestId: 0, oauthPending: false,
 				oauthGetToken: { disabled: false }, applyAuthorizationType: () => {}, notifyRequestChanged: () => {},

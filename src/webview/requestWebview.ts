@@ -102,6 +102,7 @@ export function initializeRequestWebview(
 			});
 			void postEnvironmentTooltipSetting(webview);
             void postTokenViewSetting(webview);
+            void postAutoGenerateStateSetting(webview);
 			handlers.onReady?.();
 			return;
 		}
@@ -224,6 +225,9 @@ export function initializeRequestWebview(
 		});
 	});
 	const settingsSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('restcraft.autoGenerateAuthorizationCodeState')) {
+            void postAutoGenerateStateSetting(webview);
+        }
 		if (event.affectsConfiguration('restcraft.defaultTokenView')) {
 			void postTokenViewSetting(webview);
 		}
@@ -238,6 +242,12 @@ export function initializeRequestWebview(
 	}));
 }
 
+
+/** Updates the preference without changing an already-open request's State. */
+async function postAutoGenerateStateSetting(webview: vscode.Webview): Promise<void> {
+    const value = vscode.workspace.getConfiguration('restcraft').get<boolean>('autoGenerateAuthorizationCodeState', false);
+    await webview.postMessage({ type: 'autoGenerateStateSetting', value: value === true });
+}
 
 /** Sends the extension-wide token output preference to each open webview. */
 async function postTokenViewSetting(webview: vscode.Webview): Promise<void> {

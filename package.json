@@ -80,6 +80,12 @@
           "scope": "application",
           "description": "Show resolved .env values in tooltips when hovering over {{VARIABLE}} references in request fields."
         },
+        "restcraft.autoGenerateAuthorizationCodeState": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Automatically generate state for new authorization code flows when selecting Authorization Code in the Authorization tab, only if State is empty. Existing State values are preserved."
+        },
         "restcraft.defaultTokenView": {
           "type": "string",
           "enum": [
