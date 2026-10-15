@@ -358,7 +358,8 @@ for breaking changes with the Angular semantic-release preset. Ordinary merge
 subjects and `fixup!` subjects fail validation; rebase or squash them before
 submitting the final branch history.
 
-Pull request CI runs `commits`, `checks`, and `tests` as three parallel jobs.
-The final **CI gate** fails if any job
-fails, is cancelled, or is skipped. Configure **CI gate** as a required status
+Pull request CI runs `commits` and `verify` in parallel. The `verify` job checks
+lint, formatting, and types, then runs extension tests and builds the production
+bundle. Its status check is named **Verify extension**. The final **CI gate**
+fails if either job fails, is cancelled, or is skipped. Configure **CI gate** as a required status
 check in the main branch ruleset to block merging when any of these checks fails.

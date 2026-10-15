@@ -27,38 +27,25 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bash scripts/commit.sh
 
-  checks:
-    name: Lint, format, and types
+  verify:
+    name: Verify extension
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
+
       - name: Install dependencies
         run: npm ci
+
       - name: Check lint, formatting, and types
         run: npm run check
-
-  tests:
-    name: Tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Install virtual display support
         run: sudo apt-get update && sudo apt-get install -y xvfb
@@ -72,18 +59,17 @@ jobs:
   gate:
     name: CI gate
     runs-on: ubuntu-latest
-    needs: [commits, checks, tests]
+    needs: [commits, verify]
     if: ${{ always() }}
     steps:
       - name: Require all parallel jobs to succeed
         env:
           COMMITS_RESULT: ${{ needs.commits.result }}
-          CHECKS_RESULT: ${{ needs.checks.result }}
-          TESTS_RESULT: ${{ needs.tests.result }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
         run: |
-          for result in "$COMMITS_RESULT" "$CHECKS_RESULT" "$TESTS_RESULT"; do
+          for result in "$COMMITS_RESULT" "$VERIFY_RESULT"; do
             if [ "$result" != "success" ]; then
-              echo "::error::All CI jobs must succeed (commits=$COMMITS_RESULT, checks=$CHECKS_RESULT, tests=$TESTS_RESULT)."
+              echo "::error::All CI jobs must succeed (commits=$COMMITS_RESULT, verify=$VERIFY_RESULT)."
               exit 1
             fi
           done
