@@ -18,6 +18,7 @@ Create, save, and send HTTP API requests inside Visual Studio Code. RestCraft gi
 - Build REST API requests with query parameters, headers, JSON bodies, and request descriptions.
 - Keep disabled parameters and headers saved for later without sending them.
 - Inspect response status, headers, and body in the API Workbench.
+- View server-sent events (`text/event-stream`) as they arrive, with collapsible event cards, event types and IDs, formatted JSON, and **Expand all** / **Collapse all** controls. The **Raw** tab preserves the received text. Cancelling or timing out keeps events already received; streams use `restcraft.requestTimeout` (set to `0` to disable the timeout).
 - Use `{{VARIABLE}}` references with the nearest `.env` or a manually selected environment file.
 - Authenticate with Basic auth, Bearer tokens, or OAuth 2.0 client credentials and authorization code with PKCE. Authorization Code allows an optional client secret when sending credentials in the body.
 - Save OAuth tokens in `.env` and optionally authorize before each request.
@@ -97,3 +98,16 @@ Open VS Code Settings and search for **RestCraft**.
 - [Report a bug or request a feature](https://github.com/nickchecan/restcraft/issues)
 - [Release notes](https://github.com/nickchecan/restcraft/releases)
 - [Development and testing](https://github.com/nickchecan/restcraft/blob/main/docs/development.md)
+
+## Import from Bruno
+
+Open the Command Palette with **Cmd+Shift+P** (macOS) or **Ctrl+Shift+P** (Windows/Linux) and choose **RestCraft: Import from Bruno**. Select a request file or a collection folder. On Windows/Linux, choose **Request file** or **Collection folder** first because native dialogs cannot select both types at once.
+
+- Selecting a file imports a `.bru`, `.yml`, or `.yaml` HTTP request and saves it as `.api.json`, then opens the request editor.
+- Selecting a collection folder imports the collection containing `bruno.json` (BRU) or `opencollection.yml` / `opencollection.yaml` (YAML). Then choose a destination parent folder. RestCraft creates a new folder with the source folder name and imports requests recursively, keeping relative folders and filenames. The destination must not already exist.
+
+Imports preserve request names, methods, URLs, query parameters (including disabled and repeated entries), headers, documentation, JSON/text/XML/form-urlencoded bodies, and bearer tokens. Collection and folder headers and inherited bearer authentication are applied to each request. Variable references remain unchanged; configure RestCraft `.env` files after import. Existing destination files are never overwritten.
+
+This importer supports BRU and OpenCollection 1.0.0 YAML formats, including collection and folder `request.headers` and `request.auth` settings. YAML query/path parameters can be typed entries or grouped lists. JSON collection exports are not supported. Unsupported authentication and body modes stop the import with an error before collection files are written. Scripts, tests, assertions, runtime variables, settings, and collection configuration are not executed or migrated; warnings identify these omissions. Bruno environments are not migrated. Standalone request imports cannot resolve collection or folder inheritance; use collection import for those requests. Imports never send HTTP requests.
+
+Importable BRU and YAML sample collections are available in [examples/bruno](examples/bruno/README.md).

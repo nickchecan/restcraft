@@ -1,0 +1,16 @@
+info:
+  name: Echo form
+  type: http
+  seq: 1
+http:
+  method: POST
+  url: https://httpbin.org/post
+  auth: none
+  body:
+    type: form-urlencoded
+    data:
+      - name: name
+        value: Ada Lovelace
+      - name: debug
+        value: yes
+        disabled: true

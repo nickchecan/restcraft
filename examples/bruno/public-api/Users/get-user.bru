@@ -1,0 +1,19 @@
+meta {
+  name: Get one user
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://jsonplaceholder.typicode.com/users/:userId
+  body: none
+  auth: none
+}
+
+params:path {
+  userId: 1
+}
+
+docs {
+  Replaces the Bruno path parameter with user ID 1 during import.
+}

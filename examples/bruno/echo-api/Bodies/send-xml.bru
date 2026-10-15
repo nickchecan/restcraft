@@ -1,0 +1,17 @@
+meta {
+  name: Echo XML
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://httpbin.org/post
+  body: xml
+  auth: none
+}
+
+body:xml {
+  <message>
+    <text>Hello from RestCraft</text>
+  </message>
+}

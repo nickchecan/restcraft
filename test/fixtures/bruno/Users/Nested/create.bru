@@ -1,0 +1,16 @@
+meta {
+  name: Create user
+  type: http
+  seq: 2
+}
+post {
+  url: https://api.example.com/users
+  body: json
+  auth: none
+}
+body:json {
+  {
+    "name": "Ada",
+    "profile": {"roles": ["admin"], "template": "{{ROLE}}"}
+  }
+}

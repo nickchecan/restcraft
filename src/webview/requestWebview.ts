@@ -4,7 +4,7 @@ import { isEnvironmentFileSettings, copyEnvironmentFileSettings, isTokenView } f
 
 import { parseEnvFile, resolveRequestVariables, updateEnvValue } from '../request/environment';
 import { buildOAuthTokenRequest, readOAuthAccessToken, isOAuthAuthorization } from '../request/oauth';
-import { executeRequest } from '../request/requestRunner';
+import { executeRequest, StreamListener } from '../request/requestRunner';
 import { AuthorizationCodeFields } from '../request/authorizationCode';
 import { getAuthorizationCodeToken, getOAuthRedirectUri } from './oauthCallback';
 import {
@@ -80,7 +80,7 @@ export interface RequestWebviewHandlers {
 	onGetRequestUri?: () => vscode.Uri | undefined;
 	onReady?: () => void;
 	onRequestChanged?: (message: RequestChangedMessage) => void;
-	onSendRequest?: (message: SendRequestMessage, signal: AbortSignal) => Promise<ApiResponse>;
+	onSendRequest?: (message: SendRequestMessage, signal: AbortSignal, onStream?: StreamListener) => Promise<ApiResponse>;
 	onResolveEnvironmentVariable?: (name: string) => Promise<string | undefined>;
 	onCheckEnvironmentVariables?: (names: string[]) => Promise<string[]>;
 }
@@ -462,8 +462,11 @@ async function handleMessage(
 
 		controller = new AbortController();
 		activeRequests.set(message.requestId, controller);
+		const onStream: StreamListener = (update) => {
+			void webview.postMessage({ type: 'requestStream', requestId: message.requestId, update });
+		};
 		const response = handlers.onSendRequest
-			? await handlers.onSendRequest(message, controller.signal)
+			? await handlers.onSendRequest(message, controller.signal, onStream)
 			: await executeRequest(
 					{
 						method: message.method,
@@ -473,15 +476,19 @@ async function handleMessage(
 					},
 					getRequestTimeout(),
 					controller.signal,
+					'follow',
+					onStream,
 				);
 
 		await webview.postMessage({
 			type: 'requestComplete',
+			requestId: message.requestId,
 			response,
 		});
 	} catch (error) {
 		await webview.postMessage({
 			type: 'requestError',
+			requestId: message.requestId,
 			message: error instanceof Error ? error.message : 'Request failed.',
 			cancelled: controller?.signal.aborted === true,
 		});
@@ -500,6 +507,7 @@ export async function executeRequestWithEnvironment(
 	message: SendRequestMessage,
 	requestUri: vscode.Uri | undefined,
 	signal?: AbortSignal,
+	onStream?: StreamListener,
 ): Promise<ApiResponse> {
 	if (!vscode.workspace.isTrusted) {
 		throw new Error('Sending requests and resolving .env variables requires a trusted workspace.');
@@ -517,7 +525,7 @@ export async function executeRequestWithEnvironment(
 	);
 	await confirmInsecureCredentialRequest(request.url, request.headers);
 
-	return executeRequest(request, getRequestTimeout(), signal);
+	return executeRequest(request, getRequestTimeout(), signal, 'follow', onStream);
 }
 
 /** Reads one environment value for an explicit hover lookup. */

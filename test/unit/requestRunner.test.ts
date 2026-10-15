@@ -9,6 +9,96 @@ suite('Request runner', () => {
 		globalThis.fetch = originalFetch;
 	});
 
+	test('delivers SSE before completion and decodes split UTF-8 without changing raw text', async () => {
+		let transport!: ReadableStreamDefaultController<Uint8Array>;
+		const stream = new ReadableStream<Uint8Array>({
+			start(controller) {
+				transport = controller;
+			},
+		});
+		globalThis.fetch = async () =>
+			new Response(stream, { headers: { 'Content-Type': 'text/event-stream; charset=utf-8' } });
+		const raw = 'data: {"text":"café"}\n\n';
+		const bytes = new TextEncoder().encode(raw);
+		const split = bytes.indexOf(0xc3) + 1;
+		const chunks: string[] = [];
+		let received!: () => void;
+		const firstChunk = new Promise<void>((resolve) => {
+			received = resolve;
+		});
+		const pending = executeRequest({ method: 'GET', url: 'https://example.com' }, 0, undefined, 'follow', (update) => {
+			chunks.push(update.chunk);
+			if (update.chunk) {
+				received();
+			}
+		});
+		transport.enqueue(bytes.slice(0, split));
+		await firstChunk;
+		assert.strictEqual(chunks.join(''), 'data: {"text":"caf');
+		transport.enqueue(bytes.slice(split));
+		transport.close();
+		assert.strictEqual((await pending).body, raw);
+		assert.strictEqual(chunks.join(''), raw);
+	});
+
+	test('cancelling a live stream retains delivered chunks and reports cancellation', async () => {
+		const abort = new AbortController();
+		globalThis.fetch = async (_input, init) =>
+			new Response(
+				new ReadableStream({
+					start(controller) {
+						controller.enqueue(new TextEncoder().encode('data: first\n\n'));
+						init?.signal?.addEventListener('abort', () => controller.error(new Error('aborted')));
+					},
+				}),
+				{ headers: { 'Content-Type': 'text/event-stream' } },
+			);
+		const chunks: string[] = [];
+		await assert.rejects(
+			executeRequest({ method: 'GET', url: 'https://example.com' }, 0, abort.signal, 'follow', (update) => {
+				if (update.chunk) {
+					chunks.push(update.chunk);
+					abort.abort();
+				}
+			}),
+			/Request cancelled/,
+		);
+		assert.deepStrictEqual(chunks, ['data: first\n\n']);
+	});
+
+	test('times out while waiting for the next event and keeps delivered chunks', async () => {
+		globalThis.fetch = async (_input, init) =>
+			new Response(
+				new ReadableStream({
+					start(controller) {
+						controller.enqueue(new TextEncoder().encode('data: first\n\n'));
+						init?.signal?.addEventListener('abort', () => controller.error(new Error('aborted')));
+					},
+				}),
+				{ headers: { 'Content-Type': 'text/event-stream' } },
+			);
+		const chunks: string[] = [];
+		await assert.rejects(
+			executeRequest({ method: 'GET', url: 'https://example.com' }, 10, undefined, 'follow', (update) => {
+				if (update.chunk) {
+					chunks.push(update.chunk);
+				}
+			}),
+			/Request timed out after 10 ms/,
+		);
+		assert.deepStrictEqual(chunks, ['data: first\n\n']);
+	});
+
+	test('ordinary JSON responses remain buffered even when a stream listener is provided', async () => {
+		globalThis.fetch = async () => new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } });
+		let updates = 0;
+		const response = await executeRequest({ method: 'GET', url: 'https://example.com' }, 0, undefined, 'follow', () => {
+			updates++;
+		});
+		assert.strictEqual(response.body, '{"ok":true}');
+		assert.strictEqual(updates, 0);
+	});
+
 	test('normalizes request fields before sending', async () => {
 		// Arrange
 		let capturedInput: string | URL | Request | undefined;

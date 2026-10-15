@@ -1,0 +1,13 @@
+info:
+  name: Echo text
+  type: http
+  seq: 1
+http:
+  method: POST
+  url: https://httpbin.org/post
+  auth: none
+  body:
+    type: text
+    data: |
+      Hello from a Bruno YAML request.
+      This body has two lines.

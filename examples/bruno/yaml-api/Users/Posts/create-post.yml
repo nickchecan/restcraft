@@ -1,0 +1,16 @@
+info:
+  name: Create sample post
+  type: http
+  seq: 1
+http:
+  method: POST
+  url: https://jsonplaceholder.typicode.com/posts
+  auth: none
+  body:
+    type: json
+    data: |-
+      {
+        "title": "Imported from YAML",
+        "body": "Hello from RestCraft",
+        "userId": 1
+      }

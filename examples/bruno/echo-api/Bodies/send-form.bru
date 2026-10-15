@@ -1,0 +1,17 @@
+meta {
+  name: Echo form
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://httpbin.org/post
+  body: form-urlencoded
+  auth: none
+}
+
+body:form-urlencoded {
+  name: Ada Lovelace
+  topic: API imports
+  ~debug: true
+}
