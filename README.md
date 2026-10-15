@@ -23,6 +23,14 @@ Create, save, and send HTTP API requests inside Visual Studio Code. RestCraft gi
 - Save OAuth tokens in `.env` and optionally authorize before each request.
 - Cancel requests and configure a request timeout.
 
+## Network log
+
+Run **RestCraft: Show Network Log** from the Command Palette, or select **Restcraft Network** in VS Code's Output panel. Requests are logged automatically while RestCraft is active, including OAuth token exchanges before an API request. Each call has a matching request/response ID, timestamps, duration, method, resolved URL, headers, and response body. Failed, cancelled, and timed-out calls are recorded too.
+
+Authorization and cookie headers and common secret fields (including tokens, client secrets, passwords, and API keys) are masked in headers, query parameters, JSON bodies, and form-encoded bodies. The **Restcraft: Redact Sensitive Content In Network Log** setting (`restcraft.redactSensitiveContentInNetworkLog`) is enabled by default. Uncheck it to log full URLs, headers, and bodies, including credentials and tokens. Changes apply to new requests without reloading VS Code; existing output is unchanged. Other content is logged in full; arbitrary text and custom secret field names may still contain sensitive data. Review logs before sharing them. JSON is formatted for readability.
+
+The channel is session output, not persistent request history. Use the Output panel's Clear Output action to clear it. It captures the input supplied to the HTTP runtime and the returned response, rather than exact wire bytes, runtime-added headers, intermediate redirects, or browser login traffic. Bodies are text, consistent with the response viewer.
+
 ## Start in a minute
 
 Requires VS Code **1.118.0 or later**.

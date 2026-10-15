@@ -1,3 +1,4 @@
+import { startNetworkLog } from './networkLog';
 import { ApiRequest, ApiResponse, isHttpMethod } from './types';
 
 /**
@@ -31,22 +32,27 @@ export async function executeRequest(
 				}, timeoutMs)
 			: undefined;
 
+	const body = shouldSendBody(method, request.body) ? request.body : undefined;
+	const completeLog = startNetworkLog({ method, url, headers: request.headers, body });
 	try {
 		const response = await fetch(url, {
 			method,
 			redirect,
 			headers: request.headers,
-			body: shouldSendBody(method, request.body) ? request.body : undefined,
+			body,
 			signal: controller.signal,
 		});
 
-		return {
+		const result: ApiResponse = {
 			status: response.status,
 			statusText: response.statusText,
 			headers: Object.fromEntries(response.headers.entries()),
 			body: method === 'HEAD' ? '' : await response.text(),
 		};
+		completeLog(result);
+		return result;
 	} catch (error) {
+		completeLog(controller.signal.aborted ? (didTimeout ? 'timeout' : 'cancelled') : 'failed');
 		if (controller.signal.aborted) {
 			throw new Error(didTimeout ? `Request timed out after ${timeoutMs} ms.` : 'Request cancelled.');
 		}
