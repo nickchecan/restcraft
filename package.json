@@ -147,5 +147,11 @@
 		"semantic-release": "^25.0.3",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.56.1"
+	},
+	"overrides": {
+		"mocha": {
+			"diff": "^8.0.3",
+			"serialize-javascript": "^7.1.2"
+		}
 	}
 }
