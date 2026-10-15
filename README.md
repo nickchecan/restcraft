@@ -5,7 +5,7 @@
 [![Dependabot Updates](https://github.com/nickchecan/restcraft/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/nickchecan/restcraft/actions/workflows/dependabot/dependabot-updates)
 [![CodeQL](https://github.com/nickchecan/restcraft/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/nickchecan/restcraft/actions/workflows/github-code-scanning/codeql)
 
-[Latest release](https://github.com/nickchecan/restcraft/releases/latest) · [Automated releases with semantic-release](https://github.com/semantic-release/semantic-release)
+[Latest release](https://github.com/nickchecan/restcraft/releases/latest) · [Request guide](https://github.com/nickchecan/restcraft/blob/main/docs/request-guide.md) · [Report an issue](https://github.com/nickchecan/restcraft/issues)
 
 Create, save, and send HTTP API requests inside Visual Studio Code. RestCraft gives you a Postman-like API client with readable `.api.json` files you can share and review in Git alongside your code.
 
@@ -13,30 +13,18 @@ Create, save, and send HTTP API requests inside Visual Studio Code. RestCraft gi
   <img src="assets/demo.gif" alt="Create and send an API request in RestCraft" width="860">
 </p>
 
-## What you can do
+## Features
 
-- Build REST API requests with query parameters, headers, JSON bodies, and request descriptions.
-- Keep disabled parameters and headers saved for later without sending them.
-- Inspect response status, headers, and body in the API Workbench.
-- View server-sent events (`text/event-stream`) as they arrive, with collapsible event cards, event types and IDs, formatted JSON, and **Expand all** / **Collapse all** controls. The **Raw** tab preserves the received text. Cancelling or timing out keeps events already received; streams use `restcraft.requestTimeout` (set to `0` to disable the timeout).
-- Use `{{VARIABLE}}` references with the nearest `.env` or a manually selected environment file.
-- Authenticate with Basic auth, Bearer tokens, or OAuth 2.0 client credentials and authorization code with PKCE. Authorization Code allows an optional client secret when sending credentials in the body.
-- Save OAuth tokens in `.env` and optionally authorize before each request.
-- Cancel requests and configure a request timeout.
-
-## Network history
-
-Run **RestCraft: Show Network History** from the Command Palette to open a live panel of API calls and OAuth token exchanges. Select a call to inspect its request, response, timestamps, status, and duration. Filter by method, URL, or status, and use **Clear history** to remove recorded calls. Calls appear individually in chronological order, newest first, and keep collecting while the panel is closed.
-
-History keeps the latest 100 calls in memory for the current extension session. Each request and response preview is limited to 100,000 characters, with truncation marked; the Output channel retains the full logged text. History uses the same redaction setting as the network log and stores the displayed content only. Changing the setting affects new calls; it does not change existing entries. Clearing history does not clear the Output channel. Browser login traffic and intermediate redirects are not captured.
-
-## Network log
-
-Click the **Open RestCraft log console** (debug-console) button immediately after History in the request editor footer, run **RestCraft: Show Network Log** from the Command Palette, or select **Restcraft Network** in VS Code's Output panel. Requests are logged automatically while RestCraft is active, including OAuth token exchanges before an API request. Each call has a matching request/response ID, timestamps, duration, method, resolved URL, headers, and response body. Failed, cancelled, and timed-out calls are recorded too.
-
-Authorization and cookie headers and common secret fields (including tokens, client secrets, passwords, and API keys) are masked in headers, query parameters, JSON bodies, and form-encoded bodies. The **Restcraft: Redact Sensitive Content In Network Log** setting (`restcraft.redactSensitiveContentInNetworkLog`) is enabled by default. Uncheck it to log full URLs, headers, and bodies, including credentials and tokens. Changes apply to new requests without reloading VS Code; existing output is unchanged. Other content is logged in full; arbitrary text and custom secret field names may still contain sensitive data. Review logs before sharing them. JSON is formatted for readability. Request/response indicator lines (including timestamps and status) and the **Headers:** and **Body:** labels use theme-aware syntax highlighting in the Output panel.
-
-The channel is session output, not persistent request history. Use the Output panel's Clear Output action to clear it. It captures the input supplied to the HTTP runtime and the returned response, rather than exact wire bytes, runtime-added headers, intermediate redirects, or browser login traffic. Bodies are text, consistent with the response viewer.
+- **File-based requests:** create and share readable `.api.json` files with names and descriptions, right beside your code.
+- **Request editor:** GET, POST, PUT, PATCH, DELETE, HEAD, and OPTIONS; ordered query parameters and headers; saved disabled entries; tab counts and indicators for configured fields.
+- **Flexible bodies:** raw, JSON, text, XML, HTML, and form URL encoded, with JSON beautification.
+- **Response inspection:** status, duration, size, formatted body, headers, raw text, and a sandboxed HTML preview.
+- **Live server-sent events:** collapsible event cards with types, IDs, formatted JSON, and expand/collapse controls. Raw text and received events remain available after cancellation or timeout.
+- **Environments:** `{{VARIABLE}}` references, variable highlighting and hover values, and nearest or manually selected `.env` files.
+- **Authentication:** Basic, Bearer, and OAuth 2.0 Client Credentials or browser-based Authorization Code with PKCE. View, copy, decode, or hide tokens; save them in `.env` or the Authorization header; optionally authorize before sending.
+- **Network tools:** searchable session history and a highlighted Output log for API calls and OAuth token exchanges, with sensitive-content redaction enabled by default.
+- **Bruno import:** bring individual requests or whole BRU/OpenCollection YAML collections into RestCraft.
+- **Request control:** cancel in-flight requests and configure timeouts, including long-lived streams.
 
 ## Start in a minute
 
@@ -80,13 +68,37 @@ RestCraft searches from the request's directory up to the workspace root and use
 
 Sending requests, reading environment values, and retrieving OAuth tokens require a trusted workspace. Keep client secrets in environment variables: literal secrets and tokens saved directly in request files are plain text.
 
+## Import from Bruno
+
+Run **RestCraft: Import from Bruno** in the Command Palette and select a request file or collection folder. On Windows/Linux, choose the import type first.
+
+- **Request:** import a `.bru`, `.yml`, or `.yaml` file as `.api.json` and open it in the editor.
+- **Collection:** select a folder containing `bruno.json` or `opencollection.yml` / `opencollection.yaml`, then choose a destination parent folder. RestCraft creates a new folder and preserves the request folder structure.
+
+Imports preserve names, methods, URLs, query parameters, disabled entries, headers, documentation, JSON/text/XML/form-urlencoded bodies, and bearer authentication. Collection imports also apply inherited collection and folder headers and bearer auth. Existing files are never overwritten, and importing never sends requests.
+
+BRU and OpenCollection 1.0.0 YAML are supported; JSON collection exports are not. Configure `.env` files after import: Bruno environments, scripts, tests, assertions, runtime variables, and settings are not migrated. Warnings identify omissions; unsupported authentication or body modes stop the import. Use collection import when requests depend on inherited settings.
+
+Try the [sample Bruno collections](https://github.com/nickchecan/restcraft/blob/main/examples/bruno/README.md).
+
+## Network history and logs
+
+Open **History** or **Open RestCraft log console** from the request editor footer, or run **RestCraft: Show Network History** / **RestCraft: Show Network Log** in the Command Palette.
+
+**Network History** collects the latest 100 API calls and OAuth token exchanges during the extension session, even when its panel is closed. Filter by method, URL, or status, then select a call to inspect request/response details, timestamps, and duration. Previews are limited to 100,000 characters each; truncation is marked.
+
+**Restcraft Network** in VS Code's Output panel includes full logged text, formatted JSON, highlighted headers, matching request/response IDs, and failed, cancelled, or timed-out calls. Clear history and Clear Output work independently. Neither view persists across extension sessions or captures browser login traffic or intermediate redirects.
+
+Both views mask authorization/cookie headers and common secret fields by default. Disable `restcraft.redactSensitiveContentInNetworkLog` to include credentials and tokens in new entries; existing entries stay unchanged. Custom secret names and arbitrary text may still contain sensitive data, so review before sharing.
+
 ## Settings
 
 Open VS Code Settings and search for **RestCraft**.
 
 | Setting                                        | Default | Purpose                                                                             |
 | ---------------------------------------------- | ------- | ----------------------------------------------------------------------------------- |
-| `restcraft.requestTimeout`                     | `30000` | Request timeout in milliseconds; `0` disables it.                                   |
+| `restcraft.requestTimeout`                     | `30000` | Timeout in milliseconds, including streams; `0` disables it.                        |
+| `restcraft.redactSensitiveContentInNetworkLog` | `true`  | Mask common secrets in new network log and history entries.                         |
 | `restcraft.showEnvironmentVariableValues`      | `true`  | Show resolved environment values in hover tooltips.                                 |
 | `restcraft.defaultTokenView`                   | `raw`   | Show raw, decoded, or hidden token output. JWT decoding does not verify signatures. |
 | `restcraft.autoGenerateAuthorizationCodeState` | `false` | Generate state when selecting Authorization Code if the field is empty.             |
@@ -98,16 +110,3 @@ Open VS Code Settings and search for **RestCraft**.
 - [Report a bug or request a feature](https://github.com/nickchecan/restcraft/issues)
 - [Release notes](https://github.com/nickchecan/restcraft/releases)
 - [Development and testing](https://github.com/nickchecan/restcraft/blob/main/docs/development.md)
-
-## Import from Bruno
-
-Open the Command Palette with **Cmd+Shift+P** (macOS) or **Ctrl+Shift+P** (Windows/Linux) and choose **RestCraft: Import from Bruno**. Select a request file or a collection folder. On Windows/Linux, choose **Request file** or **Collection folder** first because native dialogs cannot select both types at once.
-
-- Selecting a file imports a `.bru`, `.yml`, or `.yaml` HTTP request and saves it as `.api.json`, then opens the request editor.
-- Selecting a collection folder imports the collection containing `bruno.json` (BRU) or `opencollection.yml` / `opencollection.yaml` (YAML). Then choose a destination parent folder. RestCraft creates a new folder with the source folder name and imports requests recursively, keeping relative folders and filenames. The destination must not already exist.
-
-Imports preserve request names, methods, URLs, query parameters (including disabled and repeated entries), headers, documentation, JSON/text/XML/form-urlencoded bodies, and bearer tokens. Collection and folder headers and inherited bearer authentication are applied to each request. Variable references remain unchanged; configure RestCraft `.env` files after import. Existing destination files are never overwritten.
-
-This importer supports BRU and OpenCollection 1.0.0 YAML formats, including collection and folder `request.headers` and `request.auth` settings. YAML query/path parameters can be typed entries or grouped lists. JSON collection exports are not supported. Unsupported authentication and body modes stop the import with an error before collection files are written. Scripts, tests, assertions, runtime variables, settings, and collection configuration are not executed or migrated; warnings identify these omissions. Bruno environments are not migrated. Standalone request imports cannot resolve collection or folder inheritance; use collection import for those requests. Imports never send HTTP requests.
-
-Importable BRU and YAML sample collections are available in [examples/bruno](examples/bruno/README.md).
