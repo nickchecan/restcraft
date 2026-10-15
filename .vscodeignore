@@ -2,6 +2,7 @@
 .vscode-test/**
 .github/**
 scripts/**
+.husky/**
 .prettierrc.json
 .prettierignore
 out/**

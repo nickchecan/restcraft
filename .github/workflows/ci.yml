@@ -41,10 +41,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Check lint, formatting, and types
-        run: bash scripts/check.sh
+        run: npm run check
 
-  verify:
-    name: Verify extension
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -72,18 +72,18 @@ jobs:
   gate:
     name: CI gate
     runs-on: ubuntu-latest
-    needs: [commits, checks, verify]
+    needs: [commits, checks, tests]
     if: ${{ always() }}
     steps:
       - name: Require all parallel jobs to succeed
         env:
           COMMITS_RESULT: ${{ needs.commits.result }}
           CHECKS_RESULT: ${{ needs.checks.result }}
-          VERIFY_RESULT: ${{ needs.verify.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
         run: |
-          for result in "$COMMITS_RESULT" "$CHECKS_RESULT" "$VERIFY_RESULT"; do
+          for result in "$COMMITS_RESULT" "$CHECKS_RESULT" "$TESTS_RESULT"; do
             if [ "$result" != "success" ]; then
-              echo "::error::All CI jobs must succeed (commits=$COMMITS_RESULT, checks=$CHECKS_RESULT, verify=$VERIFY_RESULT)."
+              echo "::error::All CI jobs must succeed (commits=$COMMITS_RESULT, checks=$CHECKS_RESULT, tests=$TESTS_RESULT)."
               exit 1
             fi
           done

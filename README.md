@@ -335,10 +335,19 @@ API and environment references are treated as plain text.
 
 ## Development checks
 
-Install dependencies with `npm ci`, then run `./scripts/check.sh` to check lint
+Install dependencies with `npm ci`, then run `npm run check` to check lint
 (including warnings), Prettier formatting, and TypeScript types. Fix formatting
 with `npm run format`. Generated files, binary assets, and the npm lockfile are
 excluded from formatting checks.
+
+Installing dependencies also installs Husky's local Git hooks. Before a commit,
+`pre-commit` runs `npm run check` against the working directory; `commit-msg`
+runs `scripts/commit.sh --message-file` against the pending commit message.
+Either failing check prevents the commit. Checks include unstaged changes;
+these hooks do not stage or reformat files. Run `npm run prepare` to reinstall
+the hooks in an existing checkout. CI and production installs skip hook setup.
+Local hooks can be bypassed with `git commit --no-verify`, so required CI checks
+remain the final enforcement.
 
 Run `./scripts/commit.sh origin/main HEAD` to validate every commit introduced by
 your branch relative to its merge base with main. You can supply other base and
@@ -349,7 +358,7 @@ for breaking changes with the Angular semantic-release preset. Ordinary merge
 subjects and `fixup!` subjects fail validation; rebase or squash them before
 submitting the final branch history.
 
-Pull request CI runs commit validation, lint/format/types, and extension
-verification as three parallel jobs. The final **CI gate** fails if any job
+Pull request CI runs `commits`, `checks`, and `tests` as three parallel jobs.
+The final **CI gate** fails if any job
 fails, is cancelled, or is skipped. Configure **CI gate** as a required status
 check in the main branch ruleset to block merging when any of these checks fails.
