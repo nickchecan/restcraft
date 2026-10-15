@@ -2,7 +2,7 @@
 	"name": "restcraft",
 	"displayName": "RestCraft",
 	"description": "Create, manage, and execute API requests from file-based definitions using a Postman-like interface inside Visual Studio Code.",
-	"version": "1.8.2",
+	"version": "1.9.0",
 	"publisher": "nickchecan",
 	"icon": "media/icon-gear-clean-transparent.png",
 	"repository": {
