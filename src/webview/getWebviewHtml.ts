@@ -352,8 +352,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			background: var(--vscode-inputValidation-errorBorder, #c72e0f);
 		}
 
-        #oauth-cancel-token,
-        #oauth-cancel-token:hover {
+        button.request-cancel:not(:disabled),
+        button.request-cancel:not(:disabled):hover {
             color: #fff;
             background: #e02424;
         }
