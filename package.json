@@ -127,7 +127,9 @@
 		"release": "semantic-release",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
-		"prepare": "node .husky/install.ts"
+		"prepare": "node .husky/install.ts",
+		"test:unit": "npm run compile-tests && npm run compile && vscode-test --label unit",
+		"test:integration": "npm run compile-tests && npm run compile && vscode-test --label integration"
 	},
 	"devDependencies": {
 		"@semantic-release/exec": "^7.1.0",

@@ -1,11 +1,13 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import { buildAuthorizationUrl } from '../src/request/authorizationCode';
-import { openOAuthBrowser } from '../src/webview/oauthBrowser';
+import { buildAuthorizationUrl } from '../../src/request/authorizationCode';
+import { openOAuthBrowser } from '../../src/webview/oauthBrowser';
 
 suite('OAuth browser URL transport', () => {
 	test('preserves the encoded URL through the VS Code external opener', async () => {
+		// Arrange
 		const redirect = 'vscode://nickchecan.restcraft/oauth/callback?windowId=4&route=a%2Bb';
+		// Act
 		const url = buildAuthorizationUrl(
 			{
 				url: 'https://demo.duendesoftware.com/connect/token',
@@ -27,6 +29,7 @@ suite('OAuth browser URL transport', () => {
 			browserUrl = typeof target === 'string' ? target : encodeURI(target.toString(true));
 			return true;
 		};
+		// Assert
 		assert.strictEqual(await openOAuthBrowser(url, opener), true);
 		assert.strictEqual(browserUrl, url);
 		const params = new URL(browserUrl).searchParams;
@@ -39,7 +42,14 @@ suite('OAuth browser URL transport', () => {
 	});
 
 	test('reports browser-open failure and propagates errors', async () => {
-		assert.strictEqual(await openOAuthBrowser('https://example.com/', async () => false), false);
+		// Arrange
+		// Inputs are supplied directly to the operation below.
+
+		// Act
+		const actual = await openOAuthBrowser('https://example.com/', async () => false);
+
+		// Assert
+		assert.strictEqual(actual, false);
 		await assert.rejects(
 			Promise.resolve(
 				openOAuthBrowser('https://example.com/', async () => {

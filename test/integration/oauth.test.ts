@@ -1,6 +1,6 @@
 import * as assert from 'assert';
-import { buildOAuthTokenRequest, readOAuthAccessToken, headersForPersistence } from '../src/request/oauth';
-import { ApiResponse } from '../src/request/types';
+import { buildOAuthTokenRequest, readOAuthAccessToken, headersForPersistence } from '../../src/request/oauth';
+import { ApiResponse } from '../../src/request/types';
 
 suite('OAuth client credentials', () => {
 	const fields = {
@@ -12,7 +12,10 @@ suite('OAuth client credentials', () => {
 	const response = (body: string, status = 200): ApiResponse => ({ status, body, statusText: '', headers: {} });
 
 	test('encodes credentials separately and includes optional scope', () => {
+		// Arrange
+		// Act
 		const request = buildOAuthTokenRequest(fields);
+		// Assert
 		assert.strictEqual(request.method, 'POST');
 		assert.strictEqual(request.headers?.['Content-Type'], 'application/x-www-form-urlencoded');
 		const credentials = Buffer.from(request.headers!.Authorization.slice(6), 'base64').toString('utf8');
@@ -22,13 +25,25 @@ suite('OAuth client credentials', () => {
 	});
 
 	test('rejects insecure URLs and missing credentials before execution', () => {
-		assert.throws(() => buildOAuthTokenRequest({ ...fields, url: 'http://example.com/token' }), /HTTPS/);
+		// Arrange
+		// Act
+		const actionUnderTest = () => buildOAuthTokenRequest({ ...fields, url: 'http://example.com/token' });
+
+		// Assert
+		assert.throws(actionUnderTest, /HTTPS/);
 		assert.throws(() => buildOAuthTokenRequest({ ...fields, clientSecret: '' }), /Client Secret/);
 		assert.throws(() => buildOAuthTokenRequest({ ...fields, url: 'invalid' }), /valid Access Token URL/);
 	});
 
 	test('accepts bearer tokens and rejects unusable responses without exposing their body', () => {
-		assert.strictEqual(readOAuthAccessToken(response('{"access_token":"abc", "token_type":"Bearer"}')), 'abc');
+		// Arrange
+		// Inputs are supplied directly to the operation below.
+
+		// Act
+		const actual = readOAuthAccessToken(response('{"access_token":"abc", "token_type":"Bearer"}'));
+
+		// Assert
+		assert.strictEqual(actual, 'abc');
 		assert.throws(() => readOAuthAccessToken(response('secret details', 401)), /HTTP 401/);
 		assert.throws(() => readOAuthAccessToken(response('not JSON')), /invalid JSON/);
 		for (const body of [
@@ -40,6 +55,7 @@ suite('OAuth client credentials', () => {
 		}
 	});
 	test('preserves header rows while OAuth configuration changes', () => {
+		// Arrange
 		const authorization = {
 			type: 'oauth2' as const,
 			grantType: 'client_credentials' as const,
@@ -50,7 +66,11 @@ suite('OAuth client credentials', () => {
 		};
 		const headers = { authorization: 'Bearer private-token', Accept: 'application/json' };
 		const state = [{ name: 'AUTHORIZATION', value: 'Bearer private-token', enabled: true }];
-		assert.deepStrictEqual(headersForPersistence(headers, state, authorization), {
+		// Act
+		const actionUnderTest = headersForPersistence(headers, state, authorization);
+
+		// Assert
+		assert.deepStrictEqual(actionUnderTest, {
 			headers,
 			headerState: state,
 		});

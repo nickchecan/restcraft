@@ -1,22 +1,28 @@
 import * as assert from 'assert';
 
-import { updateEnvValue, parseEnvFile, resolveRequestVariables } from '../src/request/environment';
+import { updateEnvValue, parseEnvFile, resolveRequestVariables } from '../../src/request/environment';
 
 suite('Environment variables', () => {
 	test('parses env files', () => {
-		assert.deepStrictEqual(
-			parseEnvFile(
-				['# API environment', 'DOMAIN=https://google.com', 'TOKEN="abc123"', "PASSWORD='secret'", ''].join('\n'),
-			),
-			{
-				DOMAIN: 'https://google.com',
-				TOKEN: 'abc123',
-				PASSWORD: 'secret',
-			},
+		// Arrange
+		// Inputs are supplied directly to the operation below.
+
+		// Act
+		const actual = parseEnvFile(
+			['# API environment', 'DOMAIN=https://google.com', 'TOKEN="abc123"', "PASSWORD='secret'", ''].join('\n'),
 		);
+
+		// Assert
+		assert.deepStrictEqual(actual, {
+			DOMAIN: 'https://google.com',
+			TOKEN: 'abc123',
+			PASSWORD: 'secret',
+		});
 	});
 
 	test('resolves variables in request fields', () => {
+		// Arrange
+		// Act
 		const request = resolveRequestVariables(
 			{
 				method: 'POST',
@@ -35,6 +41,7 @@ suite('Environment variables', () => {
 			},
 		);
 
+		// Assert
 		assert.deepStrictEqual(request, {
 			method: 'POST',
 			url: 'https://google.com/endpoint',
@@ -47,6 +54,8 @@ suite('Environment variables', () => {
 	});
 
 	test('resolves variables inside basic auth credentials before sending', () => {
+		// Arrange
+		// Act
 		const request = resolveRequestVariables(
 			{
 				method: 'GET',
@@ -60,6 +69,7 @@ suite('Environment variables', () => {
 			},
 		);
 
+		// Assert
 		assert.strictEqual(
 			request.headers?.Authorization,
 			`Basic ${Buffer.from('postman:secret', 'utf8').toString('base64')}`,
@@ -67,6 +77,8 @@ suite('Environment variables', () => {
 	});
 
 	test('resolves variables in form url encoded body fields', () => {
+		// Arrange
+		// Act
 		const request = resolveRequestVariables(
 			{
 				method: 'POST',
@@ -84,6 +96,7 @@ suite('Environment variables', () => {
 			},
 		);
 
+		// Assert
 		assert.deepStrictEqual(Array.from(new URLSearchParams(request.body).entries()), [
 			['username', 'postman'],
 			['password', 'secret'],
@@ -91,21 +104,26 @@ suite('Environment variables', () => {
 	});
 
 	test('reports missing variables', () => {
-		assert.throws(
-			() =>
-				resolveRequestVariables(
-					{
-						method: 'GET',
-						url: '{{DOMAIN}}/endpoint/{{ID}}',
-					},
-					{},
-				),
-			/Missing environment variables: DOMAIN, ID/,
-		);
+		// Arrange
+		// Act
+		const actionUnderTest = () =>
+			resolveRequestVariables(
+				{
+					method: 'GET',
+					url: '{{DOMAIN}}/endpoint/{{ID}}',
+				},
+				{},
+			);
+
+		// Assert
+		assert.throws(actionUnderTest, /Missing environment variables: DOMAIN, ID/);
 	});
 	test('updates token values without changing unrelated env lines or CRLF endings', () => {
+		// Arrange
 		const content = '# Config\r\nOTHER=keep\r\nACCESS_TOKEN=old\r\nACCESS_TOKEN=duplicate\r\n';
+		// Act
 		const updated = updateEnvValue(content, 'ACCESS_TOKEN', 'new.token=');
+		// Assert
 		assert.strictEqual(updated, '# Config\r\nOTHER=keep\r\nACCESS_TOKEN="new.token="\r\nACCESS_TOKEN="new.token="\r\n');
 		assert.strictEqual(parseEnvFile(updated).ACCESS_TOKEN, 'new.token=');
 		assert.strictEqual(updateEnvValue('OTHER=keep', 'MY_TOKEN', 'abc'), 'OTHER=keep\nMY_TOKEN="abc"\n');

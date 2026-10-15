@@ -15,10 +15,11 @@ release.config.cjs
 .gitignore
 .yarnrc
 esbuild.js
-vsc-extension-quickstart.md
 **/tsconfig.json
 **/eslint.config.mjs
 **/*.map
 **/*.ts
 **/.vscode-test.*
 examples/**/.env
+docs/**
+test/**

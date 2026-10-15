@@ -4,12 +4,14 @@ import { tmpdir } from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
-import { RequestEditorProvider } from '../src/webview/requestEditorProvider';
-import { RequestChangedMessage } from '../src/webview/requestWebview';
+import { RequestEditorProvider } from '../../src/webview/requestEditorProvider';
+import { RequestChangedMessage } from '../../src/webview/requestWebview';
 
 suite('Request editor document synchronization', () => {
 	for (const eol of ['\n', '\r\n']) {
 		test(`preserves rows through the first edit and save (${eol === '\n' ? 'LF' : 'CRLF'})`, async () => {
+			// Arrange
+			// Act
 			const directory = vscode.Uri.file(await mkdtemp(path.join(tmpdir(), 'restcraft-editor-')));
 			const uri = vscode.Uri.joinPath(directory, 'request.api.json');
 			const request = { name: 'Request', method: 'GET', url: 'https://example.com/', headers: {}, body: null };
@@ -38,6 +40,7 @@ suite('Request editor document synchronization', () => {
 			const cancellation = new vscode.CancellationTokenSource();
 			provider.resolveCustomTextEditor(document, panel, cancellation.token);
 
+			// Assert
 			try {
 				messages.fire({ type: 'webviewReady' });
 				assert.strictEqual(loads.length, 1);

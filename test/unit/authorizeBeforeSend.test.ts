@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import type * as vscode from 'vscode';
 import { runInNewContext } from 'vm';
-import { getWebviewHtml } from '../src/webview/getWebviewHtml';
+import { getWebviewHtml } from '../../src/webview/getWebviewHtml';
 
 suite('Authorize before sending', () => {
 	const html = getWebviewHtml({} as vscode.Webview, '1.0.0');
@@ -78,8 +78,11 @@ suite('Authorize before sending', () => {
 	}
 
 	test('waits for authorization and then sends using the updated header', async () => {
+		// Arrange
 		const state = setup();
+		// Act
 		const pending = state.submit();
+		// Assert
 		assert.strictEqual(state.authorizations(), 1);
 		assert.strictEqual(state.messages.length, 0);
 		assert.strictEqual(state.context.authorizationBeforeSendPending, true);
@@ -92,6 +95,9 @@ suite('Authorize before sending', () => {
 	});
 
 	test('does not send when authorization fails or is cancelled', async () => {
+		// Arrange
+		// Act
+		// Assert
 		for (const error of ['Invalid Client ID.', 'Token request cancelled.']) {
 			const state = setup();
 			const pending = state.submit();
@@ -104,16 +110,22 @@ suite('Authorize before sending', () => {
 	});
 
 	test('clicking Send again while authorizing cancels instead of starting another attempt', async () => {
+		// Arrange
 		const state = setup();
 		const pending = state.submit();
 		await state.submit();
+		// Act
 		await pending;
+		// Assert
 		assert.strictEqual(state.authorizations(), 1);
 		assert.strictEqual(state.cancellations(), 1);
 		assert.strictEqual(state.messages.length, 0);
 	});
 
 	test('unchecked setting and other authentication types send without fetching a token', async () => {
+		// Arrange
+		// Act
+		// Assert
 		for (const [enabled, type] of [
 			[false, 'oauth2'],
 			[true, 'none'],
@@ -129,10 +141,13 @@ suite('Authorize before sending', () => {
 	});
 
 	test('token completion resolves after the header update even though the button has already been enabled', async () => {
+		// Arrange
+		// Act
 		const start = html.indexOf('function authorizeForSend()');
 		const end = html.indexOf("form.addEventListener('submit'", start);
 		const resultStart = html.indexOf("if (message.type === 'oauthTokenResult')");
 		const resultEnd = html.indexOf("if (message.type === 'requestComplete')", resultStart);
+		// Assert
 		for (const outcome of ['success', 'error', 'cancel']) {
 			let header = 'old-token';
 			const context = {

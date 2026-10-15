@@ -3,17 +3,23 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { runInNewContext } from 'vm';
 
-import { buttonIcons } from '../src/webview/buttonIcons';
-import { getWebviewHtml } from '../src/webview/getWebviewHtml';
+import { buttonIcons } from '../../src/webview/buttonIcons';
+import { getWebviewHtml } from '../../src/webview/getWebviewHtml';
 
 suite('Webview HTML', () => {
 	test('renders the supplied extension version in the footer', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 
+		// Assert
 		assert.match(html, /<span class="editor-footer-version" aria-label="RestCraft version">v1\.2\.3<\/span>/);
 	});
 	test('includes OAuth grant choices and valid client-side JavaScript', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		// Assert
 		assert.ok(html.includes('<option value="oauth2">OAuth 2.0</option>'));
 		assert.ok(html.includes('<option value="client_credentials">Client Credentials</option>'));
 		assert.ok(html.includes('<option value="authorization_code">Authorization Code</option>'));
@@ -22,6 +28,8 @@ suite('Webview HTML', () => {
 		assert.doesNotThrow(() => new Function(script));
 	});
 	test('OAuth text edits highlight environment references and preserve their literal values', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf(
 			"['oauth-url', 'oauth-client-id', 'oauth-client-secret', 'oauth-scope', 'oauth-authorization-url', 'oauth-state'].forEach",
@@ -71,9 +79,12 @@ suite('Webview HTML', () => {
 			assert.strictEqual(highlighted.at(-1), fields[id]);
 			assert.strictEqual(fields[id].value, '{{TEST_VARIABLE}}');
 		}
+		// Assert
 		assert.strictEqual(changes, 6);
 	});
 	test('changing client authentication to None clears the secret before saving', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf("document.getElementById('oauth-client-authentication').addEventListener");
 		const end = html.indexOf("document.getElementById('oauth-generate-state').addEventListener", start);
@@ -102,6 +113,7 @@ suite('Webview HTML', () => {
 		};
 		runInNewContext(html.slice(start, end), context);
 		change();
+		// Assert
 		assert.strictEqual(savedSecret, '{{CLIENT_SECRET}}');
 		authentication.value = 'none';
 		change();
@@ -112,6 +124,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(secret.value, '');
 	});
 	test('Cancel immediately invalidates a queued token result without updating the header', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf("document.getElementById('oauth-cancel-token').addEventListener");
 		const end = html.indexOf('const oauthCancelObserver', start);
@@ -147,6 +161,7 @@ suite('Webview HTML', () => {
 		};
 		runInNewContext(html.slice(start, end), context);
 		cancel();
+		// Assert
 		assert.strictEqual(context.oauthPending, false);
 		assert.strictEqual(context.oauthGetToken.disabled, false);
 		assert.strictEqual(context.oauthRequestId, 5);
@@ -162,6 +177,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(messages.length, 1);
 	});
 	test('automatic State generation runs only when selecting Authorization Code with the preference enabled', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf("oauthGrantType.addEventListener('change'");
 		const end = html.indexOf("['oauth-url'", start);
@@ -195,6 +212,7 @@ suite('Webview HTML', () => {
 		};
 		runInNewContext(html.slice(start, end), context);
 		change();
+		// Assert
 		assert.strictEqual(generations, 0);
 		context.autoGenerateAuthorizationCodeState = true;
 		change();
@@ -223,6 +241,8 @@ suite('Webview HTML', () => {
 	});
 
 	test('changing the global automatic State preference does not generate or overwrite existing State', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf("if (message.type === 'autoGenerateStateSetting')");
 		const end = html.indexOf("if (message.type === 'tokenViewSetting')", start);
@@ -234,12 +254,15 @@ suite('Webview HTML', () => {
 			},
 		};
 		runInNewContext('(function () {' + html.slice(start, end) + '})();', context);
+		// Assert
 		assert.strictEqual(context.autoGenerateAuthorizationCodeState, true);
 		context.message.value = 'true';
 		runInNewContext('(function () {' + html.slice(start, end) + '})();', context);
 		assert.strictEqual(context.autoGenerateAuthorizationCodeState, false);
 	});
 	test('Generate State creates a fresh random value and notifies the input listener', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function generateOAuthState()');
 		const end = html.indexOf("document.getElementById('oauth-pkce').addEventListener", start);
@@ -271,6 +294,7 @@ suite('Webview HTML', () => {
 		runInNewContext(html.slice(start, end), context);
 		generate();
 		const first = state.value;
+		// Assert
 		assert.match(first, /^[a-f0-9]{64}$/);
 		generate();
 		assert.match(state.value, /^[a-f0-9]{64}$/);
@@ -279,9 +303,12 @@ suite('Webview HTML', () => {
 		assert.ok(html.includes(buttonIcons.wand));
 	});
 	test('restores saved OAuth controls and clears them when loading a legacy request', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('// Loading another request invalidates pending token results');
 		const end = html.indexOf('setRequestBodyContent(message.request.body', start);
+		// Assert
 		assert.ok(start >= 0 && end > start);
 		const fields: Record<string, { value: string; checked?: boolean }> = {};
 		for (const id of [
@@ -379,6 +406,8 @@ suite('Webview HTML', () => {
 		}
 	});
 	test('token output renders resolved display state independently of the saved header', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function updateOAuthTokenDisplay()');
 		const end = html.indexOf('// Hides or shows an authorization field', start);
@@ -396,6 +425,7 @@ suite('Webview HTML', () => {
 			authorizationLayout: { classList: { toggle: () => {} } },
 		};
 		runInNewContext(html.slice(start, end) + '; updateOAuthTokenDisplay();', context);
+		// Assert
 		assert.strictEqual(context.oauthAccessToken.value, '');
 		assert.strictEqual(context.oauthCopyToken.disabled, true);
 		context.displayedOAuthToken = 'new-token';
@@ -404,6 +434,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(context.oauthCopyToken.disabled, false);
 	});
 	test('decoded token output formats and highlights JSON while escaping token contents', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function updateOAuthTokenDisplay()');
 		const end = html.indexOf('// Hides or shows an authorization field', start);
@@ -429,6 +461,7 @@ suite('Webview HTML', () => {
 			context,
 		);
 		const output = context.oauthDecodedToken.innerHTML;
+		// Assert
 		assert.ok(output.includes('\n  <span class="json-token-key">"header":</span>'));
 		for (const type of ['key', 'string', 'number', 'literal']) {
 			assert.ok(output.includes('json-token-' + type));
@@ -443,9 +476,12 @@ suite('Webview HTML', () => {
 		assert.strictEqual(context.oauthDecodedToken.textContent, 'No access token configured.');
 	});
 	test('keeps unchecked OAuth header rows saved but excludes them from sending', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function readRequestHeaders()');
 		const end = html.indexOf('// Returns the executable value for a header row.', start);
+		// Assert
 		assert.ok(start >= 0 && end > start);
 		const rows = [
 			{ name: 'authorization', value: 'Bearer {{MY_TOKEN}}', enabled: false },
@@ -474,6 +510,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(result.sent.Accept, 'application/json');
 	});
 	test('decodes JWT header and UTF-8 payload locally and handles opaque or malformed tokens', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function decodeOAuthToken(token)');
 		const end = html.indexOf('// Hides or shows an authorization field', start);
@@ -484,6 +522,7 @@ suite('Webview HTML', () => {
 			[header, payload].map((value) => Buffer.from(JSON.stringify(value)).toString('base64url')).join('.') +
 			'.signature';
 		const decoded = runInNewContext(html.slice(start, end) + '; decodeOAuthToken(token);', context);
+		// Assert
 		assert.deepStrictEqual(JSON.parse(decoded), { header, payload });
 		for (const token of ['', 'opaque-token', 'bad.invalid.signature']) {
 			context.token = token;
@@ -500,6 +539,8 @@ suite('Webview HTML', () => {
 	});
 
 	test('token radio buttons update checked state and show the matching content panel', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function showOAuthTokenView(view)');
 		const end = html.indexOf('// Decodes locally;', start);
@@ -529,6 +570,7 @@ suite('Webview HTML', () => {
 			oauthDecodedPanel: element(),
 		};
 		runInNewContext(html.slice(start, end) + "; showOAuthTokenView('decoded');", context);
+		// Assert
 		assert.strictEqual(context.oauthRawPanel.classes.hidden, true);
 		assert.strictEqual(context.oauthDecodedPanel.classes.hidden, false);
 		assert.strictEqual(context.oauthDecodedOption.checked, true);
@@ -546,6 +588,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(context.oauthDecodedPanel.classes.hidden, true);
 	});
 	test('Copy uses the resolved access token and ignores empty output or other authentication types', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf("oauthCopyToken.addEventListener('click'");
 		const end = html.indexOf('const authorizationLayout', start);
@@ -567,6 +611,7 @@ suite('Webview HTML', () => {
 		};
 		runInNewContext(html.slice(start, end), context);
 		copy();
+		// Assert
 		assert.strictEqual(messages.length, 0);
 		context.displayedOAuthToken = 'resolved-env-token';
 		copy();
@@ -577,6 +622,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(messages.length, 1);
 	});
 	test('toggles client secret visibility and accessible button labels', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function setOAuthSecretVisible(visible)');
 		const end = html.indexOf('function setBasicPasswordVisible', start);
@@ -592,6 +639,7 @@ suite('Webview HTML', () => {
 			},
 		};
 		runInNewContext(html.slice(start, end) + '; setOAuthSecretVisible(true);', context);
+		// Assert
 		assert.strictEqual(context.oauthClientSecret.type, 'text');
 		assert.ok(context.oauthSecretToggle.innerHTML.includes(buttonIcons.eyeClosed));
 		assert.ok(context.oauthSecretToggle.innerHTML.includes('Hide'));
@@ -602,7 +650,10 @@ suite('Webview HTML', () => {
 		assert.strictEqual(context.oauthClientSecret.value, 'unchanged');
 	});
 	test('Basic Auth password starts masked and supports showing and hiding', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		// Assert
 		assert.match(html, /id="basic-auth-password"[^>]*type="password"/);
 		const start = html.indexOf('function setBasicPasswordVisible(visible)');
 		const end = html.indexOf('// Shows the authorization inputs', start);
@@ -628,7 +679,10 @@ suite('Webview HTML', () => {
 		assert.strictEqual(context.basicAuthPassword.value, 'unchanged');
 	});
 	test('request and response sections collapse independently without clearing content', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		// Assert
 		for (const name of ['request', 'response']) {
 			assert.ok(html.includes(`aria-controls="${name}-section"`));
 			const attributes: Record<string, string> = { 'aria-expanded': 'true' };
@@ -669,7 +723,10 @@ suite('Webview HTML', () => {
 		}
 	});
 	test('Settings displays environment paths, remains empty when missing, and ignores stale results', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		// Assert
 		assert.ok(html.includes('id="request-settings-tab"'));
 		assert.ok(html.includes("type: 'openEnvironmentFile'"));
 		const start = html.indexOf("if (message.type === 'environmentFile')");
@@ -696,6 +753,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(context.requestEnvPath.value, '');
 	});
 	test('configured token results refresh the output without persisting a resolved token', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf("if (message.type === 'configuredOAuthToken')");
 		const end = html.indexOf("if (message.type === 'environmentFileSelected')", start);
@@ -711,6 +770,7 @@ suite('Webview HTML', () => {
 		};
 		const code = '(function () {' + html.slice(start, end) + '})();';
 		runInNewContext(code, context);
+		// Assert
 		assert.strictEqual(displayed, 'resolved-env-token');
 		assert.strictEqual(
 			context.oauthStatus.textContent,
@@ -724,6 +784,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(displayed, 'resolved-env-token');
 	});
 	test('refreshing OAuth output clears old environment errors even without a token', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function refreshConfiguredOAuthToken()');
 		const end = html.indexOf('// Displays the current OAuth token', start);
@@ -737,10 +799,13 @@ suite('Webview HTML', () => {
 			readAuthorizationHeaderValue: () => '',
 		};
 		runInNewContext(html.slice(start, end) + '; refreshConfiguredOAuthToken();', context);
+		// Assert
 		assert.strictEqual(context.oauthStatus.textContent, '');
 		assert.strictEqual(context.configuredOAuthTokenRequestId, 2);
 	});
 	test('retrieval displays tokens without changing authorization when Update Authorization Header is unchecked', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf("if (message.type === 'oauthTokenResult')");
 		const end = html.indexOf("if (message.type === 'requestComplete')", start);
@@ -775,6 +840,7 @@ suite('Webview HTML', () => {
 		};
 		const code = '(function () {' + html.slice(start, end) + '})();';
 		runInNewContext(code, context);
+		// Assert
 		assert.strictEqual(context.displayedOAuthToken, 'new-token');
 		assert.strictEqual(context.oauthToken, 'existing-token');
 		assert.strictEqual(headerUpdates, 0);
@@ -799,6 +865,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(context.oauthToken, 'new-token');
 	});
 	test('explains that a missing token variable will be created on retrieval', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function formatConfiguredOAuthError(error)');
 		const end = html.indexOf('// This output is separate', start);
@@ -808,6 +876,7 @@ suite('Webview HTML', () => {
 			error: 'Missing environment variable: ACCESS_TOKENASD',
 		};
 		const formatted = runInNewContext(html.slice(start, end) + '; formatConfiguredOAuthError(error);', context);
+		// Assert
 		assert.match(formatted, /will be created in .env when you get a new access token/);
 		context.error = 'Missing environment variable: CLIENT_SECRET';
 		assert.strictEqual(runInNewContext('formatConfiguredOAuthError(error);', context), context.error);
@@ -816,6 +885,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(runInNewContext('formatConfiguredOAuthError(error);', context), context.error);
 	});
 	test('successful retrieval applies a token or env reference using the chosen storage option', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function applyRetrievedOAuthHeader(token)');
 		const end = html.indexOf('// Writes authorization control state', start);
@@ -828,15 +899,19 @@ suite('Webview HTML', () => {
 			},
 		};
 		runInNewContext(html.slice(start, end) + "; applyRetrievedOAuthHeader('new-token');", context);
+		// Assert
 		assert.strictEqual(header, 'Bearer {{NEW_TOKEN}}');
 		context.oauthStoreToken.checked = false;
 		runInNewContext("applyRetrievedOAuthHeader('new-token');", context);
 		assert.strictEqual(header, 'Bearer new-token');
 	});
 	test('preserves Bearer variable references in the header display when loading requests', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function readAuthorizationHeaderDisplayValue(headerValue)');
 		const end = html.indexOf('// Detects RestCraft environment variable placeholders.', start);
+		// Assert
 		for (const type of ['bearer', 'oauth2']) {
 			const context = {
 				authorizationType: { value: type },
@@ -851,9 +926,12 @@ suite('Webview HTML', () => {
 		}
 	});
 	test('configured token refresh resolves literal and env headers without modifying saved rows', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function refreshConfiguredOAuthToken()');
 		const end = html.indexOf('// Displays the current OAuth token', start);
+		// Assert
 		for (const authorization of ['Bearer saved-token', 'Bearer {{ACCESS_TOKEN}}']) {
 			let posted: { type: string; authorization: string } | undefined;
 			const context = {
@@ -876,11 +954,14 @@ suite('Webview HTML', () => {
 		}
 	});
 	test('switching grant types re-resolves the configured token without updating the header', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const listenerStart = html.indexOf("oauthGrantType.addEventListener('change', () => {");
 		const listenerEnd = html.indexOf("['oauth-url'", listenerStart);
 		const refreshStart = html.indexOf('function refreshConfiguredOAuthToken()');
 		const refreshEnd = html.indexOf('// Displays the current OAuth token', refreshStart);
+		// Assert
 		for (const header of ['Bearer configured-token', 'Bearer {{ACCESS_TOKEN}}']) {
 			let change = () => {};
 			const messages: { type: string; authorization?: string }[] = [];
@@ -920,6 +1001,8 @@ suite('Webview HTML', () => {
 		}
 	});
 	test('request tabs show dots for populated sections and clear them when emptied', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function updateRequestTabIndicators()');
 		const end = html.indexOf('// Posts the current editor state', start);
@@ -958,6 +1041,7 @@ suite('Webview HTML', () => {
 			requestEnvPath: { value: '' },
 		};
 		runInNewContext(html.slice(start, end) + '; updateRequestTabIndicators();', context);
+		// Assert
 		assert.ok(tabs.every((item) => item.populated));
 		assert.ok(tabs.every((item) => item.label.includes('contains values')));
 		context.manualEnvironmentPath = '';
@@ -975,7 +1059,10 @@ suite('Webview HTML', () => {
 		assert.ok(tabs.every((item) => !item.populated));
 	});
 	test('extension setting updates the retrieval preference without changing the current output', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		// Assert
 		assert.ok(!html.includes('id="default-token-view"'));
 		const start = html.indexOf("if (message.type === 'tokenViewSetting')");
 		const end = html.indexOf("if (message.type === 'configuredOAuthToken')", start);
@@ -988,6 +1075,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(context.defaultTokenView, 'raw');
 	});
 	test('opening Authorization applies the extension preference while clicking the active tab preserves the view', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf("requestAuthorizationTab.addEventListener('click'");
 		const end = html.indexOf("requestHeadersTab.addEventListener('click'", start);
@@ -1013,12 +1102,15 @@ suite('Webview HTML', () => {
 		};
 		runInNewContext(html.slice(start, end), context);
 		click();
+		// Assert
 		assert.strictEqual(selectedView, 'hidden');
 		selectedView = 'decoded';
 		click();
 		assert.strictEqual(selectedView, 'decoded');
 	});
 	test('description renders compact plain text and offers expansion only when needed', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function renderDescription()');
 		const end = html.indexOf('function startDescriptionEdit()', start);
@@ -1044,6 +1136,7 @@ suite('Webview HTML', () => {
 			updateResponseAreaBounds: () => {},
 		};
 		runInNewContext(html.slice(start, end) + '; renderDescription();', context);
+		// Assert
 		assert.strictEqual(toggleHidden, false);
 		assert.strictEqual(attributes['aria-expanded'], 'false');
 		assert.strictEqual(context.requestDescriptionText.textContent, 'First line...');
@@ -1065,6 +1158,8 @@ suite('Webview HTML', () => {
 		assert.strictEqual(toggleHidden, true);
 	});
 	test('Enter finishes description editing while Shift+Enter preserves newline entry', () => {
+		// Arrange
+		// Act
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf("requestDescription.addEventListener('keydown'");
 		const end = html.indexOf("window.addEventListener('resize', renderDescription)", start);
@@ -1082,6 +1177,7 @@ suite('Webview HTML', () => {
 			},
 		};
 		runInNewContext(html.slice(start, end), context);
+		// Assert
 		for (const [shiftKey, isComposing, finish] of [
 			[false, false, true],
 			[true, false, false],

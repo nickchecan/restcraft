@@ -4,9 +4,9 @@ import { tmpdir } from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
-import { createAndOpenRequestFile } from '../src/commands/createRequestFile';
-import { parseRequestFile } from '../src/request/requestFile';
-import { RequestEditorProvider } from '../src/webview/requestEditorProvider';
+import { createAndOpenRequestFile } from '../../src/commands/createRequestFile';
+import { parseRequestFile } from '../../src/request/requestFile';
+import { RequestEditorProvider } from '../../src/webview/requestEditorProvider';
 
 suite('Create request command', () => {
 	let directory: vscode.Uri;
@@ -46,11 +46,14 @@ suite('Create request command', () => {
 	});
 
 	test('creates a canonical request in the selected location and opens its file editor', async () => {
+		// Arrange
 		selectedUri = vscode.Uri.joinPath(directory, 'get-users');
+		// Act
 		await createAndOpenRequestFile(directory);
 
 		const expectedUri = vscode.Uri.joinPath(directory, 'get-users.api.json');
 		const content = await vscode.workspace.fs.readFile(expectedUri);
+		// Assert
 		assert.strictEqual(parseRequestFile(new TextDecoder().decode(content)).name, 'get-users');
 		assert.strictEqual(
 			dialogOptions?.defaultUri?.toString(),
@@ -64,19 +67,25 @@ suite('Create request command', () => {
 	});
 
 	test('canceling creates no file and opens no editor', async () => {
+		// Arrange
+		// Act
 		await createAndOpenRequestFile(directory);
+		// Assert
 		assert.deepStrictEqual(await vscode.workspace.fs.readDirectory(directory), []);
 		assert.deepStrictEqual(opened, []);
 		assert.deepStrictEqual(errors, []);
 	});
 
 	test('does not overwrite an existing file after adding the canonical suffix', async () => {
+		// Arrange
 		const existingUri = vscode.Uri.joinPath(directory, 'get-users.api.json');
 		const original = new TextEncoder().encode('existing request');
 		await vscode.workspace.fs.writeFile(existingUri, original);
 		selectedUri = vscode.Uri.joinPath(directory, 'get-users');
+		// Act
 		await createAndOpenRequestFile(directory);
 
+		// Assert
 		assert.strictEqual(new TextDecoder().decode(await vscode.workspace.fs.readFile(existingUri)), 'existing request');
 		assert.deepStrictEqual(opened, []);
 		assert.strictEqual(errors.length, 1);

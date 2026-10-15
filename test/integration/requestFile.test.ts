@@ -1,11 +1,12 @@
 import * as assert from 'assert';
 
-import { createDefaultRequestFileContent, createRequestFileName } from '../src/request/createRequestFile';
-import { isRequestFileName, parseRequestFile } from '../src/request/requestFile';
+import { createDefaultRequestFileContent, createRequestFileName } from '../../src/request/createRequestFile';
+import { isRequestFileName, parseRequestFile } from '../../src/request/requestFile';
 
 suite('Request file parser', () => {
 	for (const grantType of ['client_credentials', 'authorization_code']) {
 		test(`round-trips OAuth settings for ${grantType}`, () => {
+			// Arrange
 			const authorization = {
 				type: 'oauth2',
 				grantType,
@@ -17,13 +18,16 @@ suite('Request file parser', () => {
 				accessTokenVariable: 'MY_TOKEN',
 			};
 			const content = { name: 'OAuth', method: 'GET', url: 'https://example.com/', authorization };
+			// Act
 			const request = parseRequestFile(JSON.stringify(content));
+			// Assert
 			assert.deepStrictEqual(request.authorization, authorization);
 			assert.deepStrictEqual(parseRequestFile(JSON.stringify(request)).authorization, authorization);
 		});
 	}
 
 	test('round-trips Authorization Code options without transient callback values', () => {
+		// Arrange
 		const authorization = {
 			type: 'oauth2',
 			grantType: 'authorization_code',
@@ -42,7 +46,11 @@ suite('Request file parser', () => {
 			url: 'https://example.com/',
 			authorization: { ...authorization, redirectUrl: 'vscode://temporary', codeVerifier: 'temporary' },
 		};
-		assert.deepStrictEqual(parseRequestFile(JSON.stringify(request)).authorization, authorization);
+		// Act
+		const actionUnderTest = parseRequestFile(JSON.stringify(request)).authorization;
+
+		// Assert
+		assert.deepStrictEqual(actionUnderTest, authorization);
 		assert.deepStrictEqual(
 			parseRequestFile(JSON.stringify(parseRequestFile(JSON.stringify(request)))).authorization,
 			authorization,
@@ -61,13 +69,16 @@ suite('Request file parser', () => {
 	});
 
 	test('round-trips the request authorization-before-send flag and rejects invalid values', () => {
+		// Arrange
 		const request = { name: 'Automatic auth', method: 'GET', url: 'https://example.com/' };
+		// Act
 		for (const authorizeBeforeSend of [true, false]) {
 			assert.strictEqual(
 				parseRequestFile(JSON.stringify({ ...request, authorizeBeforeSend })).authorizeBeforeSend,
 				authorizeBeforeSend,
 			);
 		}
+		// Assert
 		assert.strictEqual(parseRequestFile(JSON.stringify(request)).authorizeBeforeSend, undefined);
 		for (const authorizeBeforeSend of ['true', 1, null]) {
 			assert.throws(() => parseRequestFile(JSON.stringify({ ...request, authorizeBeforeSend })), /authorizeBeforeSend/);
@@ -75,6 +86,7 @@ suite('Request file parser', () => {
 	});
 
 	test('rejects malformed OAuth settings', () => {
+		// Arrange
 		const authorization = {
 			type: 'oauth2',
 			grantType: 'client_credentials',
@@ -83,6 +95,8 @@ suite('Request file parser', () => {
 			clientSecret: '',
 			scope: '',
 		};
+		// Act
+		// Assert
 		for (const invalid of [
 			null,
 			{},
@@ -101,13 +115,16 @@ suite('Request file parser', () => {
 	});
 
 	test('round-trips manual environment selection and rejects invalid settings', () => {
+		// Arrange
 		const request = {
 			name: 'Manual env',
 			method: 'GET',
 			url: 'https://example.com/',
 			environment: { mode: 'manual', path: '../config/.env' },
 		};
+		// Act
 		const parsed = parseRequestFile(JSON.stringify(request));
+		// Assert
 		assert.deepStrictEqual(parsed.environment, request.environment);
 		assert.deepStrictEqual(parseRequestFile(JSON.stringify(parsed)).environment, request.environment);
 		for (const environment of [null, { mode: 'unknown', path: '' }, { mode: 'manual', path: 123 }]) {
@@ -116,6 +133,8 @@ suite('Request file parser', () => {
 	});
 
 	test('derives execution headers from enabled state and ignores redundant legacy values', () => {
+		// Arrange
+		// Act
 		const parsed = parseRequestFile(
 			JSON.stringify({
 				name: 'Headers',
@@ -128,6 +147,7 @@ suite('Request file parser', () => {
 				],
 			}),
 		);
+		// Assert
 		assert.deepStrictEqual(parsed.headers, { Accept: 'application/json' });
 		assert.strictEqual(parsed.headerState[0].value, 'Bearer {{TOKEN}}');
 		const content = createDefaultRequestFileContent('new.api.json');
@@ -135,6 +155,8 @@ suite('Request file parser', () => {
 	});
 
 	test('parses a valid request file', () => {
+		// Arrange
+		// Act
 		const request = parseRequestFile(
 			JSON.stringify({
 				name: 'Get Users',
@@ -155,6 +177,7 @@ suite('Request file parser', () => {
 			}),
 		);
 
+		// Assert
 		assert.deepStrictEqual(request, {
 			name: 'Get Users',
 			method: 'GET',
@@ -175,6 +198,8 @@ suite('Request file parser', () => {
 	});
 
 	test('parses persisted request headers with enabled flags', () => {
+		// Arrange
+		// Act
 		const request = parseRequestFile(
 			JSON.stringify({
 				name: 'Create User',
@@ -201,6 +226,7 @@ suite('Request file parser', () => {
 			}),
 		);
 
+		// Assert
 		assert.deepStrictEqual(request.headerState, [
 			{
 				name: 'Accept',
@@ -216,6 +242,8 @@ suite('Request file parser', () => {
 	});
 
 	test('backfills enabled header state from legacy headers', () => {
+		// Arrange
+		// Act
 		const request = parseRequestFile(
 			JSON.stringify({
 				name: 'Create User',
@@ -230,6 +258,7 @@ suite('Request file parser', () => {
 			}),
 		);
 
+		// Assert
 		assert.deepStrictEqual(request.headerState, [
 			{
 				name: 'Accept',
@@ -245,6 +274,8 @@ suite('Request file parser', () => {
 	});
 
 	test('parses persisted query params with enabled flags', () => {
+		// Arrange
+		// Act
 		const request = parseRequestFile(
 			JSON.stringify({
 				name: 'Search Users',
@@ -267,6 +298,7 @@ suite('Request file parser', () => {
 			}),
 		);
 
+		// Assert
 		assert.deepStrictEqual(request.params, [
 			{
 				name: 'active',
@@ -282,6 +314,8 @@ suite('Request file parser', () => {
 	});
 
 	test('backfills enabled params from legacy URLs', () => {
+		// Arrange
+		// Act
 		const request = parseRequestFile(
 			JSON.stringify({
 				name: 'Search Users',
@@ -292,6 +326,7 @@ suite('Request file parser', () => {
 			}),
 		);
 
+		// Assert
 		assert.deepStrictEqual(request.params, [
 			{
 				name: 'page',
@@ -307,65 +342,96 @@ suite('Request file parser', () => {
 	});
 
 	test('requires query param enabled flags to be booleans', () => {
-		assert.throws(
-			() =>
-				parseRequestFile(
-					JSON.stringify({
-						name: 'Search Users',
-						method: 'GET',
-						url: 'https://api.example.com/users',
-						params: [
-							{
-								name: 'debug',
-								value: '1',
-								enabled: 'false',
-							},
-						],
-						headers: {},
-						body: null,
-					}),
-				),
-			/must have a boolean enabled flag/,
-		);
+		// Arrange
+		// Act
+		const actionUnderTest = () =>
+			parseRequestFile(
+				JSON.stringify({
+					name: 'Search Users',
+					method: 'GET',
+					url: 'https://api.example.com/users',
+					params: [
+						{
+							name: 'debug',
+							value: '1',
+							enabled: 'false',
+						},
+					],
+					headers: {},
+					body: null,
+				}),
+			);
+
+		// Assert
+		assert.throws(actionUnderTest, /must have a boolean enabled flag/);
 	});
 
 	test('reports invalid JSON clearly', () => {
-		assert.throws(() => parseRequestFile('{ "name": '), /Invalid JSON:/);
+		// Arrange
+		// Act
+		const actionUnderTest = () => parseRequestFile('{ "name": ');
+
+		// Assert
+		assert.throws(actionUnderTest, /Invalid JSON:/);
 	});
 
 	test('requires http or https URLs', () => {
-		assert.throws(
-			() =>
-				parseRequestFile(
-					JSON.stringify({
-						name: 'Local file',
-						method: 'GET',
-						url: 'file:///tmp/example',
-						headers: {},
-						body: null,
-					}),
-				),
-			/must use http or https/,
-		);
+		// Arrange
+		// Act
+		const actionUnderTest = () =>
+			parseRequestFile(
+				JSON.stringify({
+					name: 'Local file',
+					method: 'GET',
+					url: 'file:///tmp/example',
+					headers: {},
+					body: null,
+				}),
+			);
+
+		// Assert
+		assert.throws(actionUnderTest, /must use http or https/);
 	});
 
 	test('matches request file names', () => {
-		assert.strictEqual(isRequestFileName('/workspace/get-users.api.json'), true);
+		// Arrange
+		// Inputs are supplied directly to the operation below.
+
+		// Act
+		const actual = isRequestFileName('/workspace/get-users.api.json');
+
+		// Assert
+		assert.strictEqual(actual, true);
 		assert.strictEqual(isRequestFileName('/workspace/get-users.json'), false);
 	});
 
 	test('creates canonical request file names from user input', () => {
-		assert.strictEqual(createRequestFileName('get-users'), 'get-users.api.json');
+		// Arrange
+		// Inputs are supplied directly to the operation below.
+
+		// Act
+		const actual = createRequestFileName('get-users');
+
+		// Assert
+		assert.strictEqual(actual, 'get-users.api.json');
 		assert.strictEqual(createRequestFileName(' get-users.api.json '), 'get-users.api.json');
 	});
 
 	test('rejects path-like request file names', () => {
-		assert.throws(() => createRequestFileName('requests/get-users'), /cannot include path separators/);
+		// Arrange
+		// Act
+		const actionUnderTest = () => createRequestFileName('requests/get-users');
+
+		// Assert
+		assert.throws(actionUnderTest, /cannot include path separators/);
 	});
 
 	test('creates parseable default request file content', () => {
+		// Arrange
+		// Act
 		const request = parseRequestFile(createDefaultRequestFileContent('get-users.api.json'));
 
+		// Assert
 		assert.deepStrictEqual(request, {
 			name: 'get-users',
 			method: 'GET',
