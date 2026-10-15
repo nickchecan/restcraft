@@ -294,7 +294,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 		}
 
 		.authorization-field .variable-input-wrapper {
-			max-width: 420px;
+			min-width: 0;
 		}
 
 		.variable-highlight-overlay {
@@ -709,7 +709,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 			.authorization-field {
 				display: grid;
-				grid-template-columns: minmax(100px, 180px) minmax(0, 320px);
+				grid-template-columns: minmax(100px, 180px) minmax(0, 1fr);
 				gap: 8px;
 				align-items: center;
 			}
@@ -720,7 +720,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			.authorization-input {
-				max-width: 420px;
+				min-width: 0;
 			}
 
 			.secret-reference {
