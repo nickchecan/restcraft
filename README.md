@@ -110,3 +110,27 @@ Open VS Code Settings and search for **RestCraft**.
 - [Report a bug or request a feature](https://github.com/nickchecan/restcraft/issues)
 - [Release notes](https://github.com/nickchecan/restcraft/releases)
 - [Development and testing](https://github.com/nickchecan/restcraft/blob/main/docs/development.md)
+
+### Response header automation
+
+In a request's **Automations** tab, add mappings from response header names (for example,
+`X-Session-Token`) to environment variable names (for example, `SESSION_TOKEN`). Each enabled,
+complete mapping runs after a user-triggered request finishes, for any HTTP status code. Header
+names match without regard to case; missing headers leave existing variables unchanged.
+Use `{{SESSION_TOKEN}}` in subsequent requests.
+
+Mappings are saved with the request as an optional `automation` array:
+
+```json
+"automation": [
+  { "header": "X-Session-Token", "variable": "SESSION_TOKEN", "enabled": true }
+]
+```
+
+Writes use the request's environment selection in **Settings**: the nearest `.env` or the selected
+manual file. In nearest mode, a missing `.env` is created beside the request; manual mode never
+falls back to another file. Save or load a request file first. Automation requires a trusted
+workspace and refuses to overwrite an environment file with unsaved edits. Existing comments,
+unrelated variables, and line endings are preserved. Empty header values clear the mapped value;
+values that cannot safely round-trip through the `.env` parser are rejected. A write failure
+shows a warning while keeping the received response available.

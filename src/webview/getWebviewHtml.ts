@@ -1211,6 +1211,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				<button class="request-tab" id="request-authorization-tab" type="button" role="tab" aria-selected="false" aria-controls="request-authorization-panel">Authorization</button>
 				<button class="request-tab" id="request-headers-tab" type="button" role="tab" aria-selected="false" aria-controls="request-headers-panel">Headers <span class="request-tab-count" hidden></span></button>
 				<button class="request-tab" id="request-body-tab" type="button" role="tab" aria-selected="false" aria-controls="request-body-panel">Body</button>
+				<button class="request-tab" id="request-automation-tab" type="button" role="tab" aria-selected="false" aria-controls="request-automation-panel">Automations <span class="request-tab-count" hidden></span></button>
 				<button class="request-tab" id="request-settings-tab" type="button" role="tab" aria-selected="false" aria-controls="request-settings-panel">Settings</button>
 			</div>
 			<button class="section-collapse" id="request-config-collapse" type="button" aria-expanded="true" aria-controls="request-config-content" aria-label="Collapse request configuration" title="Collapse request configuration"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
@@ -1368,6 +1369,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					</table>
 					<button class="request-header-add" id="add-request-body-form-row" type="button">${buttonIcons.add}<span>Add Pair</span></button>
 				</div>
+			</div>
+			<div class="request-panel-content hidden" id="request-automation-panel" role="tabpanel" aria-labelledby="request-automation-tab">
+				<p>After each completed request, copy response headers to the selected .env file. Header names are case-insensitive. Missing headers leave variables unchanged. All HTTP status codes apply.</p>
+				<table class="request-headers-table" aria-label="Response header automation">
+					<thead><tr><th scope="col"><span class="sr-only">Enabled</span></th><th scope="col">Response header</th><th scope="col">Environment variable</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+					<tbody id="automation-rows"></tbody>
+				</table>
+				<button class="request-header-add" id="automation-add" type="button">${buttonIcons.add}<span>Add Mapping</span></button>
 			</div>
 			<div class="request-panel-content hidden" id="request-settings-panel" role="tabpanel" aria-labelledby="request-settings-tab">
 				<div class="request-env-options" role="group" aria-label="Environment file selection">
@@ -1530,6 +1539,60 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				const requestAuthorizationTab = document.getElementById('request-authorization-tab');
 				const requestHeadersTab = document.getElementById('request-headers-tab');
 				const requestBodyTab = document.getElementById('request-body-tab');
+                const automationTab = document.getElementById('request-automation-tab');
+                const automationPanel = document.getElementById('request-automation-panel');
+                const automationRows = document.getElementById('automation-rows');
+                function readAutomation() {
+                    return Array.from(automationRows.children).map(row => ({
+                        enabled: row.children[0].firstChild.checked,
+                        header: row.children[1].firstChild.value.trim(),
+                        variable: row.children[2].firstChild.value.trim(),
+                    }));
+                }
+                function addAutomationRow(mapping) {
+                    const row = document.createElement('tr');
+                    for (const field of ['enabled', 'header', 'variable']) {
+                        const cell = document.createElement('td');
+                        const input = document.createElement('input');
+                        input.type = field === 'enabled' ? 'checkbox' : 'text';
+                        input.className = field === 'enabled' ? 'request-header-enabled' : 'request-header-input';
+                        if (field === 'enabled') { cell.className = 'request-header-enabled-cell'; }
+                        else { input.placeholder = field === 'header' ? 'Response header' : 'Environment variable'; }
+                        input.setAttribute('aria-label', field === 'header' ? 'Response header' : field === 'variable' ? 'Environment variable' : 'Enable mapping');
+                        if (field === 'enabled') { input.checked = mapping.enabled; }
+                        else { input.value = mapping[field]; }
+                        input.addEventListener('input', () => {
+                            const value = input.value.trim();
+                            const valid = field === 'enabled' || !value || (field === 'variable'
+                                ? /^[A-Za-z_][A-Za-z0-9_]*$/.test(value)
+                                : /^[A-Za-z0-9!#$%&'*+.^_|~-]+$/.test(value));
+                            input.setCustomValidity(valid ? '' : 'Enter a valid ' + (field === 'variable' ? 'environment variable name.' : 'HTTP header name.'));
+                            notifyRequestChanged();
+                        });
+                        input.addEventListener('change', () => {
+                            updateRequestRowEnabledState(row, row.children[0].firstChild.checked);
+                            notifyRequestChanged();
+                        });
+                        cell.appendChild(input);
+                        row.appendChild(cell);
+                    }
+                    const cell = document.createElement('td');
+                    const remove = document.createElement('button');
+                    remove.type = 'button';
+                    remove.className = 'request-header-remove';
+                    remove.ariaLabel = 'Remove mapping';
+                    remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>';
+                    remove.addEventListener('click', () => { row.remove(); notifyRequestChanged(); });
+                    cell.appendChild(remove);
+                    row.appendChild(cell);
+                    updateRequestRowEnabledState(row, mapping.enabled);
+                    automationRows.appendChild(row);
+                }
+                document.getElementById('automation-add').addEventListener('click', () => {
+                    addAutomationRow({ enabled: true, header: '', variable: '' });
+                    notifyRequestChanged();
+                });
+                automationTab.addEventListener('click', () => showRequestTab('automation'));
                 const requestSettingsTab = document.getElementById('request-settings-tab');
                 const requestSettingsPanel = document.getElementById('request-settings-panel');
                 const authorizeBeforeSend = document.getElementById('request-authorize-before-send');
@@ -2083,6 +2146,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 			vscode.postMessage({
 						type: 'sendRequest',
+                        automation: readAutomation(),
 					requestId: activeRequestId,
 						method: method.value,
 						url: latestRequestUrl,
@@ -2272,6 +2336,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				}
 
 				if (message.type === 'loadRequest') {
+                        automationRows.replaceChildren();
+                        (message.request.automation || []).forEach(addAutomationRow);
                         requestDescription.value = message.request.description || '';
                         descriptionExpanded = false;
                         finishDescriptionEdit();
@@ -2691,6 +2757,10 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					const showAuthorization = tabName === 'authorization';
 					const showHeaders = tabName === 'headers';
 					const showBody = tabName === 'body';
+                    const showAutomation = tabName === 'automation';
+                    automationTab.classList.toggle('active', showAutomation);
+                    automationTab.setAttribute('aria-selected', String(showAutomation));
+                    automationPanel.classList.toggle('hidden', !showAutomation);
                     const showSettings = tabName === 'settings';
                     requestSettingsTab.classList.toggle('active', showSettings);
                     requestSettingsTab.setAttribute('aria-selected', String(showSettings));
@@ -3703,10 +3773,12 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					const countRows = table => Array.from(table.querySelectorAll('tr')).filter(row => hasRowValues(row)).length;
 					const paramCount = countRows(requestParamsTable);
 					const headerCount = countRows(requestHeadersTable);
+					const automationCount = countRows(automationRows);
 					const states = [
 						[requestParamsTab, paramCount > 0, paramCount],
 						[requestAuthorizationTab, authorizationType.value !== 'none'],
 						[requestHeadersTab, headerCount > 0, headerCount],
+						[automationTab, automationCount > 0, automationCount],
 						[requestBodyTab, Boolean(requestBody.value.trim()) || hasRowValues(requestBodyFormTable)],
 						[requestSettingsTab, requestEnvManual.checked && Boolean(manualEnvironmentPath.trim())],
 					];
@@ -3726,6 +3798,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     updateRequestTabIndicators();
 					vscode.postMessage({
 						type: 'requestChanged',
+                        automation: readAutomation(),
                         description: requestDescription.value,
                         authorizeBeforeSend: authorizeBeforeSend.checked,
                         environment: readEnvironmentSettings(),

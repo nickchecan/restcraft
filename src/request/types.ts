@@ -49,7 +49,14 @@ export interface EnvironmentFileSettings {
 
 export type TokenView = 'raw' | 'decoded' | 'hidden';
 
+export interface ResponseHeaderMapping {
+	header: string;
+	variable: string;
+	enabled: boolean;
+}
+
 export interface RequestFileDefinition {
+	automation?: ResponseHeaderMapping[];
 	authorizeBeforeSend?: boolean;
 	description?: string;
 	name: string;

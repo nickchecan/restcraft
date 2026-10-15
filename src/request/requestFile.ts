@@ -1,3 +1,4 @@
+import { isResponseHeaderMappings } from './automation';
 import {
 	HttpMethod,
 	isHttpMethod,
@@ -46,9 +47,15 @@ export function parseRequestFile(content: string): RequestFileDefinition {
 		throw new Error('Request file property "authorization" must contain valid OAuth 2.0 settings.');
 	}
 
+	if (parsed.automation !== undefined && !isResponseHeaderMappings(parsed.automation)) {
+		throw new Error('Request file property "automation" must contain valid response header mappings.');
+	}
 	const headerState = readHeaderState(parsed);
 	return {
 		name: readRequiredString(parsed, 'name'),
+		...(parsed.automation !== undefined
+			? { automation: parsed.automation as import('./types').ResponseHeaderMapping[] }
+			: {}),
 		...(typeof parsed.authorizeBeforeSend === 'boolean' ? { authorizeBeforeSend: parsed.authorizeBeforeSend } : {}),
 		...(typeof parsed.description === 'string' ? { description: parsed.description } : {}),
 		method: readMethod(parsed),

@@ -185,12 +185,12 @@ export function updateEnvValue(content: string, name: string, value: string): st
 		throw new Error('Enter a valid environment variable name (letters, numbers, and underscores).');
 	}
 	// Quoting must round-trip through our simple parser without newline injection.
-	if (!/^[\x21-\x7e]+$/.test(value)) {
-		throw new Error('Access token contains unsupported characters.');
+	if (!/^[\x20-\x7e]*$/.test(value)) {
+		throw new Error('Environment value contains unsupported characters.');
 	}
 	const quote = value.includes('"') ? "'" : '"';
 	if (value.includes(quote)) {
-		throw new Error('Access token cannot be safely stored in .env.');
+		throw new Error('Environment value cannot be safely stored in .env.');
 	}
 	const assignment = `${name}=${quote}${value}${quote}`;
 	const eol = content.includes('\r\n') ? '\r\n' : '\n';

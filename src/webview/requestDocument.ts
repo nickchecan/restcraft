@@ -25,6 +25,11 @@ export function createUpdatedRequestDocumentText(
 	parsed.method = message.method;
 	parsed.url = message.url;
 	parsed.params = message.params;
+	if (message.automation?.length) {
+		parsed.automation = message.automation;
+	} else {
+		delete parsed.automation;
+	}
 	delete parsed.defaultTokenView;
 	if (message.environment) {
 		parsed.environment = copyEnvironmentFileSettings(message.environment);

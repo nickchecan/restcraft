@@ -1,0 +1,21 @@
+{
+	"name": "Test Automations",
+	"method": "POST",
+	"url": "https://jsonplaceholder.typicode.com/posts",
+	"body": "name=Test&secret=test",
+	"headerState": [
+		{
+			"name": "Content-Type",
+			"value": "application/x-www-form-urlencoded",
+			"enabled": true
+		}
+	],
+	"params": [],
+	"automation": [
+		{
+			"enabled": true,
+			"header": "location",
+			"variable": "LOCATIONS"
+		}
+	]
+}
