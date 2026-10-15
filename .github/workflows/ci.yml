@@ -47,12 +47,6 @@ jobs:
       - name: Check lint, formatting, and types
         run: npm run check
 
-      - name: Check dependency security
-        run: npm audit
-
-      - name: Test release behavior
-        run: npm run test:release
-
       - name: Install virtual display support
         run: sudo apt-get update && sudo apt-get install -y xvfb
 

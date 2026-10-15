@@ -1,39 +1,51 @@
 module.exports = {
-	git: {
-		requireBranch: 'main',
-		requireUpstream: false,
-		commitMessage: 'chore(release): ${version} [skip ci]\n\n${changelog}',
-		tagName: 'v${version}',
-	},
-	npm: { publish: false, versionArgs: ['--ignore-scripts'] },
-	github: {
-		release: true,
-		releaseName: 'v${version}',
-		assets: ['dist/restcraft-${version}.vsix'],
-	},
-	plugins: {
-		'@release-it/conventional-changelog': {
-			preset: { name: 'angular' },
-			infile: false,
-			async whatBump(commits) {
-				const { filterRevertedCommitsSync } = await import('conventional-commits-filter');
-				commits = Array.from(filterRevertedCommitsSync(commits));
-				if (commits.some((commit) => commit.notes.some((note) => note.title === 'BREAKING CHANGE'))) {
-					return { level: 0 };
-				}
-				if (commits.some((commit) => commit.type === 'feat')) {
-					return { level: 1 };
-				}
-				if (commits.some((commit) => ['fix', 'perf', 'revert'].includes(commit.type) || commit.revert)) {
-					return { level: 2 };
-				}
-				return null;
+	branches: ['main'],
+	tagFormat: 'v${version}',
+	plugins: [
+		[
+			'@semantic-release/commit-analyzer',
+			{
+				preset: 'angular',
 			},
-		},
-	},
-	hooks: {
-		'before:init': 'node scripts/release.cjs verify',
-		'after:bump': 'node scripts/release.cjs prepare ${version}',
-		'after:git:release': 'node scripts/release.cjs publish ${version}',
-	},
+		],
+		[
+			'@semantic-release/release-notes-generator',
+			{
+				preset: 'angular',
+			},
+		],
+		[
+			'@semantic-release/npm',
+			{
+				npmPublish: false,
+			},
+		],
+		[
+			'@semantic-release/exec',
+			{
+				verifyConditionsCmd:
+					"node -e \"const pkg = require('./package.json'); if (!pkg.publisher) { console.error('Missing package.json publisher for VS Code Marketplace publishing.'); process.exit(1); } if (!process.env.VSCE_PAT) { console.error('Missing VSCE_PAT secret for VS Code Marketplace publishing.'); process.exit(1); }\"",
+				prepareCmd: 'npm run package && vsce package --out dist/restcraft-${nextRelease.version}.vsix',
+				publishCmd: 'vsce publish --packagePath dist/restcraft-${nextRelease.version}.vsix --pat "$VSCE_PAT"',
+			},
+		],
+		[
+			'@semantic-release/git',
+			{
+				assets: ['package.json', 'package-lock.json'],
+				message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}',
+			},
+		],
+		[
+			'@semantic-release/github',
+			{
+				assets: [
+					{
+						path: 'dist/restcraft-*.vsix',
+						label: 'RestCraft VS Code extension',
+					},
+				],
+			},
+		],
+	],
 };
