@@ -1030,6 +1030,7 @@ suite('Webview HTML', () => {
 		const end = html.indexOf('// Posts the current editor state', start);
 		const tab = (name: string) => ({
 			textContent: name,
+			querySelector: () => undefined,
 			populated: false,
 			label: '',
 			classList: { toggle: (_name: string, _value: boolean) => {} },
@@ -1046,7 +1047,12 @@ suite('Webview HTML', () => {
 			return item;
 		});
 		let values = ['partial'];
-		const table = { querySelectorAll: () => values.map((value) => ({ value })) };
+		const table = {
+			querySelectorAll: (selector: string) =>
+				selector === 'tr'
+					? values.map((value) => ({ querySelectorAll: () => [{ value }] }))
+					: values.map((value) => ({ value })),
+		};
 		const context = {
 			requestParamsTab: tabs[0],
 			requestAuthorizationTab: tabs[1],
@@ -1079,6 +1085,78 @@ suite('Webview HTML', () => {
 		context.requestEnvManual.checked = false;
 		runInNewContext('updateRequestTabIndicators();', context);
 		assert.ok(tabs.every((item) => !item.populated));
+	});
+	test('header and param counts include disabled and partial rows but exclude blank rows', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('function updateRequestTabIndicators()');
+		const end = html.indexOf('// Posts the current editor state', start);
+		const makeTab = (name: string, withCount = false) => {
+			const counter = { textContent: '', hidden: true };
+			return {
+				counter,
+				populated: false,
+				label: '',
+				get textContent() {
+					return name + (counter.textContent ? ' ' + counter.textContent : '');
+				},
+				querySelector: () => (withCount ? counter : undefined),
+				classList: { toggle: (_name: string, _value: boolean) => {} },
+				setAttribute: (_name: string, _value: string) => {},
+			};
+		};
+		const headers = makeTab('Headers', true);
+		const params = makeTab('Params', true);
+		for (const tab of [headers, params]) {
+			tab.classList.toggle = (_name, value) => {
+				tab.populated = value;
+			};
+			tab.setAttribute = (_name, value) => {
+				tab.label = value;
+			};
+		}
+		const row = (name: string, value: string, enabled = true) => ({
+			querySelectorAll: () => [{ value: name }, { value }],
+			enabled,
+		});
+		let headerRows = [
+			row('Accept', 'application/json'),
+			row('X-Debug', 'true', false),
+			row('', 'partial'),
+			row('  ', ''),
+		];
+		let paramRows = [row('page', '1'), row('', '')];
+		const context = {
+			requestHeadersTab: headers,
+			requestParamsTab: params,
+			requestAuthorizationTab: makeTab('Authorization'),
+			requestBodyTab: makeTab('Body'),
+			requestSettingsTab: makeTab('Settings'),
+			requestHeadersTable: { querySelectorAll: () => headerRows },
+			requestParamsTable: { querySelectorAll: () => paramRows },
+			requestBodyFormTable: { querySelectorAll: () => [] },
+			requestBody: { value: '' },
+			authorizationType: { value: 'none' },
+			requestEnvManual: { checked: false },
+			manualEnvironmentPath: '',
+		};
+		runInNewContext(html.slice(start, end) + '; updateRequestTabIndicators();', context);
+		assert.strictEqual(headers.counter.textContent, '3');
+		assert.strictEqual(headers.counter.hidden, false);
+		assert.strictEqual(headers.populated, true);
+		assert.strictEqual(headers.label, 'Headers 3, contains values');
+		assert.strictEqual(params.counter.textContent, '1');
+		assert.strictEqual(params.counter.hidden, false);
+		headerRows = [row('', '')];
+		paramRows = [];
+		runInNewContext('updateRequestTabIndicators();', context);
+		for (const tab of [headers, params]) {
+			assert.strictEqual(tab.counter.textContent, '');
+			assert.strictEqual(tab.counter.hidden, true);
+			assert.strictEqual(tab.populated, false);
+		}
+		assert.strictEqual(headers.label, 'Headers');
+		assert.ok(html.includes('font-size: 0.85em;'));
+		assert.ok(html.includes('color: var(--vscode-descriptionForeground);'));
 	});
 	test('extension setting updates the retrieval preference without changing the current output', () => {
 		// Arrange

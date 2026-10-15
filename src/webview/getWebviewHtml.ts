@@ -410,6 +410,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				cursor: pointer;
 			}
 
+			.request-tab-count {
+				color: var(--vscode-descriptionForeground);
+				font-size: 0.85em;
+			}
+
 			.request-tab.has-values::after {
 				content: '';
 				display: inline-block;
@@ -1202,9 +1207,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 		<section class="request-panel" aria-label="Request configuration area">
 			<div class="request-tabs-toolbar">
 			<div class="request-tabs" role="tablist" aria-label="Request sections">
-				<button class="request-tab active" id="request-params-tab" type="button" role="tab" aria-selected="true" aria-controls="request-params-panel">Params</button>
+				<button class="request-tab active" id="request-params-tab" type="button" role="tab" aria-selected="true" aria-controls="request-params-panel">Params <span class="request-tab-count" hidden></span></button>
 				<button class="request-tab" id="request-authorization-tab" type="button" role="tab" aria-selected="false" aria-controls="request-authorization-panel">Authorization</button>
-				<button class="request-tab" id="request-headers-tab" type="button" role="tab" aria-selected="false" aria-controls="request-headers-panel">Headers</button>
+				<button class="request-tab" id="request-headers-tab" type="button" role="tab" aria-selected="false" aria-controls="request-headers-panel">Headers <span class="request-tab-count" hidden></span></button>
 				<button class="request-tab" id="request-body-tab" type="button" role="tab" aria-selected="false" aria-controls="request-body-panel">Body</button>
 				<button class="request-tab" id="request-settings-tab" type="button" role="tab" aria-selected="false" aria-controls="request-settings-panel">Settings</button>
 			</div>
@@ -3695,14 +3700,22 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				// Marks sections with values, including partial and disabled rows.
 				function updateRequestTabIndicators() {
 					const hasRowValues = table => Array.from(table.querySelectorAll('.request-header-input')).some(input => input.value.trim());
+					const countRows = table => Array.from(table.querySelectorAll('tr')).filter(row => hasRowValues(row)).length;
+					const paramCount = countRows(requestParamsTable);
+					const headerCount = countRows(requestHeadersTable);
 					const states = [
-						[requestParamsTab, hasRowValues(requestParamsTable)],
+						[requestParamsTab, paramCount > 0, paramCount],
 						[requestAuthorizationTab, authorizationType.value !== 'none'],
-						[requestHeadersTab, hasRowValues(requestHeadersTable)],
+						[requestHeadersTab, headerCount > 0, headerCount],
 						[requestBodyTab, Boolean(requestBody.value.trim()) || hasRowValues(requestBodyFormTable)],
 						[requestSettingsTab, requestEnvManual.checked && Boolean(manualEnvironmentPath.trim())],
 					];
-					for (const [tab, hasValues] of states) {
+					for (const [tab, hasValues, count] of states) {
+						const counter = tab.querySelector('.request-tab-count');
+						if (counter) {
+							counter.textContent = count > 0 ? String(count) : '';
+							counter.hidden = count === 0;
+						}
 						tab.classList.toggle('has-values', Boolean(hasValues));
 						tab.setAttribute('aria-label', tab.textContent.trim() + (hasValues ? ', contains values' : ''));
 					}
