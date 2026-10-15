@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 
 import { createAndOpenRequestFile } from './commands/createRequestFile';
+import { NetworkHistory } from './request/networkHistory';
+import { registerNetworkHistory } from './webview/networkHistoryPanel';
 import { setNetworkLogSink } from './request/networkLog';
 import { readPackageVersion } from './extensionVersion';
 import { registerOAuthCallback } from './webview/oauthCallback';
@@ -14,13 +16,16 @@ import { RequestEditorProvider } from './webview/requestEditorProvider';
  * or opens a `.api.json` document.
  */
 export function activate(context: vscode.ExtensionContext) {
-	const networkOutput = vscode.window.createOutputChannel('Restcraft Network');
+	const networkHistory = new NetworkHistory();
+	const networkOutput = vscode.window.createOutputChannel('Restcraft Network', 'restcraft-network-log');
 	setNetworkLogSink(
 		(text) => networkOutput.appendLine(text),
 		() => vscode.workspace.getConfiguration('restcraft').get<boolean>('redactSensitiveContentInNetworkLog', true),
+		(entry) => networkHistory.update(entry),
 	);
 	context.subscriptions.push(
 		networkOutput,
+		registerNetworkHistory(networkHistory),
 		new vscode.Disposable(() => setNetworkLogSink(undefined)),
 		vscode.commands.registerCommand('restcraft.showNetworkLog', () => networkOutput.show(true)),
 	);

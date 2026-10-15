@@ -1,4 +1,4 @@
-Button icons (send, add, eye, eye-closed, key, link-external, folder, wand, copy) are from Microsoft VS Code Codicons.
+Button icons (send, add, eye, eye-closed, key, link-external, folder, wand, copy, debug-console) are from Microsoft VS Code Codicons.
 Source: https://github.com/microsoft/vscode-codicons
 License: Creative Commons Attribution 4.0 International (see codicons-LICENSE.txt).
 https://creativecommons.org/licenses/by/4.0/

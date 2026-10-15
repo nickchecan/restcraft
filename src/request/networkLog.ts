@@ -1,6 +1,8 @@
+import { NetworkHistoryEntry } from './networkHistory';
 import { ApiRequest, ApiResponse } from './types';
 
 let sink: ((text: string) => void) | undefined;
+let historySink: ((entry: NetworkHistoryEntry) => void) | undefined;
 let sequence = 0;
 let shouldRedact = () => true;
 
@@ -8,8 +10,10 @@ let shouldRedact = () => true;
 export function setNetworkLogSink(
 	value: ((text: string) => void) | undefined,
 	redactSensitiveContent: () => boolean = () => true,
+	onHistoryEntry?: (entry: NetworkHistoryEntry) => void,
 ): void {
 	sink = value;
+	historySink = onHistoryEntry;
 	shouldRedact = redactSensitiveContent;
 }
 
@@ -81,24 +85,53 @@ function write(text: string): void {
 export function startNetworkLog(
 	request: ApiRequest,
 ): (result: ApiResponse | 'cancelled' | 'timeout' | 'failed') => void {
-	if (!sink) {
+	if (!sink && !historySink) {
 		return () => {};
 	}
 	const redactContent = shouldRedact();
 	const visible = (value: unknown) => (redactContent ? redact(value) : value);
 	const id = ++sequence;
 	const started = Date.now();
-	write(
-		`[${new Date(started).toISOString()}] #${id} REQUEST ${request.method} ${redactContent ? safeUrl(request.url) : request.url}\nHeaders: ${JSON.stringify(visible(request.headers ?? {}), null, 2)}\nBody:\n${bodyText(request.body, request.headers, redactContent)}\n`,
-	);
+	const requestText = `[${new Date(started).toISOString()}] #${id} REQUEST ${request.method} ${redactContent ? safeUrl(request.url) : request.url}\nHeaders: ${JSON.stringify(visible(request.headers ?? {}), null, 2)}\nBody:\n${bodyText(request.body, request.headers, redactContent)}\n`;
+	write(requestText);
+	const entry: NetworkHistoryEntry = {
+		id,
+		started: new Date(started).toISOString(),
+		method: request.method,
+		url: redactContent ? safeUrl(request.url) : request.url,
+		request: historyText(requestText),
+		status: 'Pending',
+		redacted: redactContent,
+	};
+	publishHistory(entry);
 	return (result) => {
 		const prefix = `[${new Date().toISOString()}] #${id} (${Date.now() - started} ms)`;
+		entry.durationMs = Date.now() - started;
 		if (typeof result === 'string') {
-			write(`${prefix} ${result.toUpperCase()}\n`);
+			entry.status = result.toUpperCase();
+			entry.response = `${prefix} ${entry.status}\n`;
+			write(entry.response);
 		} else {
-			write(
-				`${prefix} RESPONSE ${result.status} ${result.statusText}\nHeaders: ${JSON.stringify(visible(result.headers), null, 2)}\nBody:\n${bodyText(result.body, result.headers, redactContent)}\n`,
-			);
+			entry.status = `${result.status} ${result.statusText}`;
+			const responseText = `${prefix} RESPONSE ${result.status} ${result.statusText}\nHeaders: ${JSON.stringify(visible(result.headers), null, 2)}\nBody:\n${bodyText(result.body, result.headers, redactContent)}\n`;
+			write(responseText);
+			entry.response = historyText(responseText);
 		}
+		publishHistory(entry);
 	};
+}
+
+function historyText(text: string): string {
+	const limit = 100_000;
+	return text.length > limit
+		? `${text.slice(0, limit)}\n[History preview truncated at 100,000 characters; see Output for full text.]`
+		: text;
+}
+
+function publishHistory(entry: NetworkHistoryEntry): void {
+	try {
+		historySink?.(entry);
+	} catch {
+		// History must not affect network execution.
+	}
 }

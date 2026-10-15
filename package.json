@@ -43,12 +43,31 @@
 	"contributes": {
 		"commands": [
 			{
+				"command": "restcraft.showNetworkHistory",
+				"title": "RestCraft: Show Network History"
+			},
+			{
 				"command": "restcraft.showNetworkLog",
 				"title": "RestCraft: Show Network Log"
 			},
 			{
 				"command": "restcraft.createRequestFile",
 				"title": "RestCraft: Create Request File"
+			}
+		],
+		"languages": [
+			{
+				"id": "restcraft-network-log",
+				"aliases": [
+					"RestCraft Network Log"
+				]
+			}
+		],
+		"grammars": [
+			{
+				"language": "restcraft-network-log",
+				"scopeName": "source.restcraft-network-log",
+				"path": "./syntaxes/restcraft-network-log.tmLanguage.json"
 			}
 		],
 		"customEditors": [
@@ -70,7 +89,7 @@
 					"type": "boolean",
 					"default": true,
 					"scope": "application",
-					"description": "Redact sensitive content in the network log. Disable to log full URLs, headers, and bodies, including credentials and access tokens. Changes apply to new requests; existing output is unchanged."
+					"description": "Redact sensitive content in both the network log and Network History panel. Disable to show full URLs, headers, and bodies, including credentials and access tokens, in both views. Changes apply to new requests; existing log output and history entries are unchanged."
 				},
 				"restcraft.requestTimeout": {
 					"type": "number",

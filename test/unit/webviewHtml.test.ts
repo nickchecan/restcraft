@@ -7,6 +7,28 @@ import { buttonIcons } from '../../src/webview/buttonIcons';
 import { getWebviewHtml } from '../../src/webview/getWebviewHtml';
 
 suite('Webview HTML', () => {
+	test('places the log console button before history and posts the log action when clicked', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const logButton = html.indexOf('id="footer-log-button"');
+		assert.ok(logButton > html.indexOf('id="footer-issues-link"'));
+		assert.ok(logButton < html.indexOf('id="footer-history-button"'));
+		assert.ok(html.includes(buttonIcons.debugConsole));
+		const script = html.match(/footerLogButton.addEventListener\('click', \(\) => \{([\s\S]*?)\n\s*\}\);/)?.[1];
+		assert.ok(script);
+		const messages: unknown[] = [];
+		runInNewContext(script, { vscode: { postMessage: (message: unknown) => messages.push(message) } });
+		assert.strictEqual(JSON.stringify(messages), '[{"type":"openNetworkLog"}]');
+	});
+	test('places the history button after issues and posts the history action when clicked', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		assert.ok(html.indexOf('id="footer-history-button"') > html.indexOf('id="footer-issues-link"'));
+		assert.ok(html.indexOf('id="footer-history-button"') < html.indexOf('<div class="editor-footer-brand">'));
+		const script = html.match(/footerHistoryButton.addEventListener\('click', \(\) => \{([\s\S]*?)\n\s*\}\);/)?.[1];
+		assert.ok(script);
+		const messages: unknown[] = [];
+		runInNewContext(script, { vscode: { postMessage: (message: unknown) => messages.push(message) } });
+		assert.strictEqual(JSON.stringify(messages), '[{"type":"openNetworkHistory"}]');
+	});
 	test('renders the supplied extension version in the footer', () => {
 		// Arrange
 		// Act

@@ -1076,6 +1076,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			.editor-footer-icon svg {
+                margin-right: 0;
 				width: 16px;
 				height: 16px;
 				pointer-events: none;
@@ -1439,6 +1440,16 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<path d="M8 11h8"></path>
 				</svg>
 			</button>
+			<button class="editor-footer-icon" id="footer-log-button" type="button" aria-label="Open RestCraft log console" title="Open RestCraft log console">
+                ${buttonIcons.debugConsole}
+            </button>
+			<button class="editor-footer-icon" id="footer-history-button" type="button" aria-label="Open RestCraft network history" title="Open RestCraft network history">
+				<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M3 11a9 9 0 1 1 2.7 7.4"></path>
+					<path d="M3 4v7h7"></path>
+					<path d="M12 7v5l3 2"></path>
+				</svg>
+			</button>
 			<div class="editor-footer-brand">RestCraft</div>
 			<span class="editor-footer-version" aria-label="RestCraft version">v${escapedExtensionVersion}</span>
 		</footer>
@@ -1735,6 +1746,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			const responsePreviewEmpty = document.getElementById('response-preview-empty');
 			const footerRepositoryLink = document.getElementById('footer-repository-link');
 			const footerIssuesLink = document.getElementById('footer-issues-link');
+			const footerLogButton = document.getElementById('footer-log-button');
+			const footerHistoryButton = document.getElementById('footer-history-button');
             const footerXLink = document.getElementById('footer-x-link');
 			const footerSettingsButton = document.getElementById('footer-settings-button');
 			const editorFooter = document.querySelector('.editor-footer');
@@ -1777,6 +1790,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					vscode.postMessage({
 						type: 'openIssues',
 					});
+				});
+
+				footerLogButton.addEventListener('click', () => {
+                    vscode.postMessage({ type: 'openNetworkLog' });
+                });
+
+				footerHistoryButton.addEventListener('click', () => {
+					vscode.postMessage({ type: 'openNetworkHistory' });
 				});
 
 				footerSettingsButton.addEventListener('click', () => {

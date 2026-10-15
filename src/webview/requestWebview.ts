@@ -222,6 +222,16 @@ export function initializeRequestWebview(
 			return;
 		}
 
+		if (isRecord(message) && message.type === 'openNetworkLog') {
+			void vscode.commands.executeCommand('restcraft.showNetworkLog');
+			return;
+		}
+
+		if (isRecord(message) && message.type === 'openNetworkHistory') {
+			void vscode.commands.executeCommand('restcraft.showNetworkHistory');
+			return;
+		}
+
 		if (isOpenSettingsMessage(message)) {
 			void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:nickchecan.restcraft');
 			return;
