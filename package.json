@@ -55,12 +55,8 @@
 				"title": "RestCraft: Create Request File"
 			},
 			{
-				"command": "restcraft.importBrunoRequest",
-				"title": "RestCraft: Import from Bruno Request"
-			},
-			{
-				"command": "restcraft.importBrunoCollection",
-				"title": "RestCraft: Import from Bruno Collection"
+				"command": "restcraft.importBruno",
+				"title": "RestCraft: Import from Bruno"
 			}
 		],
 		"languages": [

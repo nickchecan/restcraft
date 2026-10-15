@@ -101,10 +101,10 @@ Open VS Code Settings and search for **RestCraft**.
 
 ## Import from Bruno
 
-Open the Command Palette with **Cmd+Shift+P** (macOS) or **Ctrl+Shift+P** (Windows/Linux):
+Open the Command Palette with **Cmd+Shift+P** (macOS) or **Ctrl+Shift+P** (Windows/Linux) and choose **RestCraft: Import from Bruno**. Select a request file or a collection folder. On Windows/Linux, choose **Request file** or **Collection folder** first because native dialogs cannot select both types at once.
 
-- **RestCraft: Import from Bruno Request** selects a `.bru`, `.yml`, or `.yaml` HTTP request and saves it as `.api.json`, then opens the request editor.
-- **RestCraft: Import from Bruno Collection** selects a collection folder containing `bruno.json` (BRU) or `opencollection.yml` / `opencollection.yaml` (YAML), then a destination parent folder. RestCraft creates a new folder with the source folder name and imports requests recursively, keeping relative folders and filenames. The destination must not already exist.
+- Selecting a file imports a `.bru`, `.yml`, or `.yaml` HTTP request and saves it as `.api.json`, then opens the request editor.
+- Selecting a collection folder imports the collection containing `bruno.json` (BRU) or `opencollection.yml` / `opencollection.yaml` (YAML). Then choose a destination parent folder. RestCraft creates a new folder with the source folder name and imports requests recursively, keeping relative folders and filenames. The destination must not already exist.
 
 Imports preserve request names, methods, URLs, query parameters (including disabled and repeated entries), headers, documentation, JSON/text/XML/form-urlencoded bodies, and bearer tokens. Collection and folder headers and inherited bearer authentication are applied to each request. Variable references remain unchanged; configure RestCraft `.env` files after import. Existing destination files are never overwritten.
 

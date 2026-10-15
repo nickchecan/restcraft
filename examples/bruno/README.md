@@ -2,9 +2,11 @@
 
 These examples contain three independent Bruno collections. Importing only creates request files; sending a request is a separate action in RestCraft.
 
+On Windows/Linux, the command first asks **Request file** or **Collection folder** to accommodate native dialog restrictions. On macOS, the picker accepts either directly.
+
 ## Import a collection
 
-Open the Command Palette (**Cmd+Shift+P** / **Ctrl+Shift+P**) and choose **RestCraft: Import from Bruno Collection**. Select one of these folders, then choose a destination parent folder:
+Open the Command Palette (**Cmd+Shift+P** / **Ctrl+Shift+P**) and choose **RestCraft: Import from Bruno**. Select one of these folders, then choose a destination parent folder:
 
 - `public-api`: three JSONPlaceholder requests, including a path parameter, disabled query/header entries, a JSON body, inherited headers, and nested `Users/Posts` folders.
 - `yaml-api`: six OpenCollection YAML requests, including nested folders, disabled query/header entries, JSON, form and text bodies, and inherited or explicit bearer authentication. This collection uses `opencollection.yml`.
@@ -14,7 +16,7 @@ Select the collection folder containing `bruno.json` or `opencollection.yml`, ra
 
 ## Import an individual request
 
-Choose **RestCraft: Import from Bruno Request**, select a `.bru`, `.yml`, or `.yaml` request file, and choose where to save the `.api.json` output. Good starting points are:
+Choose **RestCraft: Import from Bruno**, select a `.bru`, `.yml`, or `.yaml` request file, and choose where to save the `.api.json` output. Good starting points are:
 
 - `yaml-api/Users/list-users.yml`
 - `yaml-api/Users/Posts/create-post.yml`

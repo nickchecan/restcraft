@@ -3,19 +3,52 @@ import * as path from 'path';
 import { importBrunoCollection, importBrunoRequest } from '../import/brunoFiles';
 import { RequestEditorProvider } from '../webview/requestEditorProvider';
 
-export async function importFromBruno(collection: boolean): Promise<void> {
+interface BrunoSourcePicker {
+	open(options: vscode.OpenDialogOptions): Thenable<vscode.Uri[] | undefined>;
+	chooseKind(): Thenable<string | undefined>;
+}
+
+/** Native dialogs can select files and folders together only on macOS. */
+export async function selectBrunoSource(
+	platform: NodeJS.Platform = process.platform,
+	picker: BrunoSourcePicker = {
+		open: (options) => vscode.window.showOpenDialog(options),
+		chooseKind: () =>
+			vscode.window.showQuickPick(['Request file', 'Collection folder'], {
+				title: 'Import from Bruno',
+				placeHolder: 'Choose what to import',
+			}),
+	},
+): Promise<vscode.Uri | undefined> {
+	let kind: string | undefined;
+	if (platform !== 'darwin') {
+		kind = await picker.chooseKind();
+		if (!kind) {
+			return undefined;
+		}
+	}
+	const selected = await picker.open({
+		title: 'Select Bruno request file or collection folder',
+		openLabel: 'Import',
+		canSelectFiles: kind !== 'Collection folder',
+		canSelectFolders: kind !== 'Request file',
+		canSelectMany: false,
+		filters: { 'Bruno requests': ['bru', 'yml', 'yaml'] },
+	});
+	return selected?.[0];
+}
+
+export async function importFromBruno(): Promise<void> {
 	try {
-		const selected = await vscode.window.showOpenDialog({
-			title: collection ? 'Select Bruno collection folder' : 'Select Bruno request',
-			canSelectFiles: !collection,
-			canSelectFolders: collection,
-			canSelectMany: false,
-			...(!collection ? { filters: { 'Bruno requests': ['bru', 'yml', 'yaml'] } } : {}),
-		});
-		if (!selected?.[0]) {
+		const source = await selectBrunoSource();
+		if (!source) {
 			return;
 		}
-		const source = selected[0];
+		const stat = await vscode.workspace.fs.stat(source);
+		const collection = (stat.type & vscode.FileType.Directory) !== 0;
+		if (!collection && !/\.(bru|ya?ml)$/i.test(source.path)) {
+			throw new Error('Select a Bruno .bru, .yml, or .yaml request file, or a collection folder.');
+		}
 		let warnings: string[];
 		if (collection) {
 			const folders = await vscode.window.showOpenDialog({

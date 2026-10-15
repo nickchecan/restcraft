@@ -14,8 +14,14 @@ suite('Extension activation', () => {
 		// Assert
 		assert.strictEqual(extension.isActive, true);
 		assert.ok(commands.includes('restcraft.createRequestFile'));
-		assert.ok(commands.includes('restcraft.importBrunoRequest'));
-		assert.ok(commands.includes('restcraft.importBrunoCollection'));
+		assert.ok(commands.includes('restcraft.importBruno'));
+		assert.ok(!commands.includes('restcraft.importBrunoRequest'));
+		assert.ok(!commands.includes('restcraft.importBrunoCollection'));
+		const contributed = extension.packageJSON.contributes.commands as { command: string }[];
+		assert.deepStrictEqual(
+			contributed.filter((entry) => entry.command.startsWith('restcraft.importBruno')).map((entry) => entry.command),
+			['restcraft.importBruno'],
+		);
 		assert.ok(commands.includes('restcraft.showNetworkHistory'));
 		assert.ok(commands.includes('restcraft.showNetworkLog'));
 	});
