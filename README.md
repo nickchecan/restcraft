@@ -18,6 +18,7 @@ Create, save, and send HTTP API requests inside Visual Studio Code. RestCraft gi
 - Build REST API requests with query parameters, headers, JSON bodies, and request descriptions.
 - Keep disabled parameters and headers saved for later without sending them.
 - Inspect response status, headers, and body in the API Workbench.
+- View server-sent events (`text/event-stream`) as they arrive, with collapsible event cards, event types and IDs, formatted JSON, and **Expand all** / **Collapse all** controls. The **Raw** tab preserves the received text. Cancelling or timing out keeps events already received; streams use `restcraft.requestTimeout` (set to `0` to disable the timeout).
 - Use `{{VARIABLE}}` references with the nearest `.env` or a manually selected environment file.
 - Authenticate with Basic auth, Bearer tokens, or OAuth 2.0 client credentials and authorization code with PKCE. Authorization Code allows an optional client secret when sending credentials in the body.
 - Save OAuth tokens in `.env` and optionally authorize before each request.

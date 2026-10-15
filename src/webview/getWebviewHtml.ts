@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { buttonIcons } from './buttonIcons';
+import { createEventStreamParser } from './eventStream';
 
 /**
  * Generates the complete API Workbench webview document.
@@ -945,6 +946,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			.response-content,
+			.response-body-content.events-mode { display: block; }
+			.events-mode > pre { display: none; }
+			.stream-events { padding: 12px; }
+			.stream-tools { display: flex; gap: 8px; margin-bottom: 12px; }
+			.stream-event { border: 1px solid var(--vscode-panel-border); margin-bottom: 8px; }
+			.stream-event summary { cursor: pointer; padding: 8px; overflow-wrap: anywhere; }
+			.stream-event pre { padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
 			.response-line-numbers {
 				margin: 0;
 				box-sizing: border-box;
@@ -1398,6 +1407,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				<div class="response-body-content" id="response-body-content">
 					<pre class="response-line-numbers" id="response-body-lines" aria-hidden="true">1</pre>
 					<pre class="response-content" id="response-body">(empty)</pre>
+					<div class="stream-events hidden" id="stream-events">
+						<div class="stream-tools">
+							<button type="button" id="stream-expand">Expand all</button>
+							<button type="button" id="stream-collapse">Collapse all</button>
+							<span id="stream-count" aria-live="polite"></span>
+						</div>
+						<div id="stream-event-list"></div>
+					</div>
 				</div>
 			</div>
 			<div class="response-panel-content hidden" id="headers-panel" role="tabpanel" aria-labelledby="headers-tab">
@@ -1762,6 +1779,19 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				const responseBodyContent = document.getElementById('response-body-content');
 				const responseBodyLines = document.getElementById('response-body-lines');
 				const responseBody = document.getElementById('response-body');
+				const streamEvents = document.getElementById('stream-events');
+				const streamEventList = document.getElementById('stream-event-list');
+				let streamParser;
+				let streamBody = '';
+				let streamCount = 0;
+				let streamExpanded = true;
+				const createEventStreamParser = ${createEventStreamParser.toString()};
+				for (const [id, expanded] of [['stream-expand', true], ['stream-collapse', false]]) {
+					document.getElementById(id).addEventListener('click', () => {
+						streamExpanded = expanded;
+						for (const card of streamEventList.children) { card.open = expanded; }
+					});
+				}
 				let requestStartedAt = 0;
 				let requestTimer = undefined;
 				let latestRequestUrl = '';
@@ -1966,7 +1996,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			});
 
 				responseBodyContent.addEventListener('mousemove', (event) => {
-					updateScrollablePreHoverLine(responseBodyContent, responseBody, event);
+					if (!streamParser) { updateScrollablePreHoverLine(responseBodyContent, responseBody, event); }
 				});
 
 				responseBodyContent.addEventListener('mouseleave', () => {
@@ -2128,7 +2158,19 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     completeOAuthBeforeSend(message, message.error || (typeof message.token === 'string' ? '' : 'Unable to get an access token.'));
                     return;
                 }
+                if (message.type === 'requestStream') {
+					if (message.requestId !== activeRequestId || !requestInProgress) { return; }
+					if (!streamParser) { beginEventStream(); }
+					streamBody += message.update.chunk;
+					streamParser(message.update.chunk);
+					setRawContent(streamBody || '(empty)');
+					responseSize.textContent = formatResponseSize(streamBody);
+					renderResponseHeaders(message.update.headers);
+					setResponseStatus('Streaming: ' + message.update.status + ' ' + message.update.statusText);
+					return;
+				}
                 if (message.type === 'requestComplete') {
+				if (message.requestId !== undefined && message.requestId !== activeRequestId) { return; }
 				requestInProgress = false;
 				send.innerHTML = buttonIcons.send + '<span>Send</span>';
 				send.classList.remove('request-cancel');
@@ -2140,17 +2182,22 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 				if (message.type === 'requestError') {
+				if (message.requestId !== undefined && message.requestId !== activeRequestId) { return; }
 				requestInProgress = false;
 				send.innerHTML = buttonIcons.send + '<span>Send</span>';
 				send.classList.remove('request-cancel');
 				send.disabled = !workspaceTrusted;
 					stopRequestTimer();
-				setResponseStatus(message.cancelled ? 'Request cancelled' : 'Request failed', message.cancelled ? '' : 'error');
-					responseSize.textContent = '';
-					responseHeaders.textContent = '(none)';
-					setRawContent(message.message);
-					setBodyContent(message.message);
-					setPreviewContent('', false);
+				setResponseStatus(message.cancelled ? 'Request cancelled' : (message.message || 'Request failed'), message.cancelled ? '' : 'error');
+					if (!streamParser) {
+						responseSize.textContent = '';
+						responseHeaders.textContent = '(none)';
+						setRawContent(message.message);
+						setBodyContent(message.message);
+						setPreviewContent('', false);
+					} else {
+						streamParser('', true);
+					}
 					updateResponseAreaBounds();
 					return;
 				}
@@ -3834,6 +3881,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 			// Sets formatted response body text and line numbers.
 			function setBodyContent(content, highlightJson) {
+				streamParser = undefined;
+				streamBody = '';
+				streamEvents.classList.add('hidden');
+				responseBodyContent.classList.remove('events-mode');
+				streamEventList.replaceChildren();
 				if (highlightJson) {
 					responseBody.innerHTML = formatJsonHighlight(content);
 				} else {
@@ -3851,9 +3903,44 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 			// Formats and renders response body content based on headers.
 			function setFormattedBodyContent(content, headers) {
+				if (readHeaderValue(headers, 'Content-Type').split(';')[0].trim().toLowerCase() === 'text/event-stream') {
+					if (!streamParser) {
+						beginEventStream();
+						streamParser(content);
+					}
+					streamParser('', true);
+					return;
+				}
 				const formatted = formatResponseBody(content, headers);
 
 				setBodyContent(formatted.content, formatted.highlightJson);
+			}
+
+			// Creates native keyboard-accessible disclosure cards without rebuilding earlier events.
+			function beginEventStream() {
+				streamBody = '';
+				streamCount = 0;
+				streamExpanded = true;
+				streamEventList.replaceChildren();
+				document.getElementById('stream-count').textContent = 'Waiting for events…';
+				responseBodyContent.classList.add('events-mode');
+				streamEvents.classList.remove('hidden');
+				streamParser = createEventStreamParser((event) => {
+					const card = document.createElement('details');
+					card.className = 'stream-event';
+					card.open = streamExpanded;
+					const summary = document.createElement('summary');
+					summary.textContent = 'Event ' + (++streamCount) + ' · ' + event.type + (event.id ? ' · ID: ' + event.id : '');
+					const payload = document.createElement('pre');
+					try {
+						payload.innerHTML = formatJsonHighlight(JSON.stringify(JSON.parse(event.data), null, 2));
+					} catch {
+						payload.textContent = event.data;
+					}
+					card.append(summary, payload);
+					streamEventList.append(card);
+					document.getElementById('stream-count').textContent = streamCount + (streamCount === 1 ? ' event' : ' events');
+				});
 			}
 
 			// Chooses formatted JSON response output when possible.

@@ -1220,3 +1220,74 @@ suite('Webview HTML', () => {
 		}
 	});
 });
+
+suite('Streaming response cards', () => {
+	test('formats JSON safely, retains plain text and preserves existing disclosure state', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const elements = new Map<string, { textContent: string }>();
+		const list = {
+			children: [] as Record<string, unknown>[],
+			replaceChildren() {
+				this.children = [];
+			},
+			append(card: Record<string, unknown>) {
+				this.children.push(card);
+			},
+		};
+		const context = {
+			streamBody: '',
+			streamCount: 0,
+			streamExpanded: true,
+			streamParser: undefined,
+			streamEventList: list,
+			streamEvents: { classList: { remove() {} } },
+			responseBodyContent: { classList: { add() {} } },
+			document: {
+				getElementById(id: string) {
+					if (!elements.has(id)) {
+						elements.set(id, { textContent: '' });
+					}
+					return elements.get(id);
+				},
+				createElement() {
+					return {
+						children: [] as unknown[],
+						append(...children: unknown[]) {
+							this.children.push(...children);
+						},
+					};
+				},
+			},
+		};
+		const parserStart = html.indexOf('const createEventStreamParser = ');
+		const parserEnd = html.indexOf('for (const [id, expanded]', parserStart);
+		const highlightStart = html.indexOf('function formatJsonHighlight(content)');
+		const highlightEnd = html.indexOf('// Sets formatted response body text', highlightStart);
+		const cardsStart = html.indexOf('function beginEventStream()');
+		const cardsEnd = html.indexOf('// Chooses formatted JSON response output', cardsStart);
+		runInNewContext(
+			html.slice(parserStart, parserEnd) +
+				html.slice(highlightStart, highlightEnd) +
+				html.slice(cardsStart, cardsEnd) +
+				'; beginEventStream();',
+			context,
+		);
+		runInNewContext(
+			'streamParser(' + JSON.stringify('event: update\ndata: {"text":"<img>","ok":true}\n\n') + ');',
+			context,
+		);
+		assert.strictEqual(list.children.length, 1);
+		const first = list.children[0];
+		const children = first.children as { textContent?: string; innerHTML?: string }[];
+		assert.strictEqual(children[0].textContent, 'Event 1 · update');
+		assert.ok(children[1].innerHTML?.includes('&lt;img&gt;'));
+		assert.ok(children[1].innerHTML?.includes('json-token-key'));
+		assert.ok(children[1].innerHTML?.includes('\n  '));
+		first.open = false;
+		runInNewContext("streamExpanded = false; streamParser('data: [DONE]\\n\\n');", context);
+		assert.strictEqual(list.children[0], first);
+		assert.strictEqual(first.open, false);
+		assert.strictEqual(list.children[1].open, false);
+		assert.strictEqual((list.children[1].children as { textContent: string }[])[1].textContent, '[DONE]');
+	});
+});

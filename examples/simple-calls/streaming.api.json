@@ -1,0 +1,14 @@
+{
+  "name": "Format Streaming Event",
+  "method": "GET",
+  "url": "https://stream.wikimedia.org/v2/stream/recentchange",
+  "params": [],
+  "headerState": [
+    {
+      "name": "Accept",
+      "value": "text/event-stream",
+      "enabled": true
+    }
+  ],
+  "body": null
+}

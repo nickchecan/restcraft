@@ -1,6 +1,9 @@
 import { startNetworkLog } from './networkLog';
 import { ApiRequest, ApiResponse, isHttpMethod } from './types';
 
+export type StreamUpdate = Omit<ApiResponse, 'body'> & { chunk: string };
+export type StreamListener = (update: StreamUpdate) => void;
+
 /**
  * Executes a validated API request using the extension host's fetch runtime.
  *
@@ -13,6 +16,7 @@ export async function executeRequest(
 	timeoutMs = 30000,
 	signal?: AbortSignal,
 	redirect: 'follow' | 'error' = 'follow',
+	onStream?: StreamListener,
 ): Promise<ApiResponse> {
 	const method = normalizeMethod(request.method);
 	const url = normalizeUrl(request.url);
@@ -43,12 +47,40 @@ export async function executeRequest(
 			signal: controller.signal,
 		});
 
-		const result: ApiResponse = {
+		const metadata = {
 			status: response.status,
 			statusText: response.statusText,
 			headers: Object.fromEntries(response.headers.entries()),
-			body: method === 'HEAD' ? '' : await response.text(),
 		};
+		let responseBody = '';
+		if (
+			method !== 'HEAD' &&
+			onStream &&
+			response.body &&
+			response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() === 'text/event-stream'
+		) {
+			onStream({ ...metadata, chunk: '' });
+			const reader = response.body.getReader();
+			const decoder = new TextDecoder();
+			try {
+				while (true) {
+					const { done, value } = await reader.read();
+					const chunk = done ? decoder.decode() : decoder.decode(value, { stream: true });
+					responseBody += chunk;
+					if (chunk) {
+						onStream({ ...metadata, chunk });
+					}
+					if (done) {
+						break;
+					}
+				}
+			} finally {
+				reader.releaseLock();
+			}
+		} else if (method !== 'HEAD') {
+			responseBody = await response.text();
+		}
+		const result: ApiResponse = { ...metadata, body: responseBody };
 		completeLog(result);
 		return result;
 	} catch (error) {
