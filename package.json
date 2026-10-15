@@ -124,28 +124,37 @@
 		"lint": "eslint src test",
 		"check": "npm run lint -- --max-warnings=0 && npm run format:check && npm run check-types",
 		"test": "vscode-test",
-		"release": "semantic-release",
+		"release": "release-it --ci --config release.config.cjs",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
-		"prepare": "node .husky/install.ts"
+		"prepare": "node .husky/install.ts",
+		"test:release": "node --test scripts/release.test.cjs"
 	},
 	"devDependencies": {
-		"@semantic-release/exec": "^7.1.0",
-		"@semantic-release/git": "^10.0.1",
-		"@semantic-release/github": "^12.0.10",
+		"@release-it/conventional-changelog": "^12.0.2",
 		"@types/mocha": "^10.0.10",
 		"@types/node": "26.x",
 		"@types/vscode": "^1.118.0",
 		"@vscode/test-cli": "^0.0.15",
 		"@vscode/test-electron": "^2.5.2",
 		"@vscode/vsce": "^4.0.0",
+		"conventional-commits-filter": "^6.0.1",
 		"esbuild": "^0.28.2",
 		"eslint": "^9.39.3",
 		"husky": "9.1.7",
 		"npm-run-all": "^4.1.5",
 		"prettier": "3.9.10",
-		"semantic-release": "^25.0.3",
+		"release-it": "^21.1.1",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.56.1"
+	},
+	"overrides": {
+		"mocha": {
+			"diff": "^8.0.3",
+			"serialize-javascript": "^7.1.2"
+		},
+		"get-uri": {
+			"basic-ftp": "^6.2.3"
+		}
 	}
 }

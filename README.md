@@ -1,7 +1,7 @@
 # RestCraft for VS Code
 
 [![Latest release](https://img.shields.io/github/v/release/nickchecan/restcraft?label=release)](https://github.com/nickchecan/restcraft/releases/latest)
-[![semantic-release: angular](https://img.shields.io/badge/semantic--release-angular-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
+[![release-it: angular](https://img.shields.io/badge/release--it-angular-e10079)](https://github.com/release-it/release-it)
 [![CI](https://github.com/nickchecan/restcraft/actions/workflows/ci.yml/badge.svg)](https://github.com/nickchecan/restcraft/actions/workflows/ci.yml)
 [![Release](https://github.com/nickchecan/restcraft/actions/workflows/release.yml/badge.svg)](https://github.com/nickchecan/restcraft/actions/workflows/release.yml)
 
@@ -354,7 +354,7 @@ your branch relative to its merge base with main. You can supply other base and
 head refs as arguments. Commit subjects must use `type: summary` or
 `type(scope): summary`, with one of `build`, `chore`, `ci`, `docs`, `feat`, `fix`,
 `perf`, `refactor`, `revert`, `style`, or `test`. Use a `BREAKING CHANGE:` footer
-for breaking changes with the Angular semantic-release preset. Ordinary merge
+for breaking changes with the Angular conventional commit preset. Ordinary merge
 subjects and `fixup!` subjects fail validation; rebase or squash them before
 submitting the final branch history.
 
@@ -363,3 +363,21 @@ lint, formatting, and types, then runs extension tests and builds the production
 bundle. Its status check is named **Verify extension**. The final **CI gate**
 fails if either job fails, is cancelled, or is skipped. Configure **CI gate** as a required status
 check in the main branch ruleset to block merging when any of these checks fails.
+
+### Automated releases
+
+The release workflow uses release-it with the Angular conventional commit preset.
+`fix:`, `perf:`, and reverts produce patch releases; `feat:` produces a minor
+release; a `BREAKING CHANGE:` footer produces a major release. Documentation and
+maintenance commits alone do not release, and reverted commits cancel their
+original changes when both occur after the latest release tag.
+
+On `main`, the workflow updates `package.json` and `package-lock.json`, builds the
+VSIX, commits with `chore(release): ... [skip ci]`, tags `v<version>`, publishes
+the VSIX to the Marketplace, and creates a GitHub release with the same artifact.
+It does not publish to npm. Git pushes and GitHub releases use the dedicated
+release App token; Marketplace publishing uses `VSCE_PAT` from the environment.
+
+Run `npm run test:release` to verify version selection and local Git release
+behavior in temporary repositories. This command does not publish or create a
+VSIX. `npm run release` performs a real release and is not a verification command.

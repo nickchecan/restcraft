@@ -65,7 +65,7 @@ npm ci
 
 Use `npm install` when intentionally changing dependencies, and include the corresponding `package-lock.json` change. Do not run `npm audit fix --force` as incidental cleanup.
 
-Use Node 22.18+ for the TypeScript Husky installer. PR CI uses Node 22; the release workflow uses Node 24. Check dependency engine requirements when choosing a local Node version.
+Use Node 22.22.2+, 24.15.0+, or 26+ for the release tooling. PR CI uses Node 22; the release workflow uses Node 24. Check dependency engine requirements when choosing a local Node version.
 
 ## Checks, Formatting, and Local Hooks
 
@@ -128,7 +128,7 @@ Run relevant tests for behavior changes and `npm run check` before handing off c
 
 ## Release and Publishing
 
-Publishing is handled by semantic-release through `.github/workflows/release.yml`.
+Publishing is handled by release-it through `.github/workflows/release.yml`.
 
 - The release workflow runs on pushes to `main`.
 - `release.config.cjs` uses the Angular conventional commit preset.
@@ -138,9 +138,10 @@ Publishing is handled by semantic-release through `.github/workflows/release.yml
 - `docs:`, `chore:`, and other non-release commit types usually do not trigger publishing.
 - The release job verifies, packages, creates a `.vsix`, publishes with `vsce`, and requires the `VSCE_PAT` secret.
 - Release authentication also requires the Actions variable `RELEASE_APP_CLIENT_ID` and Actions secret `RELEASE_APP_PRIVATE_KEY` (complete PEM). Never print, commit, or copy credential values into chat or logs.
-- `actions/create-github-app-token` creates a repository-scoped token after verification, with contents, issues, and pull requests write permissions. Semantic-release receives it as `GITHUB_TOKEN`; the workflow's default token remains read-only.
-- Keep checkout's `persist-credentials: false` so cached default credentials do not override the App token for pushes. The commit author `semantic-release-bot` is not the authenticated bypass actor.
-- `@semantic-release/git` updates `package.json` and `package-lock.json` with `chore(release): ... [skip ci]`. Preserve the skip marker to avoid recursive workflow runs from App-authenticated pushes. Do not bump versions manually unless requested.
+- `actions/create-github-app-token` creates a repository-scoped token after verification, with contents, issues, and pull requests write permissions. Release-it receives it as `GITHUB_TOKEN`; the workflow's default token remains read-only.
+- Run `npm run test:release` for isolated release lifecycle tests. CI also runs `npm audit`.
+- Keep checkout's `persist-credentials: false` so cached default credentials do not override the App token for pushes. The commit author `restcraft-release-bot` is not the authenticated bypass actor.
+- Release-it updates `package.json` and `package-lock.json` with `chore(release): ... [skip ci]`. Preserve the skip marker to avoid recursive workflow runs from App-authenticated pushes. Do not bump versions manually unless requested.
 - `npm run package` builds the production JavaScript bundle; it does not create a `.vsix`. Running `npm run release` can publish to the Marketplace and must not be used as a verification command.
 - To test the Marketplace token locally without publishing, run:
 

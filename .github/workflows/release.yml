@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          # Let semantic-release authenticate Git pushes with the release App.
+          # Authenticate Git pushes with the release App, not the checkout token.
           persist-credentials: false
 
       - name: Set up Node.js
@@ -53,6 +53,9 @@ jobs:
       - name: Build the production bundle
         run: npm run package
 
+      - name: Test release behavior
+        run: npm run test:release
+
       # Mint the short-lived token after verification so it does not expire
       # while dependencies are installed or tests run.
       - name: Create release App token
@@ -65,8 +68,14 @@ jobs:
           permission-issues: write
           permission-pull-requests: write
 
-      - name: Run semantic release
+      - name: Run release-it
         env:
           GITHUB_TOKEN: ${{ steps.release-token.outputs.token }}
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npm run release
+          GIT_ASKPASS: ${{ github.workspace }}/scripts/git-askpass.sh
+          GIT_TERMINAL_PROMPT: 0
+        run: |
+          git config --local credential.helper ''
+          git config user.name 'restcraft-release-bot'
+          git config user.email 'restcraft-release-bot@users.noreply.github.com'
+          npm run release
