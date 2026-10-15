@@ -1,0 +1,15 @@
+info:
+  name: Create user
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: https://api.example.com/users
+  auth: none
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Ada",
+        "profile": {"roles": ["admin"], "template": "{{ROLE}}"}
+      }

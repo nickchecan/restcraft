@@ -1,0 +1,15 @@
+meta {
+  name: Inherited bearer token
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://httpbin.org/bearer
+  body: none
+  auth: inherit
+}
+
+docs {
+  Import the entire echo-api collection to inherit the folder bearer token. The token is a public demo value.
+}

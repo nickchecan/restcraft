@@ -1,0 +1,19 @@
+meta {
+  name: Explicit bearer token
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://httpbin.org/bearer
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: example-demo-token
+}
+
+docs {
+  Self-contained bearer authentication example suitable for standalone request import. The token is a public demo value.
+}

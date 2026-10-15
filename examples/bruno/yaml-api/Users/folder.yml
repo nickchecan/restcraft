@@ -1,0 +1,8 @@
+info:
+  name: Users
+  type: folder
+  seq: 1
+request:
+  headers:
+    - name: X-Example-Folder
+      value: users

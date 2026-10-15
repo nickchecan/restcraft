@@ -1,0 +1,23 @@
+meta {
+  name: Create sample post
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://jsonplaceholder.typicode.com/posts
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "title": "Imported from Bruno",
+    "body": "Hello from RestCraft",
+    "userId": 1
+  }
+}
+
+docs {
+  Creates a simulated post on JSONPlaceholder. Demonstrates nested collection folders and a JSON body.
+}

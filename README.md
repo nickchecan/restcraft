@@ -98,3 +98,16 @@ Open VS Code Settings and search for **RestCraft**.
 - [Report a bug or request a feature](https://github.com/nickchecan/restcraft/issues)
 - [Release notes](https://github.com/nickchecan/restcraft/releases)
 - [Development and testing](https://github.com/nickchecan/restcraft/blob/main/docs/development.md)
+
+## Import from Bruno
+
+Open the Command Palette with **Cmd+Shift+P** (macOS) or **Ctrl+Shift+P** (Windows/Linux):
+
+- **RestCraft: Import from Bruno Request** selects a `.bru`, `.yml`, or `.yaml` HTTP request and saves it as `.api.json`, then opens the request editor.
+- **RestCraft: Import from Bruno Collection** selects a collection folder containing `bruno.json` (BRU) or `opencollection.yml` / `opencollection.yaml` (YAML), then a destination parent folder. RestCraft creates a new folder with the source folder name and imports requests recursively, keeping relative folders and filenames. The destination must not already exist.
+
+Imports preserve request names, methods, URLs, query parameters (including disabled and repeated entries), headers, documentation, JSON/text/XML/form-urlencoded bodies, and bearer tokens. Collection and folder headers and inherited bearer authentication are applied to each request. Variable references remain unchanged; configure RestCraft `.env` files after import. Existing destination files are never overwritten.
+
+This importer supports BRU and OpenCollection 1.0.0 YAML formats, including collection and folder `request.headers` and `request.auth` settings. YAML query/path parameters can be typed entries or grouped lists. JSON collection exports are not supported. Unsupported authentication and body modes stop the import with an error before collection files are written. Scripts, tests, assertions, runtime variables, settings, and collection configuration are not executed or migrated; warnings identify these omissions. Bruno environments are not migrated. Standalone request imports cannot resolve collection or folder inheritance; use collection import for those requests. Imports never send HTTP requests.
+
+Importable BRU and YAML sample collections are available in [examples/bruno](examples/bruno/README.md).

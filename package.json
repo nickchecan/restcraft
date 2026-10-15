@@ -53,6 +53,14 @@
 			{
 				"command": "restcraft.createRequestFile",
 				"title": "RestCraft: Create Request File"
+			},
+			{
+				"command": "restcraft.importBrunoRequest",
+				"title": "RestCraft: Import from Bruno Request"
+			},
+			{
+				"command": "restcraft.importBrunoCollection",
+				"title": "RestCraft: Import from Bruno Collection"
 			}
 		],
 		"languages": [
@@ -184,5 +192,8 @@
 			"diff": "^8.0.3",
 			"serialize-javascript": "^7.1.2"
 		}
+	},
+	"dependencies": {
+		"yaml": "^2.9.1"
 	}
 }

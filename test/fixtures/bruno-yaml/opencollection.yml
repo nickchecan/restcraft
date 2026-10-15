@@ -1,0 +1,10 @@
+opencollection: 1.0.0
+info:
+  name: Example YAML API
+request:
+  headers:
+    - name: Accept
+      value: application/json
+  auth:
+    type: bearer
+    token: '{{API_TOKEN}}'

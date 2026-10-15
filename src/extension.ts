@@ -1,3 +1,4 @@
+import { importFromBruno } from './commands/importBruno';
 import * as vscode from 'vscode';
 
 import { createAndOpenRequestFile } from './commands/createRequestFile';
@@ -34,6 +35,8 @@ export function activate(context: vscode.ExtensionContext) {
 	const createRequestFile = vscode.commands.registerCommand('restcraft.createRequestFile', createAndOpenRequestFile);
 
 	context.subscriptions.push(
+		vscode.commands.registerCommand('restcraft.importBrunoRequest', () => importFromBruno(false)),
+		vscode.commands.registerCommand('restcraft.importBrunoCollection', () => importFromBruno(true)),
 		registerOAuthCallback(context.extension.id),
 		createRequestFile,
 		RequestEditorProvider.register(context, extensionVersion),
