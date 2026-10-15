@@ -1036,7 +1036,7 @@ suite('Webview HTML', () => {
 			classList: { toggle: (_name: string, _value: boolean) => {} },
 			setAttribute: (_name: string, _value: string) => {},
 		});
-		const tabs = ['Params', 'Authorization', 'Headers', 'Body', 'Settings'].map((name) => {
+		const tabs = ['Params', 'Authorization', 'Headers', 'Body', 'Settings', 'Automations'].map((name) => {
 			const item = tab(name);
 			item.classList.toggle = (_name, value) => {
 				item.populated = value;
@@ -1059,6 +1059,8 @@ suite('Webview HTML', () => {
 			requestHeadersTab: tabs[2],
 			requestBodyTab: tabs[3],
 			requestSettingsTab: tabs[4],
+			automationTab: tabs[5],
+			automationRows: table,
 			requestParamsTable: table,
 			requestHeadersTable: table,
 			requestBodyFormTable: table,
@@ -1086,7 +1088,7 @@ suite('Webview HTML', () => {
 		runInNewContext('updateRequestTabIndicators();', context);
 		assert.ok(tabs.every((item) => !item.populated));
 	});
-	test('header and param counts include disabled and partial rows but exclude blank rows', () => {
+	test('header, param, and automation counts include disabled and partial rows but exclude blank rows', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('function updateRequestTabIndicators()');
 		const end = html.indexOf('// Posts the current editor state', start);
@@ -1106,7 +1108,8 @@ suite('Webview HTML', () => {
 		};
 		const headers = makeTab('Headers', true);
 		const params = makeTab('Params', true);
-		for (const tab of [headers, params]) {
+		const automations = makeTab('Automations', true);
+		for (const tab of [headers, params, automations]) {
 			tab.classList.toggle = (_name, value) => {
 				tab.populated = value;
 			};
@@ -1127,6 +1130,8 @@ suite('Webview HTML', () => {
 		let paramRows = [row('page', '1'), row('', '')];
 		const context = {
 			requestHeadersTab: headers,
+			automationTab: automations,
+			automationRows: { querySelectorAll: () => headerRows },
 			requestParamsTab: params,
 			requestAuthorizationTab: makeTab('Authorization'),
 			requestBodyTab: makeTab('Body'),
@@ -1144,12 +1149,16 @@ suite('Webview HTML', () => {
 		assert.strictEqual(headers.counter.hidden, false);
 		assert.strictEqual(headers.populated, true);
 		assert.strictEqual(headers.label, 'Headers 3, contains values');
+		assert.strictEqual(automations.counter.textContent, '3');
+		assert.strictEqual(automations.counter.hidden, false);
+		assert.strictEqual(automations.populated, true);
+		assert.strictEqual(automations.label, 'Automations 3, contains values');
 		assert.strictEqual(params.counter.textContent, '1');
 		assert.strictEqual(params.counter.hidden, false);
 		headerRows = [row('', '')];
 		paramRows = [];
 		runInNewContext('updateRequestTabIndicators();', context);
-		for (const tab of [headers, params]) {
+		for (const tab of [headers, params, automations]) {
 			assert.strictEqual(tab.counter.textContent, '');
 			assert.strictEqual(tab.counter.hidden, true);
 			assert.strictEqual(tab.populated, false);

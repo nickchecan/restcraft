@@ -1,3 +1,5 @@
+import { isResponseHeaderMappings, responseHeaderAssignments } from '../request/automation';
+import { ResponseHeaderMapping } from '../request/types';
 import * as vscode from 'vscode';
 import { isAbsolute, posix } from 'path';
 import { isEnvironmentFileSettings, copyEnvironmentFileSettings, isTokenView } from '../request/environmentSettings';
@@ -19,6 +21,7 @@ import { isRecord, isStringRecord } from '../shared/object';
 import { getWebviewHtml } from './getWebviewHtml';
 
 export interface SendRequestMessage {
+	automation?: ResponseHeaderMapping[];
 	type: 'sendRequest';
 	requestId: number;
 	method: string;
@@ -61,6 +64,7 @@ interface CheckEnvironmentVariablesMessage {
 }
 
 export interface RequestChangedMessage {
+	automation?: ResponseHeaderMapping[];
 	authorizeBeforeSend?: boolean;
 	description?: string;
 	type: 'requestChanged';
@@ -460,6 +464,7 @@ async function handleMessage(
 			throw new Error('Sending requests and resolving .env variables requires a trusted workspace.');
 		}
 
+		const requestUri = handlers.onGetRequestUri?.();
 		controller = new AbortController();
 		activeRequests.set(message.requestId, controller);
 		const onStream: StreamListener = (update) => {
@@ -480,6 +485,22 @@ async function handleMessage(
 					onStream,
 				);
 
+		let automationError: string | undefined;
+		try {
+			const assignments = responseHeaderAssignments(message.automation ?? [], response.headers);
+			if (Object.keys(assignments).length) {
+				const uri = requestUri;
+				if (!uri) {
+					throw new Error('Save or load a request file before running automation.');
+				}
+				await storeEnvironmentValues(uri, assignments, controller.signal);
+			}
+		} catch (error) {
+			automationError = error instanceof Error ? error.message : 'Unable to update environment variables.';
+		}
+		if (automationError) {
+			void vscode.window.showWarningMessage('Response received, but automation failed: ' + automationError);
+		}
 		await webview.postMessage({
 			type: 'requestComplete',
 			requestId: message.requestId,
@@ -774,6 +795,7 @@ function isSendRequestMessage(message: unknown): message is SendRequestMessage {
 
 	return (
 		candidate.type === 'sendRequest' &&
+		(candidate.automation === undefined || isResponseHeaderMappings(candidate.automation)) &&
 		typeof candidate.requestId === 'number' &&
 		Number.isSafeInteger(candidate.requestId) &&
 		typeof candidate.method === 'string' &&
@@ -894,6 +916,7 @@ function isRequestChangedMessage(message: unknown): message is RequestChangedMes
 		(candidate.environment === undefined || isEnvironmentFileSettings(candidate.environment)) &&
 		(candidate.authorization === undefined || isOAuthAuthorization(candidate.authorization)) &&
 		candidate.type === 'requestChanged' &&
+		(candidate.automation === undefined || isResponseHeaderMappings(candidate.automation)) &&
 		(candidate.authorizeBeforeSend === undefined || typeof candidate.authorizeBeforeSend === 'boolean') &&
 		(candidate.description === undefined || typeof candidate.description === 'string') &&
 		typeof candidate.name === 'string' &&
@@ -1056,8 +1079,16 @@ export async function storeOAuthTokenInEnvironment(
 	token: string,
 	signal?: AbortSignal,
 ): Promise<void> {
+	return storeEnvironmentValues(requestUri, { [name]: token }, signal);
+}
+
+async function storeEnvironmentValues(
+	requestUri: vscode.Uri,
+	values: Record<string, string>,
+	signal?: AbortSignal,
+): Promise<void> {
 	if (!vscode.workspace.isTrusted) {
-		throw new Error('Storing an access token requires a trusted workspace.');
+		throw new Error('Writing environment variables requires a trusted workspace.');
 	}
 	const target = await findEnvironmentFile(requestUri);
 	const key = target.uri.toString();
@@ -1066,11 +1097,11 @@ export async function storeOAuthTokenInEnvironment(
 		.catch(() => {})
 		.then(async () => {
 			if (!vscode.workspace.isTrusted) {
-				throw new Error('Storing an access token requires a trusted workspace.');
+				throw new Error('Writing environment variables requires a trusted workspace.');
 			}
 			const openDocument = vscode.workspace.textDocuments.find((document) => document.uri.toString() === key);
 			if (openDocument?.isDirty) {
-				throw new Error('Save the .env file before storing an access token.');
+				throw new Error('Save the .env file before writing environment variables.');
 			}
 			let content = '';
 			try {
@@ -1081,9 +1112,14 @@ export async function storeOAuthTokenInEnvironment(
 				}
 			}
 			if (signal?.aborted) {
-				throw new Error('Token request cancelled.');
+				throw new Error('Environment update cancelled.');
 			}
-			await vscode.workspace.fs.writeFile(target.uri, new TextEncoder().encode(updateEnvValue(content, name, token)));
+			await vscode.workspace.fs.writeFile(
+				target.uri,
+				new TextEncoder().encode(
+					Object.entries(values).reduce((text, [name, value]) => updateEnvValue(text, name, value), content),
+				),
+			);
 		});
 	environmentWrites.set(key, write);
 	try {
