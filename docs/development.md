@@ -72,3 +72,22 @@ or Extension Host launch is an infrastructure failure, not a passing test run.
 
 Run `npm run check`, `npm test`, and `npm run package` before handing off a code change.
 The CI verification job runs the same checks and production build.
+
+## Dependency security limitations
+
+Run `npm audit` after dependency changes and inspect the actual installed tree with
+`npm ls`, rather than assuming an override fixed an advisory. As checked on
+October 14, 2026, the latest compatible semantic-release and npm plugin still
+install npm 11.21.0. Its published archive bundles affected copies of
+`brace-expansion`, `http-cache-semantics`, `ip-address`, `postcss-selector-parser`,
+and `undici`. npm 12.2.0 also bundles those copies. Updating npm alone or adding
+ordinary overrides does not replace them; npm reports that these bundled dependencies
+cannot be fixed automatically. Dependabot can consequently report
+`security_update_not_possible` until an upstream npm release includes the patches.
+
+A separate `braces` advisory affects release tooling through `micromatch`;
+`braces` 3.0.3 is still the latest published version at this check. Do not use
+`npm audit fix --force` to downgrade the release toolchain or dismiss alerts merely
+to obtain a passing badge. Recheck upstream releases and the audit before deciding
+whether a broader toolchain change is needed. These are development dependencies;
+`npm run package` bundles the extension independently of the release toolchain.
