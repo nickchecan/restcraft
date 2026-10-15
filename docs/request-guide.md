@@ -126,7 +126,7 @@ receives the VS Code callback, and exchanges the returned code for an access tok
 
 For Authorization Code, configure **Authorization URL**, **Access Token URL**,
 **Client ID**, **Scope**, and **Client Authentication** (None, HTTP Basic, or
-credentials in the body). Client Secret is shown when authentication is selected. Switching authentication
+credentials in the body). Client Secret is shown when authentication is selected. For **Send credentials in body**, Client Secret is optional; when empty, the token request includes Client ID and omits `client_secret`. HTTP Basic client authentication still requires a secret. Switching authentication
 to **None** clears the saved client secret. Editable OAuth text fields accept
 `{{VARIABLE_NAME}}` references and show the same variable highlighting and
 hover previews as other request fields. References are saved as entered; both

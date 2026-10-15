@@ -3084,6 +3084,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     const showCode = showOAuth && oauthGrantType.value === 'authorization_code';
                     document.querySelectorAll('.oauth-code-field').forEach((field) => setAuthorizationFieldHidden(field, !showCode));
                     const hideSecret = showCode && document.getElementById('oauth-client-authentication').value === 'none';
+                    document.querySelector('label[for="oauth-client-secret"]').textContent = showCode && document.getElementById('oauth-client-authentication').value === 'body' ? 'Client Secret (optional)' : 'Client Secret';
                     setAuthorizationFieldHidden(document.querySelector('label[for="oauth-client-secret"]'), !showOAuth || hideSecret);
                     setAuthorizationFieldHidden(document.getElementById('oauth-client-secret').closest('.authorization-secret-control'), !showOAuth || hideSecret);
                     oauthGetToken.disabled = oauthPending;

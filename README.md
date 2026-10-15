@@ -19,7 +19,7 @@ Create, save, and send HTTP API requests inside Visual Studio Code. RestCraft gi
 - Keep disabled parameters and headers saved for later without sending them.
 - Inspect response status, headers, and body in the API Workbench.
 - Use `{{VARIABLE}}` references with the nearest `.env` or a manually selected environment file.
-- Authenticate with Basic auth, Bearer tokens, or OAuth 2.0 client credentials and authorization code with PKCE.
+- Authenticate with Basic auth, Bearer tokens, or OAuth 2.0 client credentials and authorization code with PKCE. Authorization Code allows an optional client secret when sending credentials in the body.
 - Save OAuth tokens in `.env` and optionally authorize before each request.
 - Cancel requests and configure a request timeout.
 

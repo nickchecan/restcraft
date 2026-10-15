@@ -41,7 +41,7 @@ export function validateAuthorizationCodeFields(fields: AuthorizationCodeFields)
 	if (!fields.clientId.trim()) {
 		throw new Error('Enter a Client ID.');
 	}
-	if (fields.clientAuthentication !== 'none' && !fields.clientSecret) {
+	if (fields.clientAuthentication === 'basic' && !fields.clientSecret) {
 		throw new Error('Enter a Client Secret.');
 	}
 	// VS Code decodes callback URI components before delivering them. URL-safe
@@ -112,7 +112,7 @@ export function buildAuthorizationCodeTokenRequest(
 		headers.Authorization = `Basic ${Buffer.from(`${encode(fields.clientId.trim())}:${encode(fields.clientSecret)}`).toString('base64')}`;
 	} else {
 		body.set('client_id', fields.clientId.trim());
-		if (fields.clientAuthentication === 'body') {
+		if (fields.clientAuthentication === 'body' && fields.clientSecret) {
 			body.set('client_secret', fields.clientSecret);
 		}
 	}
