@@ -7,6 +7,55 @@ import { buttonIcons } from '../../src/webview/buttonIcons';
 import { getWebviewHtml } from '../../src/webview/getWebviewHtml';
 
 suite('Webview HTML', () => {
+	test('authorization divider limits dragging, supports keyboard resizing, and resets', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const start = html.indexOf('let authorizationResizePointer;');
+		const end = html.indexOf('const oauthButtonAlignmentObserver', start);
+		const handlers = new Map<string, (event: Record<string, unknown>) => void>();
+		const attributes = new Map<string, string>();
+		let width = 500;
+		let layoutWidth = 1200;
+		let capturedPointer: number | undefined;
+		const context = {
+			authorizationLayout: {
+				getBoundingClientRect: () => ({ left: 30, width: layoutWidth }),
+				style: { setProperty: (_name: string, value: string) => (width = parseInt(value, 10)) },
+			},
+			authorizationFields: { getBoundingClientRect: () => ({ width, right: 30 + width }) },
+			authorizationResizer: {
+				addEventListener: (name: string, handler: (event: Record<string, unknown>) => void) =>
+					handlers.set(name, handler),
+				setAttribute: (name: string, value: string) => attributes.set(name, value),
+				setPointerCapture: (pointer: number) => (capturedPointer = pointer),
+				classList: { add: () => {}, remove: () => {} },
+			},
+		};
+		runInNewContext(html.slice(start, end), context);
+		const event = { button: 0, pointerId: 1, clientX: 554, preventDefault: () => {} };
+		handlers.get('pointerdown')!(event);
+		assert.strictEqual(capturedPointer, 1);
+		handlers.get('pointermove')!({ ...event, clientX: 574 });
+		assert.strictEqual(width, 520);
+		handlers.get('pointermove')!({ ...event, clientX: 2000 });
+		assert.strictEqual(width, 620);
+		handlers.get('pointermove')!({ ...event, clientX: 0 });
+		assert.strictEqual(width, 380);
+		handlers.get('lostpointercapture')!({});
+		handlers.get('pointermove')!({ ...event, clientX: 2000 });
+		assert.strictEqual(width, 380);
+		handlers.get('keydown')!({ key: 'ArrowRight', preventDefault: () => {} });
+		assert.strictEqual(width, 400);
+		handlers.get('keydown')!({ key: 'Home', preventDefault: () => {} });
+		assert.strictEqual(width, 500);
+		handlers.get('dblclick')!({});
+		assert.strictEqual(width, 500);
+		layoutWidth = 700;
+		handlers.get('dblclick')!({});
+		assert.strictEqual(width, 436);
+		assert.strictEqual(attributes.get('aria-valuenow'), '436');
+		assert.strictEqual(attributes.get('aria-valuemin'), '316');
+		assert.strictEqual(attributes.get('aria-valuemax'), '436');
+	});
 	test('places the log console button after history and posts the log action when clicked', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const logButton = html.indexOf('id="footer-log-button"');
