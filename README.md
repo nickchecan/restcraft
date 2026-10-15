@@ -46,34 +46,34 @@ Example request file:
 
 ```json
 {
-  "name": "Get user profile",
-  "method": "GET",
-  "url": "https://api.example.com/users/{{USER_ID}}?include=settings",
-  "params": [
-    {
-      "name": "include",
-      "value": "settings",
-      "enabled": true
-    },
-    {
-      "name": "debug",
-      "value": "1",
-      "enabled": false
-    }
-  ],
-  "headerState": [
-    {
-      "name": "Authorization",
-      "value": "Bearer {{API_TOKEN}}",
-      "enabled": true
-    },
-    {
-      "name": "X-Debug",
-      "value": "1",
-      "enabled": false
-    }
-  ],
-  "body": null
+	"name": "Get user profile",
+	"method": "GET",
+	"url": "https://api.example.com/users/{{USER_ID}}?include=settings",
+	"params": [
+		{
+			"name": "include",
+			"value": "settings",
+			"enabled": true
+		},
+		{
+			"name": "debug",
+			"value": "1",
+			"enabled": false
+		}
+	],
+	"headerState": [
+		{
+			"name": "Authorization",
+			"value": "Bearer {{API_TOKEN}}",
+			"enabled": true
+		},
+		{
+			"name": "X-Debug",
+			"value": "1",
+			"enabled": false
+		}
+	],
+	"body": null
 }
 ```
 
@@ -81,15 +81,15 @@ Example request file:
 
 Request files use the `.api.json` extension and support:
 
-| Property | Required | Description |
-| --- | --- | --- |
-| `name` | Yes | Human-readable request name. |
-| `method` | Yes | One of `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, or `OPTIONS`. |
-| `url` | Yes | An `http` or `https` URL. |
-| `params` | No | Array of query parameters with `name`, `value`, and `enabled` fields. Disabled params stay in the editor but are omitted from the sent URL. |
-| `headerState` | No | Array of headers with `name`, `value`, and `enabled` fields. Disabled headers stay in the editor but are omitted when sending the request. |
-| `headers` | Legacy | Supported for older files; converted to enabled `headerState` rows when `headerState` is absent. |
-| `body` | No | Any JSON value. Use `null` when the request does not need a body. |
+| Property      | Required | Description                                                                                                                                 |
+| ------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`        | Yes      | Human-readable request name.                                                                                                                |
+| `method`      | Yes      | One of `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, or `OPTIONS`.                                                                       |
+| `url`         | Yes      | An `http` or `https` URL.                                                                                                                   |
+| `params`      | No       | Array of query parameters with `name`, `value`, and `enabled` fields. Disabled params stay in the editor but are omitted from the sent URL. |
+| `headerState` | No       | Array of headers with `name`, `value`, and `enabled` fields. Disabled headers stay in the editor but are omitted when sending the request.  |
+| `headers`     | Legacy   | Supported for older files; converted to enabled `headerState` rows when `headerState` is absent.                                            |
+| `body`        | No       | Any JSON value. Use `null` when the request does not need a body.                                                                           |
 
 When `params` is omitted, RestCraft backfills enabled params from the query string in `url` for compatibility with older request files. After editing query params in the custom editor, RestCraft saves the `params` array so enabled and disabled states are remembered when the request is reopened.
 
@@ -113,25 +113,25 @@ You can use variables in URLs, headers, and request bodies:
 
 ```json
 {
-  "name": "Create project",
-  "method": "POST",
-  "url": "{{BASE_URL}}/projects",
-  "params": [],
-  "headerState": [
-    {
-      "name": "Authorization",
-      "value": "Bearer {{API_TOKEN}}",
-      "enabled": true
-    },
-    {
-      "name": "Content-Type",
-      "value": "application/json",
-      "enabled": true
-    }
-  ],
-  "body": {
-    "name": "Launch Plan"
-  }
+	"name": "Create project",
+	"method": "POST",
+	"url": "{{BASE_URL}}/projects",
+	"params": [],
+	"headerState": [
+		{
+			"name": "Authorization",
+			"value": "Bearer {{API_TOKEN}}",
+			"enabled": true
+		},
+		{
+			"name": "Content-Type",
+			"value": "application/json",
+			"enabled": true
+		}
+	],
+	"body": {
+		"name": "Launch Plan"
+	}
 }
 ```
 
@@ -139,8 +139,8 @@ You can use variables in URLs, headers, and request bodies:
 
 RestCraft contributes one command to VS Code:
 
-| Command | Description |
-| --- | --- |
+| Command                          | Description                                                            |
+| -------------------------------- | ---------------------------------------------------------------------- |
 | `RestCraft: Create Request File` | Creates and opens a request file after choosing its name and location. |
 
 ## Feedback
@@ -332,3 +332,34 @@ API and environment references are treated as plain text.
 ```json
 "description": "Retrieves a demo access token.\nUse before calling the protected API."
 ```
+
+## Development checks
+
+Install dependencies with `npm ci`, then run `npm run check` to check lint
+(including warnings), Prettier formatting, and TypeScript types. Fix formatting
+with `npm run format`. Generated files, binary assets, and the npm lockfile are
+excluded from formatting checks.
+
+Installing dependencies also installs Husky's local Git hooks. Before a commit,
+`pre-commit` runs `npm run check` against the working directory; `commit-msg`
+runs `scripts/commit.sh --message-file` against the pending commit message.
+Either failing check prevents the commit. Checks include unstaged changes;
+these hooks do not stage or reformat files. Run `npm run prepare` to reinstall
+the hooks in an existing checkout. CI and production installs skip hook setup.
+Local hooks can be bypassed with `git commit --no-verify`, so required CI checks
+remain the final enforcement.
+
+Run `./scripts/commit.sh origin/main HEAD` to validate every commit introduced by
+your branch relative to its merge base with main. You can supply other base and
+head refs as arguments. Commit subjects must use `type: summary` or
+`type(scope): summary`, with one of `build`, `chore`, `ci`, `docs`, `feat`, `fix`,
+`perf`, `refactor`, `revert`, `style`, or `test`. Use a `BREAKING CHANGE:` footer
+for breaking changes with the Angular semantic-release preset. Ordinary merge
+subjects and `fixup!` subjects fail validation; rebase or squash them before
+submitting the final branch history.
+
+Pull request CI runs `commits` and `verify` in parallel. The `verify` job checks
+lint, formatting, and types, then runs extension tests and builds the production
+bundle. Its status check is named **Verify extension**. The final **CI gate**
+fails if either job fails, is cancelled, or is skipped. Configure **CI gate** as a required status
+check in the main branch ruleset to block merging when any of these checks fails.

@@ -1,145 +1,151 @@
 {
-  "name": "restcraft",
-  "displayName": "RestCraft",
-  "description": "Create, manage, and execute API requests from file-based definitions using a Postman-like interface inside Visual Studio Code.",
-  "version": "1.7.0",
-  "publisher": "nickchecan",
-  "icon": "media/icon-gear-clean-transparent.png",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/nickchecan/restcraft.git"
-  },
-  "engines": {
-    "vscode": "^1.118.0"
-  },
-  "categories": [
-    "Testing",
-    "Other"
-  ],
-  "keywords": [
-    "api",
-    "http",
-    "https",
-    "rest",
-    "request",
-    "testing",
-    "postman",
-    "client",
-    "webview",
-    "environment"
-  ],
-  "activationEvents": [
-    "onCustomEditor:restcraft.requestEditor",
-    "onCommand:restcraft.createRequestFile",
-    "onUri"
-  ],
-  "capabilities": {
-    "untrustedWorkspaces": {
-      "supported": "limited",
-      "description": "%capabilities.untrustedWorkspaces.description%"
-    }
-  },
-  "main": "./dist/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "restcraft.createRequestFile",
-        "title": "RestCraft: Create Request File"
-      }
-    ],
-    "customEditors": [
-      {
-        "viewType": "restcraft.requestEditor",
-        "displayName": "API Workbench",
-        "selector": [
-          {
-            "filenamePattern": "*.api.json"
-          }
-        ],
-        "priority": "default"
-      }
-    ],
-    "configuration": {
-      "title": "RestCraft",
-      "properties": {
-        "restcraft.requestTimeout": {
-          "type": "number",
-          "default": 30000,
-          "minimum": 0,
-          "description": "Maximum time in milliseconds to wait for an API request. Set to 0 to disable the timeout."
-        },
-        "restcraft.suppressInsecureCredentialWarning": {
-          "type": "boolean",
-          "default": false,
-          "scope": "application",
-          "description": "Do not warn before sending authentication credentials to remote servers over unencrypted HTTP."
-        },
-        "restcraft.showEnvironmentVariableValues": {
-          "type": "boolean",
-          "default": true,
-          "scope": "application",
-          "description": "Show resolved .env values in tooltips when hovering over {{VARIABLE}} references in request fields."
-        },
-        "restcraft.autoGenerateAuthorizationCodeState": {
-          "type": "boolean",
-          "default": false,
-          "scope": "application",
-          "description": "Automatically generate state for new authorization code flows when selecting Authorization Code in the Authorization tab, only if State is empty. Existing State values are preserved."
-        },
-        "restcraft.defaultTokenView": {
-          "type": "string",
-          "enum": [
-            "raw",
-            "decoded",
-            "hidden"
-          ],
-          "enumDescriptions": [
-            "Show the access token.",
-            "Show the decoded JWT header and payload.",
-            "Hide the token output."
-          ],
-          "default": "raw",
-          "scope": "application",
-          "description": "Token output view to select when opening the Authorization tab. Retrieving tokens preserves the selected view.",
-          "enumItemLabels": [
-            "Access Token",
-            "Decoded Token",
-            "Hidden"
-          ]
-        }
-      }
-    }
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run package",
-    "compile": "npm run check-types && npm run lint && node esbuild.js",
-    "watch": "npm-run-all -p watch:*",
-    "watch:esbuild": "node esbuild.js --watch",
-    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "npm run check-types && npm run lint && node esbuild.js --production",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
-    "check-types": "tsc --noEmit",
-    "lint": "eslint src test",
-    "test": "vscode-test",
-    "release": "semantic-release"
-  },
-  "devDependencies": {
-    "@semantic-release/exec": "^7.1.0",
-    "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^12.0.10",
-    "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
-    "@types/vscode": "^1.118.0",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
-    "@vscode/vsce": "^3.9.1",
-    "esbuild": "^0.27.3",
-    "eslint": "^9.39.3",
-    "npm-run-all": "^4.1.5",
-    "semantic-release": "^25.0.3",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
-  }
+	"name": "restcraft",
+	"displayName": "RestCraft",
+	"description": "Create, manage, and execute API requests from file-based definitions using a Postman-like interface inside Visual Studio Code.",
+	"version": "1.7.0",
+	"publisher": "nickchecan",
+	"icon": "media/icon-gear-clean-transparent.png",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/nickchecan/restcraft.git"
+	},
+	"engines": {
+		"vscode": "^1.118.0"
+	},
+	"categories": [
+		"Testing",
+		"Other"
+	],
+	"keywords": [
+		"api",
+		"http",
+		"https",
+		"rest",
+		"request",
+		"testing",
+		"postman",
+		"client",
+		"webview",
+		"environment"
+	],
+	"activationEvents": [
+		"onCustomEditor:restcraft.requestEditor",
+		"onCommand:restcraft.createRequestFile",
+		"onUri"
+	],
+	"capabilities": {
+		"untrustedWorkspaces": {
+			"supported": "limited",
+			"description": "%capabilities.untrustedWorkspaces.description%"
+		}
+	},
+	"main": "./dist/extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"command": "restcraft.createRequestFile",
+				"title": "RestCraft: Create Request File"
+			}
+		],
+		"customEditors": [
+			{
+				"viewType": "restcraft.requestEditor",
+				"displayName": "API Workbench",
+				"selector": [
+					{
+						"filenamePattern": "*.api.json"
+					}
+				],
+				"priority": "default"
+			}
+		],
+		"configuration": {
+			"title": "RestCraft",
+			"properties": {
+				"restcraft.requestTimeout": {
+					"type": "number",
+					"default": 30000,
+					"minimum": 0,
+					"description": "Maximum time in milliseconds to wait for an API request. Set to 0 to disable the timeout."
+				},
+				"restcraft.suppressInsecureCredentialWarning": {
+					"type": "boolean",
+					"default": false,
+					"scope": "application",
+					"description": "Do not warn before sending authentication credentials to remote servers over unencrypted HTTP."
+				},
+				"restcraft.showEnvironmentVariableValues": {
+					"type": "boolean",
+					"default": true,
+					"scope": "application",
+					"description": "Show resolved .env values in tooltips when hovering over {{VARIABLE}} references in request fields."
+				},
+				"restcraft.autoGenerateAuthorizationCodeState": {
+					"type": "boolean",
+					"default": false,
+					"scope": "application",
+					"description": "Automatically generate state for new authorization code flows when selecting Authorization Code in the Authorization tab, only if State is empty. Existing State values are preserved."
+				},
+				"restcraft.defaultTokenView": {
+					"type": "string",
+					"enum": [
+						"raw",
+						"decoded",
+						"hidden"
+					],
+					"enumDescriptions": [
+						"Show the access token.",
+						"Show the decoded JWT header and payload.",
+						"Hide the token output."
+					],
+					"default": "raw",
+					"scope": "application",
+					"description": "Token output view to select when opening the Authorization tab. Retrieving tokens preserves the selected view.",
+					"enumItemLabels": [
+						"Access Token",
+						"Decoded Token",
+						"Hidden"
+					]
+				}
+			}
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "npm run package",
+		"compile": "npm run check-types && npm run lint && node esbuild.js",
+		"watch": "npm-run-all -p watch:*",
+		"watch:esbuild": "node esbuild.js --watch",
+		"watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+		"package": "npm run check-types && npm run lint && node esbuild.js --production",
+		"compile-tests": "tsc -p . --outDir out",
+		"watch-tests": "tsc -p . -w --outDir out",
+		"pretest": "npm run compile-tests && npm run compile && npm run lint",
+		"check-types": "tsc --noEmit",
+		"lint": "eslint src test",
+		"check": "npm run lint -- --max-warnings=0 && npm run format:check && npm run check-types",
+		"test": "vscode-test",
+		"release": "semantic-release",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"prepare": "node .husky/install.ts"
+	},
+	"devDependencies": {
+		"@semantic-release/exec": "^7.1.0",
+		"@semantic-release/git": "^10.0.1",
+		"@semantic-release/github": "^12.0.10",
+		"@types/mocha": "^10.0.10",
+		"@types/node": "22.x",
+		"@types/vscode": "^1.118.0",
+		"@vscode/test-cli": "^0.0.12",
+		"@vscode/test-electron": "^2.5.2",
+		"@vscode/vsce": "^3.9.1",
+		"esbuild": "^0.27.3",
+		"eslint": "^9.39.3",
+		"husky": "9.1.7",
+		"npm-run-all": "^4.1.5",
+		"prettier": "3.9.10",
+		"semantic-release": "^25.0.3",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.56.1"
+	}
 }

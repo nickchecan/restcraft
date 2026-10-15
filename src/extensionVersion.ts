@@ -10,7 +10,5 @@ export interface ExtensionPackageJson {
  * malformed extension metadata.
  */
 export function readPackageVersion(packageJson: ExtensionPackageJson): string {
-	return typeof packageJson.version === 'string' && packageJson.version.trim()
-		? packageJson.version
-		: '0.0.0';
+	return typeof packageJson.version === 'string' && packageJson.version.trim() ? packageJson.version : '0.0.0';
 }

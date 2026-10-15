@@ -4,7 +4,7 @@
 
 `restcraft` is a Visual Studio Code extension that provides a Postman-like interface for creating, managing, and executing API requests from file-based definitions inside VS Code.
 
-The extension currently supports `.api.json` request files, a custom request editor, an API Workbench webview, environment variable substitution from sibling `.env` files, and user-triggered HTTP execution through the extension host.
+The extension supports `.api.json` request files, a custom request editor, an API Workbench webview, environment file selection and substitution, OAuth 2.0 client credentials and authorization code flows, and user-triggered HTTP execution through the extension host.
 
 ## Architecture Overview
 
@@ -29,16 +29,25 @@ There is not yet a persistent storage layer beyond workspace files, a broader do
 - `src/request/types.ts`: Request/response types and supported HTTP method helpers.
 - `src/request/requestFile.ts`: `.api.json` request parser and validation.
 - `src/request/environment.ts`: `.env` parsing and `{{VARIABLE}}` substitution.
+- `src/request/environmentSettings.ts`: nearest/manual environment selection validation.
+- `src/request/oauth.ts` and `src/request/authorizationCode.ts`: OAuth token requests, PKCE, and authorization code helpers.
 - `src/request/requestRunner.ts`: User-triggered HTTP execution through `fetch`.
 - `src/shared/object.ts`: Shared object and string-record type guards.
 - `src/webview/requestEditorProvider.ts`: Custom text editor provider for `.api.json` files.
 - `src/webview/requestPanel.ts`: Singleton API Workbench panel.
 - `src/webview/requestWebview.ts`: Webview message handling and environment-aware request execution.
+- `src/webview/requestDocument.ts`: request persistence and canonical header serialization.
+- `src/webview/oauthCallback.ts` and `src/webview/oauthBrowser.ts`: OAuth callback lifecycle and browser authorization.
 - `src/webview/getWebviewHtml.ts`: Generated Webview HTML, CSS, and client-side script.
 - `test/`: TypeScript Mocha tests compiled to `out/test/`.
 - `esbuild.js`: esbuild bundling configuration for the extension runtime.
 - `tsconfig.json`: TypeScript compiler settings.
 - `eslint.config.mjs`: ESLint configuration.
+- `.prettierrc.json` and `.prettierignore`: formatting conventions and exclusions.
+- `scripts/commit.sh`: shared PR commit range and pending commit message validation.
+- `.husky/`: local hooks and the TypeScript hook installer.
+- `.github/workflows/ci.yml`: PR commit validation, verification, and final gate.
+- `.github/workflows/release.yml` and `release.config.cjs`: release authentication and publishing.
 - `.vscode/launch.json`: Debug launch configuration for the Extension Host.
 - `.vscode/tasks.json`: VS Code build/watch tasks.
 - `.vscode-test.mjs`: VS Code test runner configuration.
@@ -51,8 +60,32 @@ There is not yet a persistent storage layer beyond workspace files, a broader do
 Use the existing lockfile:
 
 ```sh
-npm install
+npm ci
 ```
+
+Use `npm install` when intentionally changing dependencies, and include the corresponding `package-lock.json` change. Do not run `npm audit fix --force` as incidental cleanup.
+
+Use Node 22.18+ for the TypeScript Husky installer. PR CI uses Node 22; the release workflow uses Node 24. Check dependency engine requirements when choosing a local Node version.
+
+## Checks, Formatting, and Local Hooks
+
+- Run `npm run check` for lint (warnings fail), Prettier validation, and type checking. There is no `scripts/check.sh`.
+- Run `npm run format:check` to check formatting and `npm run format` to fix it. Prefer formatting only the files you changed when avoiding unrelated diffs.
+- Prettier uses tabs, single quotes, and a 120-character print width. Respect `.prettierignore`; do not edit generated output to fix checks.
+- Dependency installation runs `prepare`, which invokes `.husky/install.ts`. `npm run prepare` reinstalls hooks in an existing checkout. CI and production installations skip hook setup.
+- `.husky/pre-commit` runs `npm run check` against the working directory, including unstaged changes. It does not stage or fix files.
+- `.husky/commit-msg` validates the pending message using `bash scripts/commit.sh --message-file <file>`.
+- Do not bypass hooks to conceal failing checks. Report failures and fix them within the task's scope.
+
+## Pull Request CI and Branch Rules
+
+- `commits` (**Validate commits**) and `verify` (**Verify extension**) run in parallel.
+- `commits` fetches full history and validates commits introduced by the PR relative to its merge base. Locally use `bash scripts/commit.sh origin/main HEAD`, or provide explicit base/head refs. CI supplies `PR_BASE_SHA` and `PR_HEAD_SHA`.
+- `verify` runs `npm run check`, extension tests under `xvfb`, and `npm run package`.
+- `gate` (**CI gate**) depends on both jobs and fails if either fails, is cancelled, or is skipped. Requiring **CI gate** in GitHub rules blocks merges on either job's failure.
+- Job IDs and displayed status check names differ. Coordinate any renaming with GitHub's required checks; stale required names remain **Expected** and block merges.
+- Repository rulesets are external GitHub settings. Inspect their current state before changing them; do not assume local workflow edits update protection.
+- The intended sole bypass actor is the dedicated `restcraft-release-nickchecan` GitHub App, using **Always** mode for release commits. Do not add admin roles, other apps, or a general Actions bypass as a workaround.
 
 ## Build
 
@@ -91,6 +124,8 @@ npm test
 
 Tests live outside `src` in the top-level `test/` folder. Imports from tests should reference source modules through `../src/...`.
 
+Run relevant tests for behavior changes and `npm run check` before handing off code. `npm test` launches a VS Code Extension Host and may need network access to download it; Linux needs a display such as `xvfb-run -a npm test`. If download or launch fails, report the infrastructure limitation separately from test failures. Compilation or lint alone does not establish that tests passed.
+
 ## Release and Publishing
 
 Publishing is handled by semantic-release through `.github/workflows/release.yml`.
@@ -98,9 +133,15 @@ Publishing is handled by semantic-release through `.github/workflows/release.yml
 - The release workflow runs on pushes to `main`.
 - `release.config.cjs` uses the Angular conventional commit preset.
 - Use `fix:` for patch releases and `feat:` for minor releases.
-- Use a breaking-change footer or `!` marker only when a major release is intended.
+- Use a `BREAKING CHANGE:` footer only when a major release is intended. The current commit validator rejects `!` headers; do not assume support from other conventional commit presets.
+- Allowed subject types are `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, and `test`, with optional scope: `type(scope): summary`. Ordinary merge subjects and `fixup!` subjects fail validation.
 - `docs:`, `chore:`, and other non-release commit types usually do not trigger publishing.
 - The release job verifies, packages, creates a `.vsix`, publishes with `vsce`, and requires the `VSCE_PAT` secret.
+- Release authentication also requires the Actions variable `RELEASE_APP_CLIENT_ID` and Actions secret `RELEASE_APP_PRIVATE_KEY` (complete PEM). Never print, commit, or copy credential values into chat or logs.
+- `actions/create-github-app-token` creates a repository-scoped token after verification, with contents, issues, and pull requests write permissions. Semantic-release receives it as `GITHUB_TOKEN`; the workflow's default token remains read-only.
+- Keep checkout's `persist-credentials: false` so cached default credentials do not override the App token for pushes. The commit author `semantic-release-bot` is not the authenticated bypass actor.
+- `@semantic-release/git` updates `package.json` and `package-lock.json` with `chore(release): ... [skip ci]`. Preserve the skip marker to avoid recursive workflow runs from App-authenticated pushes. Do not bump versions manually unless requested.
+- `npm run package` builds the production JavaScript bundle; it does not create a `.vsix`. Running `npm run release` can publish to the Marketplace and must not be used as a verification command.
 - To test the Marketplace token locally without publishing, run:
 
 ```sh
@@ -177,10 +218,18 @@ The default build task is `watch`, defined in `.vscode/tasks.json`, and it runs:
 - Request files currently support:
   - `name`: non-empty string
   - `method`: one of `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, or `OPTIONS`
-  - `url`: `http` or `https` URL
-  - `headers`: object with string values
+  - `url`: `http` or `https` URL, including environment references
+  - `params`: ordered `{ name, value, enabled }` query parameter entries
+  - `headerState`: canonical ordered `{ name, value, enabled }` header entries
+  - `headers`: legacy string-valued object accepted on read; canonical saves use `headerState` instead
   - `body`: any JSON value, stored as `null` when absent in the editor
-- Environment references use `{{VARIABLE_NAME}}` syntax and are resolved from a `.env` file in the same directory as the request file when sending a request.
+  - Optional `description`, `authorization`, `environment`, and `authorizeBeforeSend` fields; follow `src/request/types.ts`, parser validation, and README examples for their shapes
+- Preserve disabled parameters and headers in the saved file, but omit them from execution. Keep legacy request loading compatible.
+- Environment references use `{{VARIABLE_NAME}}`. Nearest mode searches the request directory and then parents up to the containing workspace root, using the first `.env` found without merging files. Manual mode uses the selected path and does not fall back when it is missing; relative paths resolve from the request directory.
+- Reading environment values, OAuth operations, and sending requests require a trusted workspace. Keep secrets out of diagnostics and generated HTML.
+- Tokens may be stored in an `.env` variable or directly in the Authorization header according to the user's choice. Preserve that choice and unrelated environment entries. Prefer variable references for client secrets.
+- OAuth browser callbacks must remain correlated to their attempt; cancellation and late callbacks must not authorize a different request. Keep PKCE verifiers and authorization codes transient.
+- Request execution uses `restcraft.requestTimeout` (30 seconds by default; zero disables it). Preserve cancellation and timeout behavior.
 
 Do not change the request file format without updating examples, parser behavior, tests, and user-facing documentation.
 
@@ -195,10 +244,10 @@ Do not change the request file format without updating examples, parser behavior
 - Do not remove generated scaffold files such as `README.md`, `CHANGELOG.md`, or VS Code config unless the user asks for cleanup.
 - Do not commit, push, publish, or package a `.vsix` unless explicitly requested.
 
-## TODO
+## Scope and Handoff
 
-- Document the current `.api.json` format and environment variable behavior in `README.md`.
-- Add broader extension tests for activation and command registration.
-- Split `src/webview/getWebviewHtml.ts` into smaller assets/modules when doing a planned Webview cleanup.
-- Add request execution cancellation or timeout handling if long-running requests become a problem.
-- Update `README.md` with actual usage once features exist.
+- Inspect `git status` before editing and preserve unrelated user changes.
+- Keep README examples and parser/persistence tests synchronized with user-facing behavior changes.
+- Keep generated `dist/`, `out/`, `.vscode-test/`, and `.husky/_/` output out of source changes. Exclude development tooling from extension packages through `.vscodeignore`.
+- Report what changed, which checks actually passed, and any remaining blockers. Do not claim a PR was merged, protection enabled, or a release published without verifying that external state.
+- A future webview cleanup may split `getWebviewHtml.ts` into smaller modules; do not introduce a frontend framework as incidental cleanup.

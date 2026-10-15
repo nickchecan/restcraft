@@ -14,7 +14,11 @@ export function buildOAuthTokenRequest(fields: OAuthTokenFields): ApiRequest {
 		throw new Error('Enter a Client ID and Client Secret.');
 	}
 	let url: URL;
-	try { url = new URL(fields.url.trim()); } catch { throw new Error('Enter a valid Access Token URL.'); }
+	try {
+		url = new URL(fields.url.trim());
+	} catch {
+		throw new Error('Enter a valid Access Token URL.');
+	}
 	if (url.protocol !== 'https:') {
 		throw new Error('Access Token URL must use HTTPS.');
 	}
@@ -22,11 +26,16 @@ export function buildOAuthTokenRequest(fields: OAuthTokenFields): ApiRequest {
 		throw new Error('Access Token URL must not contain credentials or a fragment.');
 	}
 	const encode = (value: string) => new URLSearchParams({ value }).toString().slice('value='.length);
-	const credentials = Buffer.from(`${encode(fields.clientId)}:${encode(fields.clientSecret)}`, 'utf8').toString('base64');
+	const credentials = Buffer.from(`${encode(fields.clientId)}:${encode(fields.clientSecret)}`, 'utf8').toString(
+		'base64',
+	);
 	const body = new URLSearchParams({ grant_type: 'client_credentials' });
-	if (fields.scope.trim()) { body.set('scope', fields.scope.trim()); }
+	if (fields.scope.trim()) {
+		body.set('scope', fields.scope.trim());
+	}
 	return {
-		method: 'POST', url: url.toString(),
+		method: 'POST',
+		url: url.toString(),
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${credentials}` },
 		body: body.toString(),
 	};
@@ -38,9 +47,18 @@ export function readOAuthAccessToken(response: ApiResponse): string {
 		throw new Error(`Token request failed (HTTP ${response.status}). Check the token URL, credentials, and scope.`);
 	}
 	let data: unknown;
-	try { data = JSON.parse(response.body); } catch { throw new Error('Token endpoint returned invalid JSON.'); }
-	if (!isRecord(data) || typeof data.access_token !== 'string' || !/^[\x21-\x7e]+$/.test(data.access_token)
-		|| typeof data.token_type !== 'string' || data.token_type.toLowerCase() !== 'bearer') {
+	try {
+		data = JSON.parse(response.body);
+	} catch {
+		throw new Error('Token endpoint returned invalid JSON.');
+	}
+	if (
+		!isRecord(data) ||
+		typeof data.access_token !== 'string' ||
+		!/^[\x21-\x7e]+$/.test(data.access_token) ||
+		typeof data.token_type !== 'string' ||
+		data.token_type.toLowerCase() !== 'bearer'
+	) {
 		throw new Error('Token endpoint must return an access_token and Bearer token_type.');
 	}
 	return data.access_token;
@@ -48,33 +66,51 @@ export function readOAuthAccessToken(response: ApiResponse): string {
 
 /** Validates saved OAuth editor settings, allowing unfinished input fields. */
 export function isOAuthAuthorization(value: unknown): value is OAuthAuthorizationDefinition {
-	return isRecord(value) && value.type === 'oauth2'
-		&& (value.grantType === 'client_credentials' || value.grantType === 'authorization_code')
-		&& typeof value.accessTokenUrl === 'string' && typeof value.clientId === 'string'
-		&& typeof value.clientSecret === 'string' && typeof value.scope === 'string'
-		&& (value.authorizationUrl === undefined || typeof value.authorizationUrl === 'string')
-		&& (value.clientAuthentication === undefined || ['none', 'basic', 'body'].includes(value.clientAuthentication as string))
-		&& (value.state === undefined || typeof value.state === 'string')
-		&& (value.usePkce === undefined || typeof value.usePkce === 'boolean')
-		&& (value.updateAuthorizationHeader === undefined || typeof value.updateAuthorizationHeader === 'boolean')
-		&& (value.storeAccessToken === undefined || typeof value.storeAccessToken === 'boolean')
-		&& (value.accessTokenVariable === undefined || typeof value.accessTokenVariable === 'string');
+	return (
+		isRecord(value) &&
+		value.type === 'oauth2' &&
+		(value.grantType === 'client_credentials' || value.grantType === 'authorization_code') &&
+		typeof value.accessTokenUrl === 'string' &&
+		typeof value.clientId === 'string' &&
+		typeof value.clientSecret === 'string' &&
+		typeof value.scope === 'string' &&
+		(value.authorizationUrl === undefined || typeof value.authorizationUrl === 'string') &&
+		(value.clientAuthentication === undefined ||
+			['none', 'basic', 'body'].includes(value.clientAuthentication as string)) &&
+		(value.state === undefined || typeof value.state === 'string') &&
+		(value.usePkce === undefined || typeof value.usePkce === 'boolean') &&
+		(value.updateAuthorizationHeader === undefined || typeof value.updateAuthorizationHeader === 'boolean') &&
+		(value.storeAccessToken === undefined || typeof value.storeAccessToken === 'boolean') &&
+		(value.accessTokenVariable === undefined || typeof value.accessTokenVariable === 'string')
+	);
 }
 
 /** Copies only known settings out of untrusted file or webview input. */
 export function readOAuthAuthorization(value: OAuthAuthorizationDefinition): OAuthAuthorizationDefinition {
-	return { type: 'oauth2', grantType: value.grantType, accessTokenUrl: value.accessTokenUrl,
-		clientId: value.clientId, clientSecret: value.clientSecret, scope: value.scope,
+	return {
+		type: 'oauth2',
+		grantType: value.grantType,
+		accessTokenUrl: value.accessTokenUrl,
+		clientId: value.clientId,
+		clientSecret: value.clientSecret,
+		scope: value.scope,
 		...(value.authorizationUrl !== undefined ? { authorizationUrl: value.authorizationUrl } : {}),
 		...(value.clientAuthentication !== undefined ? { clientAuthentication: value.clientAuthentication } : {}),
 		...(value.state !== undefined ? { state: value.state } : {}),
 		...(value.usePkce !== undefined ? { usePkce: value.usePkce } : {}),
-		...(value.updateAuthorizationHeader !== undefined ? { updateAuthorizationHeader: value.updateAuthorizationHeader } : {}),
+		...(value.updateAuthorizationHeader !== undefined
+			? { updateAuthorizationHeader: value.updateAuthorizationHeader }
+			: {}),
 		...(value.storeAccessToken !== undefined ? { storeAccessToken: value.storeAccessToken } : {}),
-		...(value.accessTokenVariable !== undefined ? { accessTokenVariable: value.accessTokenVariable } : {}) };
+		...(value.accessTokenVariable !== undefined ? { accessTokenVariable: value.accessTokenVariable } : {}),
+	};
 }
 
 /** Header rows are the source of truth; configuration edits must not rewrite them. */
-export function headersForPersistence(headers: Record<string, string>, headerState: RequestHeaderDefinition[], _authorization?: OAuthAuthorizationDefinition) {
+export function headersForPersistence(
+	headers: Record<string, string>,
+	headerState: RequestHeaderDefinition[],
+	_authorization?: OAuthAuthorizationDefinition,
+) {
 	return { headers, headerState };
 }

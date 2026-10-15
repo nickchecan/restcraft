@@ -68,15 +68,7 @@ export interface RequestFileDefinition {
  *
  * Keep this list in sync with package/UI affordances when adding a method.
  */
-export const supportedMethods: readonly HttpMethod[] = [
-	'GET',
-	'POST',
-	'PUT',
-	'PATCH',
-	'DELETE',
-	'HEAD',
-	'OPTIONS',
-];
+export const supportedMethods: readonly HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
 /**
  * Runtime guard for user-provided methods.

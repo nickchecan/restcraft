@@ -88,10 +88,11 @@ suite('Request runner', () => {
 		};
 
 		await assert.rejects(
-			() => executeRequest({
-				method: 'TRACE',
-				url: 'https://example.com',
-			}),
+			() =>
+				executeRequest({
+					method: 'TRACE',
+					url: 'https://example.com',
+				}),
 			/Unsupported HTTP method: TRACE/,
 		);
 		assert.strictEqual(fetchWasCalled, false);

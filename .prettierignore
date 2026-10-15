@@ -1,0 +1,13 @@
+node_modules/
+.husky/_/
+dist/
+out/
+.vscode-test/
+.agents/
+.codex/
+assets/
+media/
+licenses/
+package-lock.json
+AGENTS.md
+*.vsix

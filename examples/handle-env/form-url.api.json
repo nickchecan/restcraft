@@ -1,13 +1,13 @@
 {
-  "name": "Testing Form URL Encoded",
-  "method": "POST",
-  "url": "https://jsonplaceholder.typicode.com/posts",
-  "body": "name=Test&secret=%7B%7BSECRET%7D%7D",
-  "headerState": [
-    {
-      "name": "Content-Type",
-      "value": "application/x-www-form-urlencoded",
-      "enabled": true
-    }
-  ]
+	"name": "Testing Form URL Encoded",
+	"method": "POST",
+	"url": "https://jsonplaceholder.typicode.com/posts",
+	"body": "name=Test&secret=%7B%7BSECRET%7D%7D",
+	"headerState": [
+		{
+			"name": "Content-Type",
+			"value": "application/x-www-form-urlencoded",
+			"enabled": true
+		}
+	]
 }

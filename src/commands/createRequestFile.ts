@@ -24,7 +24,9 @@ export async function createAndOpenRequestFile(resource?: vscode.Uri): Promise<v
 		const fileUri = vscode.Uri.joinPath(getParentUri(selectedUri), fileName);
 
 		if (await fileExists(fileUri)) {
-			await vscode.window.showErrorMessage(`A request file named "${fileName}" already exists. Choose a different name.`);
+			await vscode.window.showErrorMessage(
+				`A request file named "${fileName}" already exists. Choose a different name.`,
+			);
 			return;
 		}
 

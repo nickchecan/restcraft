@@ -133,15 +133,9 @@ export class RequestEditorProvider implements vscode.CustomTextEditorProvider {
 	/**
 	 * Replaces the full text document with serialized request JSON.
 	 */
-	private async updateDocument(
-		document: vscode.TextDocument,
-		nextText: string,
-	): Promise<void> {
+	private async updateDocument(document: vscode.TextDocument, nextText: string): Promise<void> {
 		const edit = new vscode.WorkspaceEdit();
-		const fullRange = new vscode.Range(
-			document.positionAt(0),
-			document.positionAt(document.getText().length),
-		);
+		const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
 
 		edit.replace(document.uri, fullRange, nextText);
 		await vscode.workspace.applyEdit(edit);
@@ -174,9 +168,10 @@ function readRequestDocument(content: string): RequestFileDefinition {
  */
 function readDraftRequestDocument(content: string): RequestFileDefinition {
 	const parsed = readDocumentObject(content);
-	const method = typeof parsed.method === 'string' && isHttpMethod(parsed.method.toUpperCase())
-		? parsed.method.toUpperCase() as HttpMethod
-		: 'GET';
+	const method =
+		typeof parsed.method === 'string' && isHttpMethod(parsed.method.toUpperCase())
+			? (parsed.method.toUpperCase() as HttpMethod)
+			: 'GET';
 
 	return {
 		...(typeof parsed.authorizeBeforeSend === 'boolean' ? { authorizeBeforeSend: parsed.authorizeBeforeSend } : {}),
@@ -188,8 +183,12 @@ function readDraftRequestDocument(content: string): RequestFileDefinition {
 		headerState: readDraftHeaderState(parsed.headerState, parsed.headers),
 		headers: readDraftHeaders(parsed.headers),
 		body: parsed.body ?? null,
-		...(isEnvironmentFileSettings(parsed.environment) ? { environment: copyEnvironmentFileSettings(parsed.environment) } : {}),
-		...(isOAuthAuthorization(parsed.authorization) ? { authorization: readOAuthAuthorization(parsed.authorization) } : {}),
+		...(isEnvironmentFileSettings(parsed.environment)
+			? { environment: copyEnvironmentFileSettings(parsed.environment) }
+			: {}),
+		...(isOAuthAuthorization(parsed.authorization)
+			? { authorization: readOAuthAuthorization(parsed.authorization) }
+			: {}),
 	};
 }
 

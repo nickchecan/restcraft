@@ -24,7 +24,7 @@ suite('Create request command', () => {
 		dialogOptions = undefined;
 		opened = [];
 		errors = [];
-		vscode.window.showSaveDialog = async options => {
+		vscode.window.showSaveDialog = async (options) => {
 			dialogOptions = options;
 			return selectedUri;
 		};
@@ -52,7 +52,10 @@ suite('Create request command', () => {
 		const expectedUri = vscode.Uri.joinPath(directory, 'get-users.api.json');
 		const content = await vscode.workspace.fs.readFile(expectedUri);
 		assert.strictEqual(parseRequestFile(new TextDecoder().decode(content)).name, 'get-users');
-		assert.strictEqual(dialogOptions?.defaultUri?.toString(), vscode.Uri.joinPath(directory, 'request.api.json').toString());
+		assert.strictEqual(
+			dialogOptions?.defaultUri?.toString(),
+			vscode.Uri.joinPath(directory, 'request.api.json').toString(),
+		);
 		assert.strictEqual(opened.length, 1);
 		assert.strictEqual(opened[0].command, 'vscode.openWith');
 		assert.strictEqual((opened[0].args[0] as vscode.Uri).toString(), expectedUri.toString());

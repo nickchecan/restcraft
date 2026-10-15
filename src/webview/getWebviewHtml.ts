@@ -3986,8 +3986,5 @@ function getNonce(): string {
  * Escapes text embedded into HTML content nodes.
  */
 function escapeHtmlContent(content: string): string {
-	return content
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;');
+	return content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
