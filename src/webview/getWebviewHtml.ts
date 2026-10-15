@@ -294,7 +294,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 		}
 
 		.authorization-field .variable-input-wrapper {
-			max-width: 420px;
+			min-width: 0;
 		}
 
 		.variable-highlight-overlay {
@@ -352,8 +352,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			background: var(--vscode-inputValidation-errorBorder, #c72e0f);
 		}
 
-        #oauth-cancel-token,
-        #oauth-cancel-token:hover {
+        button.request-cancel:not(:disabled),
+        button.request-cancel:not(:disabled):hover {
             color: #fff;
             background: #e02424;
         }
@@ -516,21 +516,41 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			.authorization-layout.has-oauth-token-panel {
-				grid-template-columns: minmax(300px, 500px) minmax(240px, 1fr);
+				grid-template-columns: clamp(300px, var(--authorization-fields-width, 500px), calc(100% - 264px)) minmax(240px, 1fr);
 			}
 
 			.oauth-token-panel {
+				position: relative;
 				min-width: 0;
 				min-height: 0;
 				align-self: stretch;
 				display: grid;
+				grid-template-columns: minmax(0, 1fr);
 				grid-template-rows: auto minmax(0, 1fr) auto;
 				border-left: 1px solid var(--vscode-panel-border);
 				padding-left: 24px;
+				padding-right: 24px;
                 padding-bottom: var(--oauth-actions-bottom, 0px);
                 box-sizing: border-box;
 				gap: 8px;
 			}
+
+            .authorization-resizer {
+                position: absolute;
+                left: -5px;
+                top: 0;
+                bottom: 0;
+                width: 9px;
+                cursor: col-resize;
+                touch-action: none;
+            }
+
+            .authorization-resizer:hover,
+            .authorization-resizer:focus-visible,
+            .authorization-resizer.is-dragging {
+                background: var(--vscode-focusBorder);
+                outline: none;
+            }
 
             #oauth-copy-token {
                 grid-row: 3;
@@ -626,6 +646,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 			.oauth-token-content {
 				grid-row: 2;
+				min-width: 0;
 				min-height: 0;
 				display: flex;
 				flex-direction: column;
@@ -655,11 +676,17 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
             #oauth-decoded-token {
+                min-width: 0;
+                white-space: pre;
+                overflow-wrap: normal;
                 overflow: auto;
                 padding: 2px;
             }
 
 			@media (max-width: 760px) {
+                .authorization-resizer {
+                    display: none;
+                }
 				.authorization-layout.has-oauth-token-panel {
 					grid-template-columns: minmax(0, 1fr);
 				}
@@ -670,6 +697,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					min-height: 260px;
 					border-left: 0;
 					padding-left: 0;
+					padding-right: 0;
 					border-top: 1px solid var(--vscode-panel-border);
 					padding-top: 16px;
                     padding-bottom: 0;
@@ -681,7 +709,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 			.authorization-field {
 				display: grid;
-				grid-template-columns: minmax(100px, 180px) minmax(0, 320px);
+				grid-template-columns: minmax(100px, 180px) minmax(0, 1fr);
 				gap: 8px;
 				align-items: center;
 			}
@@ -692,7 +720,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			.authorization-input {
-				max-width: 420px;
+				min-width: 0;
 			}
 
 			.secret-reference {
@@ -1305,6 +1333,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					</div>
 				</div>
 				<div class="oauth-token-panel hidden" id="oauth-token-panel">
+                    <div class="authorization-resizer" id="authorization-resizer" role="separator" tabindex="0" aria-label="Resize authorization inputs and token output" aria-orientation="vertical" aria-controls="authorization-layout" title="Drag or use arrow keys to resize. Double-click to reset."></div>
 					<div class="oauth-token-options" role="group" aria-label="Access token views">
 						<label><input id="oauth-raw-option" type="radio" name="oauth-token-view" value="raw" aria-controls="oauth-raw-panel" checked> Access Token</label>
 						<label><input id="oauth-decoded-option" type="radio" name="oauth-token-view" value="decoded" aria-controls="oauth-decoded-panel"> Decoded Token</label>
@@ -1666,7 +1695,47 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
                 const authorizationLayout = document.getElementById('authorization-layout');
                 const authorizationFields = document.querySelector('.authorization-field');
+                const authorizationResizer = document.getElementById('authorization-resizer');
+                let authorizationResizePointer;
+                let authorizationResizeOffset = 0;
+                function resizeAuthorizationFields(width) {
+                    const available = authorizationLayout.getBoundingClientRect().width - 264;
+                    const initial = Math.min(500, available);
+                    const minimum = Math.max(300, initial - 120);
+                    const maximum = Math.max(minimum, Math.min(available, initial + 120));
+                    const next = Math.round(Math.max(minimum, Math.min(maximum, width)));
+                    authorizationLayout.style.setProperty('--authorization-fields-width', next + 'px');
+                    authorizationResizer.setAttribute('aria-valuemin', String(minimum));
+                    authorizationResizer.setAttribute('aria-valuemax', String(maximum));
+                    authorizationResizer.setAttribute('aria-valuenow', String(next));
+                }
+                authorizationResizer.addEventListener('pointerdown', (event) => {
+                    if (event.button !== 0) { return; }
+                    event.preventDefault();
+                    authorizationResizePointer = event.pointerId;
+                    authorizationResizeOffset = event.clientX - authorizationFields.getBoundingClientRect().right;
+                    authorizationResizer.setPointerCapture(event.pointerId);
+                    authorizationResizer.classList.add('is-dragging');
+                });
+                authorizationResizer.addEventListener('pointermove', (event) => {
+                    if (event.pointerId !== authorizationResizePointer) { return; }
+                    resizeAuthorizationFields(event.clientX - authorizationResizeOffset - authorizationLayout.getBoundingClientRect().left);
+                });
+                authorizationResizer.addEventListener('lostpointercapture', () => {
+                    authorizationResizePointer = undefined;
+                    authorizationResizer.classList.remove('is-dragging');
+                });
+                authorizationResizer.addEventListener('keydown', (event) => {
+                    if (!['ArrowLeft', 'ArrowRight', 'Home'].includes(event.key)) { return; }
+                    event.preventDefault();
+                    const width = authorizationFields.getBoundingClientRect().width;
+                    resizeAuthorizationFields(event.key === 'Home' ? 500 : width + (event.key === 'ArrowLeft' ? -20 : 20));
+                });
+                authorizationResizer.addEventListener('dblclick', () => resizeAuthorizationFields(500));
                 const oauthButtonAlignmentObserver = new ResizeObserver(() => {
+                    if (window.innerWidth > 760 && authorizationLayout.classList.contains('has-oauth-token-panel')) {
+                        resizeAuthorizationFields(authorizationFields.getBoundingClientRect().width);
+                    }
                     const fieldsRect = authorizationFields.getBoundingClientRect();
                     const fieldsBottom = fieldsRect.bottom;
                     const actionsBottom = oauthGetToken.getBoundingClientRect().bottom;
@@ -3780,7 +3849,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						[requestHeadersTab, headerCount > 0, headerCount],
 						[automationTab, automationCount > 0, automationCount],
 						[requestBodyTab, Boolean(requestBody.value.trim()) || hasRowValues(requestBodyFormTable)],
-						[requestSettingsTab, requestEnvManual.checked && Boolean(manualEnvironmentPath.trim())],
+						[requestSettingsTab, authorizeBeforeSend.checked || (requestEnvManual.checked && Boolean(manualEnvironmentPath.trim()))],
 					];
 					for (const [tab, hasValues, count] of states) {
 						const counter = tab.querySelector('.request-tab-count');

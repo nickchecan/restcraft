@@ -68,6 +68,8 @@ RestCraft searches from the request's directory up to the workspace root and use
 
 Sending requests, reading environment values, and retrieving OAuth tokens require a trusted workspace. Keep client secrets in environment variables: literal secrets and tokens saved directly in request files are plain text.
 
+In the **Authorization** tab with **OAuth 2.0** selected, drag the vertical divider to give the inputs or token output up to 120px more space. You can also focus the divider and use the Left/Right arrow keys. Double-click it or press Home to reset. On narrow screens, the sections stack without a draggable divider.
+
 ## Import from Bruno
 
 Run **RestCraft: Import from Bruno** in the Command Palette and select a request file or collection folder. On Windows/Linux, choose the import type first.
