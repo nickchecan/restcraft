@@ -524,9 +524,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				min-height: 0;
 				align-self: stretch;
 				display: grid;
+				grid-template-columns: minmax(0, 1fr);
 				grid-template-rows: auto minmax(0, 1fr) auto;
 				border-left: 1px solid var(--vscode-panel-border);
 				padding-left: 24px;
+				padding-right: 24px;
                 padding-bottom: var(--oauth-actions-bottom, 0px);
                 box-sizing: border-box;
 				gap: 8px;
@@ -626,6 +628,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 
 			.oauth-token-content {
 				grid-row: 2;
+				min-width: 0;
 				min-height: 0;
 				display: flex;
 				flex-direction: column;
@@ -655,6 +658,9 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
             #oauth-decoded-token {
+                min-width: 0;
+                white-space: pre;
+                overflow-wrap: normal;
                 overflow: auto;
                 padding: 2px;
             }
@@ -670,6 +676,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					min-height: 260px;
 					border-left: 0;
 					padding-left: 0;
+					padding-right: 0;
 					border-top: 1px solid var(--vscode-panel-border);
 					padding-top: 16px;
                     padding-bottom: 0;
