@@ -14,5 +14,7 @@ suite('Extension activation', () => {
 		// Assert
 		assert.strictEqual(extension.isActive, true);
 		assert.ok(commands.includes('restcraft.createRequestFile'));
+		assert.ok(commands.includes('restcraft.showNetworkHistory'));
+		assert.ok(commands.includes('restcraft.showNetworkLog'));
 	});
 });

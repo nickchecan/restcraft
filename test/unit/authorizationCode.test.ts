@@ -109,6 +109,18 @@ suite('OAuth Authorization Code', () => {
 		assert.ok(!new URLSearchParams(noPkce.body).has('code_verifier'));
 	});
 
+	test('body authentication allows an empty secret and omits it from the token request', () => {
+		const publicFields = { ...fields, clientAuthentication: 'body' as const, clientSecret: '' };
+		assert.doesNotThrow(() => buildAuthorizationUrl(publicFields, redirect, 'challenge'));
+		const request = buildAuthorizationCodeTokenRequest(publicFields, redirect, 'code', 'verifier');
+		const body = new URLSearchParams(request.body);
+		assert.strictEqual(body.get('client_id'), fields.clientId);
+		assert.strictEqual(body.has('client_secret'), false);
+		assert.strictEqual(body.get('code'), 'code');
+		assert.strictEqual(body.get('code_verifier'), 'verifier');
+		assert.strictEqual(request.headers?.Authorization, undefined);
+	});
+
 	test('invalid fields fail before opening a browser or exchanging codes', () => {
 		// Arrange
 		// Act

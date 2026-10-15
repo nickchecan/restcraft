@@ -1044,6 +1044,13 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 				line-height: 1.4;
 			}
 
+            .editor-footer-separator {
+                width: 1px;
+                height: 18px;
+                flex: 0 0 1px;
+                background: var(--vscode-panel-border);
+            }
+
 			.editor-footer-brand {
 				margin-left: auto;
 				color: var(--vscode-editor-foreground);
@@ -1076,6 +1083,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			}
 
 			.editor-footer-icon svg {
+                margin-right: 0;
 				width: 16px;
 				height: 16px;
 				pointer-events: none;
@@ -1415,6 +1423,17 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					<circle cx="12" cy="12" r="2.75"></circle>
 				</svg>
 			</button>
+			<button class="editor-footer-icon" id="footer-history-button" type="button" aria-label="Open RestCraft network history" title="Open RestCraft network history">
+				<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M3 11a9 9 0 1 1 2.7 7.4"></path>
+					<path d="M3 4v7h7"></path>
+					<path d="M12 7v5l3 2"></path>
+				</svg>
+			</button>
+			<button class="editor-footer-icon" id="footer-log-button" type="button" aria-label="Open RestCraft log console" title="Open RestCraft log console">
+                ${buttonIcons.debugConsole}
+            </button>
+			<span class="editor-footer-separator" aria-hidden="true"></span>
 			<button class="editor-footer-icon" id="footer-repository-link" type="button" aria-label="Open RestCraft repository" title="Open RestCraft repository">
 				<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
 					<path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.6 7.6 0 0 1 8 3.86c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path>
@@ -1735,6 +1754,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 			const responsePreviewEmpty = document.getElementById('response-preview-empty');
 			const footerRepositoryLink = document.getElementById('footer-repository-link');
 			const footerIssuesLink = document.getElementById('footer-issues-link');
+			const footerLogButton = document.getElementById('footer-log-button');
+			const footerHistoryButton = document.getElementById('footer-history-button');
             const footerXLink = document.getElementById('footer-x-link');
 			const footerSettingsButton = document.getElementById('footer-settings-button');
 			const editorFooter = document.querySelector('.editor-footer');
@@ -1777,6 +1798,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 					vscode.postMessage({
 						type: 'openIssues',
 					});
+				});
+
+				footerLogButton.addEventListener('click', () => {
+                    vscode.postMessage({ type: 'openNetworkLog' });
+                });
+
+				footerHistoryButton.addEventListener('click', () => {
+					vscode.postMessage({ type: 'openNetworkHistory' });
 				});
 
 				footerSettingsButton.addEventListener('click', () => {
@@ -3055,6 +3084,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
                     const showCode = showOAuth && oauthGrantType.value === 'authorization_code';
                     document.querySelectorAll('.oauth-code-field').forEach((field) => setAuthorizationFieldHidden(field, !showCode));
                     const hideSecret = showCode && document.getElementById('oauth-client-authentication').value === 'none';
+                    document.querySelector('label[for="oauth-client-secret"]').textContent = showCode && document.getElementById('oauth-client-authentication').value === 'body' ? 'Client Secret (optional)' : 'Client Secret';
                     setAuthorizationFieldHidden(document.querySelector('label[for="oauth-client-secret"]'), !showOAuth || hideSecret);
                     setAuthorizationFieldHidden(document.getElementById('oauth-client-secret').closest('.authorization-secret-control'), !showOAuth || hideSecret);
                     oauthGetToken.disabled = oauthPending;

@@ -1,0 +1,22 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "RestCraft Network Log",
+	"scopeName": "source.restcraft-network-log",
+	"patterns": [
+		{
+			"name": "entity.name.function.restcraft-network-log",
+			"match": "^\\[\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z\\] #\\d+ (?:REQUEST\\b|\\(-?\\d+ ms\\) (?:RESPONSE|CANCELLED|TIMEOUT|FAILED)\\b).*$"
+		},
+		{
+			"match": "^(Headers|Body)(:)(?=\\s|$)",
+			"captures": {
+				"1": {
+					"name": "keyword.control.restcraft-network-log"
+				},
+				"2": {
+					"name": "punctuation.separator.restcraft-network-log"
+				}
+			}
+		}
+	]
+}
