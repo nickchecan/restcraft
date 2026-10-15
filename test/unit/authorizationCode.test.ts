@@ -7,8 +7,8 @@ import {
 	createPkce,
 	pkceChallenge,
 	retrieveAuthorizationCodeToken,
-} from '../src/request/authorizationCode';
-import { executeRequest } from '../src/request/requestRunner';
+} from '../../src/request/authorizationCode';
+import { executeRequest } from '../../src/request/requestRunner';
 
 suite('OAuth Authorization Code', () => {
 	const fields: AuthorizationCodeFields = {
@@ -29,10 +29,14 @@ suite('OAuth Authorization Code', () => {
 		}).toString();
 
 	test('PKCE matches the standard S256 example and generates fresh URL-safe verifiers', () => {
-		assert.strictEqual(
-			pkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'),
-			'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
-		);
+		// Arrange
+		// Inputs are supplied directly to the operation below.
+
+		// Act
+		const actual = pkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk');
+
+		// Assert
+		assert.strictEqual(actual, 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
 		const first = createPkce();
 		const second = createPkce();
 		assert.match(first.verifier, /^[A-Za-z0-9_-]{43}$/);
@@ -41,6 +45,8 @@ suite('OAuth Authorization Code', () => {
 	});
 
 	test('authorization URL preserves provider options, overrides protocol values, and excludes secrets', () => {
+		// Arrange
+		// Act
 		const url = new URL(
 			buildAuthorizationUrl(
 				{
@@ -53,6 +59,7 @@ suite('OAuth Authorization Code', () => {
 				'challenge',
 			),
 		);
+		// Assert
 		assert.strictEqual(url.searchParams.get('audience'), 'api');
 		assert.strictEqual(url.searchParams.get('redirect_uri'), redirect);
 		assert.strictEqual(url.searchParams.get('state'), fields.state);
@@ -70,6 +77,8 @@ suite('OAuth Authorization Code', () => {
 	});
 
 	test('code exchange supports None, Basic, and body authentication with the exact callback URI', () => {
+		// Arrange
+		// Act
 		for (const clientAuthentication of ['none', 'basic', 'body'] as const) {
 			const request = buildAuthorizationCodeTokenRequest(
 				{ ...fields, clientAuthentication, clientSecret: 's:e+c' },
@@ -96,10 +105,14 @@ suite('OAuth Authorization Code', () => {
 			}
 		}
 		const noPkce = buildAuthorizationCodeTokenRequest({ ...fields, usePkce: false }, redirect, 'code');
+		// Assert
 		assert.ok(!new URLSearchParams(noPkce.body).has('code_verifier'));
 	});
 
 	test('invalid fields fail before opening a browser or exchanging codes', () => {
+		// Arrange
+		// Act
+		// Assert
 		for (const invalid of [
 			{ url: 'http://provider.example/token' },
 			{ authorizationUrl: 'invalid' },
@@ -113,9 +126,12 @@ suite('OAuth Authorization Code', () => {
 	});
 
 	test('callbacks match state, reject ambiguous parameters, and consume codes once', async () => {
+		// Arrange
 		const callbacks = new AuthorizationCodeCallbacks();
 		const controller = new AbortController();
+		// Act
 		const pending = callbacks.waitForCode('expected', controller.signal);
+		// Assert
 		assert.strictEqual(callbacks.handleCallback('state=wrong&code=secret-code'), false);
 		assert.strictEqual(callbacks.handleCallback('state=expected&state=other&code=secret-code'), false);
 		assert.strictEqual(callbacks.handleCallback('state=expected&code=accepted-code'), true);
@@ -125,9 +141,12 @@ suite('OAuth Authorization Code', () => {
 	});
 
 	test('provider failures, cancellation, timeout, malformed callbacks, and duplicate states clean up attempts', async () => {
+		// Arrange
 		const callbacks = new AuthorizationCodeCallbacks();
 		let controller = new AbortController();
+		// Act
 		let pending = callbacks.waitForCode('state', controller.signal);
+		// Assert
 		assert.throws(() => callbacks.waitForCode('state', new AbortController().signal), /Another authorization/);
 		callbacks.handleCallback('state=state&error=access_denied&error_description=secret');
 		await assert.rejects(
@@ -151,9 +170,11 @@ suite('OAuth Authorization Code', () => {
 	});
 
 	test('browser callback and token exchange use matching PKCE and callback URL without real network calls', async () => {
+		// Arrange
 		const callbacks = new AuthorizationCodeCallbacks();
 		let challenge = '';
 		let exchanged = false;
+		// Act
 		const token = await retrieveAuthorizationCodeToken(
 			fields,
 			{
@@ -182,12 +203,14 @@ suite('OAuth Authorization Code', () => {
 			},
 			new AbortController().signal,
 		);
+		// Assert
 		assert.strictEqual(token, 'test-token');
 		assert.strictEqual(exchanged, true);
 		assert.strictEqual(callbacks.handleCallback('state=user-state&code=replay'), false);
 	});
 
 	test('configured empty state stays empty; browser failure and cancellation release callbacks', async () => {
+		// Arrange
 		const callbacks = new AuthorizationCodeCallbacks();
 		const dependencies = {
 			callbacks,
@@ -197,10 +220,15 @@ suite('OAuth Authorization Code', () => {
 				throw new Error('Must not exchange');
 			},
 		};
-		await assert.rejects(
-			retrieveAuthorizationCodeToken({ ...fields, state: '' }, dependencies, new AbortController().signal),
-			/open the browser/,
+		// Act
+		const actionUnderTest = retrieveAuthorizationCodeToken(
+			{ ...fields, state: '' },
+			dependencies,
+			new AbortController().signal,
 		);
+
+		// Assert
+		await assert.rejects(actionUnderTest, /open the browser/);
 		assert.strictEqual(callbacks.handleCallback('code=late'), false);
 		const controller = new AbortController();
 		await assert.rejects(
@@ -221,6 +249,7 @@ suite('OAuth Authorization Code', () => {
 	});
 
 	test('continuing browser login after Cancel ignores the callback and never exchanges a code', async () => {
+		// Arrange
 		const callbacks = new AuthorizationCodeCallbacks();
 		const controller = new AbortController();
 		let opened = () => {};
@@ -229,6 +258,7 @@ suite('OAuth Authorization Code', () => {
 		});
 		let exchanges = 0;
 		let cancelledQuery = '';
+		// Act
 		const pending = retrieveAuthorizationCodeToken(
 			fields,
 			{
@@ -248,6 +278,7 @@ suite('OAuth Authorization Code', () => {
 		);
 		await browserOpened;
 		controller.abort();
+		// Assert
 		assert.strictEqual(callbacks.handleCallback(cancelledQuery), false);
 		await assert.rejects(pending, /cancelled/);
 		assert.strictEqual(exchanges, 0);
@@ -282,6 +313,9 @@ suite('OAuth Authorization Code', () => {
 	});
 
 	test('retries work with empty State or PKCE disabled without changing configured fields', async () => {
+		// Arrange
+		// Act
+		// Assert
 		for (const options of [
 			{ state: '', usePkce: true },
 			{ state: 'manual-state', usePkce: false },
@@ -340,37 +374,42 @@ suite('OAuth Authorization Code', () => {
 	});
 
 	test('cancellation during token exchange discards a response even if the transport ignores abort', async () => {
+		// Arrange
 		const callbacks = new AuthorizationCodeCallbacks();
 		const controller = new AbortController();
-		await assert.rejects(
-			retrieveAuthorizationCodeToken(
-				fields,
-				{
-					callbacks,
-					getRedirectUri: async () => redirect,
-					openBrowser: async (url) => {
-						callbacks.handleCallback(browserCallback(url, 'code'));
-						return true;
-					},
-					exchange: async () => {
-						controller.abort();
-						return {
-							status: 200,
-							statusText: 'OK',
-							headers: {},
-							body: '{"access_token":"late-token","token_type":"Bearer"}',
-						};
-					},
+		// Act
+		const actionUnderTest = retrieveAuthorizationCodeToken(
+			fields,
+			{
+				callbacks,
+				getRedirectUri: async () => redirect,
+				openBrowser: async (url) => {
+					callbacks.handleCallback(browserCallback(url, 'code'));
+					return true;
 				},
-				controller.signal,
-			),
-			/cancelled/,
+				exchange: async () => {
+					controller.abort();
+					return {
+						status: 200,
+						statusText: 'OK',
+						headers: {},
+						body: '{"access_token":"late-token","token_type":"Bearer"}',
+					};
+				},
+			},
+			controller.signal,
 		);
+
+		// Assert
+		await assert.rejects(actionUnderTest, /cancelled/);
 	});
 
 	test('token endpoint exchange uses POST, rejects redirects, and passes cancellation to fetch', async () => {
+		// Arrange
 		const original = globalThis.fetch;
 		const callbacks = new AuthorizationCodeCallbacks();
+		// Act
+		// Assert
 		try {
 			globalThis.fetch = async (url, init) => {
 				assert.strictEqual(url, fields.url);

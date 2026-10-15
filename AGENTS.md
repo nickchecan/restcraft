@@ -17,7 +17,7 @@ This repository is a TypeScript VS Code extension bundled with esbuild.
 - Request parsing, environment resolution, and request execution live under `src/request/`.
 - Shared low-level helpers live under `src/shared/`.
 - Webview panel/editor code lives under `src/webview/`.
-- Tests are TypeScript Mocha tests in `test/`, compiled to `out/test/`, and run with `vscode-test`.
+- Tests are TypeScript Mocha tests in `test/unit/` and `test/integration/`, compiled to `out/test/`, and run with `vscode-test`.
 - Bundling is handled by `esbuild.js`.
 
 There is not yet a persistent storage layer beyond workspace files, a broader domain model, or a separate frontend framework for Webviews.
@@ -34,12 +34,11 @@ There is not yet a persistent storage layer beyond workspace files, a broader do
 - `src/request/requestRunner.ts`: User-triggered HTTP execution through `fetch`.
 - `src/shared/object.ts`: Shared object and string-record type guards.
 - `src/webview/requestEditorProvider.ts`: Custom text editor provider for `.api.json` files.
-- `src/webview/requestPanel.ts`: Singleton API Workbench panel.
 - `src/webview/requestWebview.ts`: Webview message handling and environment-aware request execution.
 - `src/webview/requestDocument.ts`: request persistence and canonical header serialization.
 - `src/webview/oauthCallback.ts` and `src/webview/oauthBrowser.ts`: OAuth callback lifecycle and browser authorization.
 - `src/webview/getWebviewHtml.ts`: Generated Webview HTML, CSS, and client-side script.
-- `test/`: TypeScript Mocha tests compiled to `out/test/`.
+- `test/unit/` and `test/integration/`: mocked-boundary and real-component Mocha tests compiled to `out/test/`.
 - `esbuild.js`: esbuild bundling configuration for the extension runtime.
 - `tsconfig.json`: TypeScript compiler settings.
 - `eslint.config.mjs`: ESLint configuration.
@@ -122,7 +121,7 @@ npm test
 
 `npm test` uses `vscode-test`. The `pretest` script runs `compile-tests`, `compile`, and `lint` first.
 
-Tests live outside `src` in the top-level `test/` folder. Imports from tests should reference source modules through `../src/...`.
+Tests live outside `src` in the top-level `test/` folder. Imports from tests should reference source modules through `../../src/...`.
 
 Run relevant tests for behavior changes and `npm run check` before handing off code. `npm test` launches a VS Code Extension Host and may need network access to download it; Linux needs a display such as `xvfb-run -a npm test`. If download or launch fails, report the infrastructure limitation separately from test failures. Compilation or lint alone does not establish that tests passed.
 

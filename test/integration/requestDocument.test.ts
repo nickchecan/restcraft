@@ -1,7 +1,7 @@
 import * as assert from 'assert';
-import { createUpdatedRequestDocumentText } from '../src/webview/requestDocument';
-import { parseRequestFile } from '../src/request/requestFile';
-import type { RequestChangedMessage } from '../src/webview/requestWebview';
+import { createUpdatedRequestDocumentText } from '../../src/webview/requestDocument';
+import { parseRequestFile } from '../../src/request/requestFile';
+import type { RequestChangedMessage } from '../../src/webview/requestWebview';
 
 suite('OAuth request document persistence', () => {
 	const message: RequestChangedMessage = {
@@ -26,7 +26,10 @@ suite('OAuth request document persistence', () => {
 	};
 
 	test('persists authorization before sending and removes it when unchecked', () => {
+		// Arrange
+		// Act
 		const saved = createUpdatedRequestDocumentText('{}', { ...message, authorizeBeforeSend: true });
+		// Assert
 		assert.strictEqual(parseRequestFile(saved).authorizeBeforeSend, true);
 		const unchecked = createUpdatedRequestDocumentText(saved, { ...message, authorizeBeforeSend: false });
 		assert.strictEqual(parseRequestFile(unchecked).authorizeBeforeSend, undefined);
@@ -34,8 +37,11 @@ suite('OAuth request document persistence', () => {
 	});
 
 	test('saves the env reference only in headerState and restores it after parsing', () => {
+		// Arrange
+		// Act
 		const text = createUpdatedRequestDocumentText('{"custom":"preserved"}', message);
 		const saved = JSON.parse(text);
+		// Assert
 		assert.strictEqual(saved.headers, undefined);
 		assert.deepStrictEqual(saved.headerState, [{ name: 'Authorization', value: 'Bearer {{MY_TOKEN}}', enabled: true }]);
 		assert.strictEqual(saved.custom, 'preserved');
@@ -46,17 +52,21 @@ suite('OAuth request document persistence', () => {
 	});
 
 	test('persists literal tokens when storage is unchecked', () => {
+		// Arrange
+		// Act
 		const text = createUpdatedRequestDocumentText('{}', {
 			...message,
 			authorization: { ...message.authorization!, storeAccessToken: false },
 			headers: { Authorization: 'Bearer sensitive-token' },
 			headerState: [{ name: 'Authorization', value: 'Bearer sensitive-token', enabled: true }],
 		});
+		// Assert
 		assert.strictEqual(JSON.parse(text).headers, undefined);
 		assert.strictEqual(JSON.parse(text).headerState[0].value, 'Bearer sensitive-token');
 		assert.strictEqual(parseRequestFile(text).headers.Authorization, 'Bearer sensitive-token');
 	});
 	test('preserves a disabled header value when editing a legacy request', () => {
+		// Arrange
 		const legacy =
 			'{"name":"Legacy","method":"GET","url":"https://example.com/","headers":{"Accept":"application/json"}}';
 		const change: RequestChangedMessage = {
@@ -65,35 +75,46 @@ suite('OAuth request document persistence', () => {
 			headers: { Accept: 'application/json' },
 			headerState: [{ name: 'Accept', value: 'application/json', enabled: false }],
 		};
+		// Act
 		const saved = parseRequestFile(createUpdatedRequestDocumentText(legacy, change));
+		// Assert
 		assert.deepStrictEqual(saved.headerState, change.headerState);
 		assert.strictEqual(saved.headers.Accept, undefined);
 	});
 
 	test('keeps an OAuth env header disabled after saving and reopening', () => {
+		// Arrange
 		const change: RequestChangedMessage = {
 			...message,
 			headerState: [{ name: 'authorization', value: 'Bearer {{MY_TOKEN}}', enabled: false }],
 		};
+		// Act
 		const saved = parseRequestFile(createUpdatedRequestDocumentText('{}', change));
+		// Assert
 		assert.deepStrictEqual(saved.headerState, [
 			{ name: 'authorization', value: 'Bearer {{MY_TOKEN}}', enabled: false },
 		]);
 		assert.strictEqual(saved.headers.Authorization, undefined);
 	});
 	test('saves manual file selection and removes it when returning to nearest mode', () => {
+		// Arrange
 		const change: RequestChangedMessage = { ...message, environment: { mode: 'manual', path: '../config/.env' } };
+		// Act
 		const text = createUpdatedRequestDocumentText('{}', change);
+		// Assert
 		assert.deepStrictEqual(parseRequestFile(text).environment, change.environment);
 		const nearest = createUpdatedRequestDocumentText(text, message);
 		assert.strictEqual(parseRequestFile(nearest).environment, undefined);
 	});
 	test('preserves existing headers when automatic OAuth header updates are disabled', () => {
+		// Arrange
 		const change: RequestChangedMessage = {
 			...message,
 			authorization: { ...message.authorization!, updateAuthorizationHeader: false },
 		};
+		// Act
 		const saved = parseRequestFile(createUpdatedRequestDocumentText('{}', change));
+		// Assert
 		assert.deepStrictEqual(saved.headers, change.headers);
 		assert.deepStrictEqual(saved.headerState, change.headerState);
 		assert.strictEqual(saved.authorization?.updateAuthorizationHeader, false);
@@ -102,6 +123,9 @@ suite('OAuth request document persistence', () => {
 		assert.deepStrictEqual(empty.headerState, []);
 	});
 	test('toggling token storage preserves the previously applied Authorization header', () => {
+		// Arrange
+		// Act
+		// Assert
 		for (const value of ['Bearer {{OLD_TOKEN}}', 'Bearer previously-retrieved-token']) {
 			for (const storeAccessToken of [false, true]) {
 				const change: RequestChangedMessage = {
@@ -117,13 +141,19 @@ suite('OAuth request document persistence', () => {
 		}
 	});
 	test('removes old per-request token view settings when saving', () => {
+		// Arrange
+		// Act
 		const text = createUpdatedRequestDocumentText('{"defaultTokenView":"hidden"}', message);
+		// Assert
 		assert.strictEqual(JSON.parse(text).defaultTokenView, undefined);
 		assert.strictEqual(JSON.parse(text).displayedOAuthToken, undefined);
 	});
 	test('persists optional multiline descriptions and removes them when cleared', () => {
+		// Arrange
 		const description = 'API context\n<example> {{not_a_request_variable}}';
+		// Act
 		const text = createUpdatedRequestDocumentText('{}', { ...message, description });
+		// Assert
 		assert.strictEqual(parseRequestFile(text).description, description);
 		assert.strictEqual(
 			JSON.parse(createUpdatedRequestDocumentText(text, { ...message, description: '' })).description,
