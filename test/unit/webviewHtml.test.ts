@@ -1116,6 +1116,7 @@ suite('Webview HTML', () => {
 			requestBody: { value: '' },
 			authorizationType: { value: 'oauth2' },
 			requestEnvManual: { checked: true },
+			authorizeBeforeSend: { checked: false },
 			manualEnvironmentPath: '../custom/.env',
 			requestEnvPath: { value: '' },
 		};
@@ -1136,6 +1137,13 @@ suite('Webview HTML', () => {
 		context.requestEnvManual.checked = false;
 		runInNewContext('updateRequestTabIndicators();', context);
 		assert.ok(tabs.every((item) => !item.populated));
+		context.authorizeBeforeSend.checked = true;
+		runInNewContext('updateRequestTabIndicators();', context);
+		assert.strictEqual(tabs[4].populated, true);
+		assert.ok(tabs[4].label.includes('contains values'));
+		context.authorizeBeforeSend.checked = false;
+		runInNewContext('updateRequestTabIndicators();', context);
+		assert.strictEqual(tabs[4].populated, false);
 	});
 	test('header, param, and automation counts include disabled and partial rows but exclude blank rows', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
@@ -1191,6 +1199,7 @@ suite('Webview HTML', () => {
 			requestBody: { value: '' },
 			authorizationType: { value: 'none' },
 			requestEnvManual: { checked: false },
+			authorizeBeforeSend: { checked: false },
 			manualEnvironmentPath: '',
 		};
 		runInNewContext(html.slice(start, end) + '; updateRequestTabIndicators();', context);

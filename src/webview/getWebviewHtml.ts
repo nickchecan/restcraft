@@ -3849,7 +3849,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionVersion: string
 						[requestHeadersTab, headerCount > 0, headerCount],
 						[automationTab, automationCount > 0, automationCount],
 						[requestBodyTab, Boolean(requestBody.value.trim()) || hasRowValues(requestBodyFormTable)],
-						[requestSettingsTab, requestEnvManual.checked && Boolean(manualEnvironmentPath.trim())],
+						[requestSettingsTab, authorizeBeforeSend.checked || (requestEnvManual.checked && Boolean(manualEnvironmentPath.trim()))],
 					];
 					for (const [tab, hasValues, count] of states) {
 						const counter = tab.querySelector('.request-tab-count');
