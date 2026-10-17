@@ -125,6 +125,12 @@ Tests live outside `src` in the top-level `test/` folder. Imports from tests sho
 
 Run relevant tests for behavior changes and `npm run check` before handing off code. `npm test` launches a VS Code Extension Host and may need network access to download it; Linux needs a display such as `xvfb-run -a npm test`. If download or launch fails, report the infrastructure limitation separately from test failures. Compilation or lint alone does not establish that tests passed.
 
+## Cursor Cloud specific instructions
+
+The default `node` on `PATH` may be older than 22.18. On the base image, `/exec-daemon/node` can be v22.14 and win over later Node installs, and that version cannot run the TypeScript Husky installer at `.husky/install.ts`. Environment install places Node.js 22.23.3 at `/usr/local/bin/node`. When `node -v` is below 22.18, prefix `npm ci`, `npm run check`, `npm test`, and `npm run package` with `PATH="/usr/local/bin:$PATH"`.
+
+There is no dev server to start. Linux tests use `xvfb-run -a npm test`. `xvfb` is installed by the environment setup when it is missing.
+
 ## Release and Publishing
 
 Publishing is handled by semantic-release through `.github/workflows/release.yml`.
