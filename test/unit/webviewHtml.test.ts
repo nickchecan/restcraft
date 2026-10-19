@@ -9,9 +9,15 @@ import { getWebviewHtml } from '../../src/webview/getWebviewHtml';
 suite('Webview HTML', () => {
 	test('keeps the workbench document stable aside from the per-render nonce', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
-		const normalized = html
-			.replace(/nonce-[A-Za-z0-9]{32}/g, 'nonce-FIXED')
-			.replace(/nonce="[A-Za-z0-9]{32}"/g, 'nonce="FIXED"');
+		const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html)?.[1];
+		const nonce = /script-src 'nonce-([A-Za-z0-9]{32})'/.exec(csp ?? '')?.[1];
+		assert.ok(nonce, 'CSP meta tag must declare a script nonce');
+		const scriptTags = [...html.matchAll(/<script\b[^>]*>/g)].map((match) => match[0]);
+		assert.ok(scriptTags.length > 0, 'Workbench document must include a script');
+		for (const tag of scriptTags) {
+			assert.strictEqual(/\bnonce="([^"]*)"/.exec(tag)?.[1], nonce, 'Every script tag must use the CSP nonce');
+		}
+		const normalized = html.replaceAll(nonce, 'FIXED');
 		assert.strictEqual(
 			createHash('sha256').update(normalized).digest('hex'),
 			'd8156ad1088a4071263612e5f047a27535ac64cb7763e98788a0ce2a535c9566',
