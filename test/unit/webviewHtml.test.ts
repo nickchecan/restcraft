@@ -4,10 +4,11 @@ import * as vscode from 'vscode';
 import { runInNewContext } from 'vm';
 
 import { buttonIcons } from '../../src/webview/buttonIcons';
+import { createEventStreamParser } from '../../src/webview/eventStream';
 import { getWebviewHtml } from '../../src/webview/getWebviewHtml';
 
 suite('Webview HTML', () => {
-	test('keeps the workbench document stable aside from the per-render nonce', () => {
+	test('keeps the workbench document stable aside from the per-render nonce and embedded parser', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html)?.[1];
 		const nonce = /script-src 'nonce-([A-Za-z0-9]{32})'/.exec(csp ?? '')?.[1];
@@ -17,10 +18,13 @@ suite('Webview HTML', () => {
 		for (const tag of scriptTags) {
 			assert.strictEqual(/\bnonce="([^"]*)"/.exec(tag)?.[1], nonce, 'Every script tag must use the CSP nonce');
 		}
-		const normalized = html.replaceAll(nonce, 'FIXED');
+		// Function#toString() follows the compiler (tsc here, esbuild in the bundle). Pin the HTML around it.
+		const parserSource = createEventStreamParser.toString();
+		assert.strictEqual(html.split(parserSource).length, 2, 'Workbench script must embed createEventStreamParser once');
+		const normalized = html.replace(parserSource, 'PARSER').replaceAll(nonce, 'FIXED');
 		assert.strictEqual(
 			createHash('sha256').update(normalized).digest('hex'),
-			'd8156ad1088a4071263612e5f047a27535ac64cb7763e98788a0ce2a535c9566',
+			'72f87873fa190a63484193c592a3e08fc4277c954f56561556bf6f6884110836',
 		);
 	});
 	test('authorization divider limits dragging, supports keyboard resizing, and resets', () => {
