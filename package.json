@@ -157,7 +157,7 @@
 		"lint": "eslint src test",
 		"check": "npm run lint -- --max-warnings=0 && npm run format:check && npm run check-types",
 		"test": "vscode-test",
-		"release": "semantic-release",
+		"release": "npx --yes -p semantic-release@25.0.9 -p @semantic-release/exec@7.1.0 -p @semantic-release/git@10.0.1 -p @semantic-release/github@12.0.10 semantic-release",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"prepare": "node .husky/install.ts",
@@ -165,9 +165,6 @@
 		"test:integration": "npm run compile-tests && npm run compile && vscode-test --label integration"
 	},
 	"devDependencies": {
-		"@semantic-release/exec": "^7.1.0",
-		"@semantic-release/git": "^10.0.1",
-		"@semantic-release/github": "^12.0.10",
 		"@types/mocha": "^10.0.10",
 		"@types/node": "26.x",
 		"@types/vscode": "^1.118.0",
@@ -179,7 +176,6 @@
 		"husky": "9.1.7",
 		"npm-run-all": "^4.1.5",
 		"prettier": "3.9.10",
-		"semantic-release": "^25.0.3",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.56.1"
 	},

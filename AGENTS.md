@@ -133,7 +133,7 @@ There is no dev server to start. Linux tests use `xvfb-run -a npm test`. `xvfb` 
 
 ## Release and Publishing
 
-Publishing is handled by semantic-release through `.github/workflows/release.yml`.
+Publishing is handled by semantic-release through `.github/workflows/release.yml`. semantic-release, `@semantic-release/exec`, `@semantic-release/git`, and `@semantic-release/github` are not project dependencies. The release workflow and `npm run release` invoke those pinned versions with `npx --yes -p`. `@semantic-release/commit-analyzer`, `@semantic-release/release-notes-generator`, and `@semantic-release/npm` are dependencies of semantic-release and are not pinned separately. The release step runs after `npm ci` and prepends `node_modules/.bin` to `PATH` so the exec plugin can run `vsce`, which stays a devDependency.
 
 - The release workflow runs on pushes to `main`.
 - `release.config.cjs` uses the Angular conventional commit preset.

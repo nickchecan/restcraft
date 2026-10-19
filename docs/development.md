@@ -36,9 +36,11 @@ In VS Code, use the **Run Extension** launch configuration to open an Extension 
 The launch configuration starts the watch task automatically.
 
 `npm run package` creates the production JavaScript bundle; it does not create a `.vsix`.
-Release publishing is automated from `main` with semantic-release. Use `fix:` for a patch
-or `feat:` for a minor release. Do not use `npm run release` as a verification command:
-it can publish the extension.
+Release publishing is automated from `main`. The release workflow runs `npm ci`, then
+invokes semantic-release with the same pinned `npx` command as `npm run release`.
+semantic-release and its plugins are not installed from `devDependencies`. Use `fix:` for
+a patch or `feat:` for a minor release. Do not use `npm run release` as a verification
+command: it can publish the extension.
 
 ## Badges on corporate networks
 
@@ -76,18 +78,16 @@ The CI verification job runs the same checks and production build.
 ## Dependency security limitations
 
 Run `npm audit` after dependency changes and inspect the actual installed tree with
-`npm ls`, rather than assuming an override fixed an advisory. As checked on
-October 14, 2026, the latest compatible semantic-release and npm plugin still
-install npm 11.21.0. Its published archive bundles affected copies of
-`brace-expansion`, `http-cache-semantics`, `ip-address`, `postcss-selector-parser`,
-and `undici`. npm 12.2.0 also bundles those copies. Updating npm alone or adding
-ordinary overrides does not replace them; npm reports that these bundled dependencies
-cannot be fixed automatically. Dependabot can consequently report
-`security_update_not_possible` until an upstream npm release includes the patches.
+`npm ls`, rather than assuming an override fixed an advisory. semantic-release and
+its plugins are invoked with pinned `npx` commands and are not installed by `npm ci`,
+so `package-lock.json` does not include them, the npm CLI bundled by
+`@semantic-release/npm`, or the `braces`/`micromatch` chain under semantic-release.
 
-A separate `braces` advisory affects release tooling through `micromatch`;
-`braces` 3.0.3 is still the latest published version at this check. Do not use
-`npm audit fix --force` to downgrade the release toolchain or dismiss alerts merely
-to obtain a passing badge. Recheck upstream releases and the audit before deciding
-whether a broader toolchain change is needed. These are development dependencies;
-`npm run package` bundles the extension independently of the release toolchain.
+Those packages still install when the release job or `npm run release` runs. npm's
+published archive bundles copies of its own dependencies, and ordinary overrides do
+not replace them. `braces` 3.0.3 remains the latest published release and is still
+reached from semantic-release through `micromatch` inside that `npx` install. Do not
+use `npm audit fix --force` to downgrade the toolchain or dismiss alerts merely to
+obtain a passing badge. Recheck upstream releases before changing the pinned versions
+in the release workflow and `npm run release`. `npm run package` bundles the extension
+independently of the release toolchain.

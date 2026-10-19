@@ -69,4 +69,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.release-token.outputs.token }}
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npm run release
+        # Keep this command identical to the package.json "release" script.
+        # npm scripts add node_modules/.bin to PATH; this step calls npx directly,
+        # so prepend it for the exec plugin's vsce package and publish commands.
+        run: PATH="$PWD/node_modules/.bin:$PATH" npx --yes -p semantic-release@25.0.9 -p @semantic-release/exec@7.1.0 -p @semantic-release/git@10.0.1 -p @semantic-release/github@12.0.10 semantic-release
