@@ -1,83 +1,31 @@
-import { isResponseHeaderMappings, responseHeaderAssignments } from '../request/automation';
-import { ResponseHeaderMapping } from '../request/types';
+import { responseHeaderAssignments } from '../request/automation';
 import * as vscode from 'vscode';
 import { isAbsolute, posix } from 'path';
 import { isEnvironmentFileSettings, copyEnvironmentFileSettings, isTokenView } from '../request/environmentSettings';
 
 import { parseEnvFile, resolveRequestVariables, updateEnvValue } from '../request/environment';
-import { buildOAuthTokenRequest, readOAuthAccessToken, isOAuthAuthorization } from '../request/oauth';
+import { buildOAuthTokenRequest, readOAuthAccessToken } from '../request/oauth';
 import { executeRequest, StreamListener } from '../request/requestRunner';
 import { AuthorizationCodeFields } from '../request/authorizationCode';
 import { getAuthorizationCodeToken, getOAuthRedirectUri } from './oauthCallback';
 import {
 	ApiResponse,
 	EnvironmentFileSettings,
-	OAuthAuthorizationDefinition,
 	RequestFileDefinition,
 	RequestHeaderDefinition,
 	RequestParamDefinition,
 } from '../request/types';
-import { isRecord, isStringRecord } from '../shared/object';
+import { isRecord } from '../shared/object';
 import { getWebviewHtml } from './getWebviewHtml';
+import {
+	CheckEnvironmentVariablesMessage,
+	readWebviewMessage,
+	RequestChangedMessage,
+	ResolveEnvironmentVariableMessage,
+	SendRequestMessage,
+} from './webviewMessage';
 
-export interface SendRequestMessage {
-	automation?: ResponseHeaderMapping[];
-	type: 'sendRequest';
-	requestId: number;
-	method: string;
-	url: string;
-	headers?: Record<string, string>;
-	body?: string;
-}
-
-interface CancelRequestMessage {
-	type: 'cancelRequest';
-	requestId: number;
-}
-
-interface WebviewReadyMessage {
-	type: 'webviewReady';
-}
-
-interface OpenRepositoryMessage {
-	type: 'openRepository';
-}
-
-interface OpenIssuesMessage {
-	type: 'openIssues';
-}
-
-interface OpenSettingsMessage {
-	type: 'openSettings';
-}
-
-interface ResolveEnvironmentVariableMessage {
-	type: 'resolveEnvironmentVariable';
-	requestId: number;
-	name: string;
-}
-
-interface CheckEnvironmentVariablesMessage {
-	type: 'checkEnvironmentVariables';
-	requestId: number;
-	names: string[];
-}
-
-export interface RequestChangedMessage {
-	automation?: ResponseHeaderMapping[];
-	authorizeBeforeSend?: boolean;
-	description?: string;
-	type: 'requestChanged';
-	environment?: EnvironmentFileSettings;
-	authorization?: OAuthAuthorizationDefinition;
-	name: string;
-	method: string;
-	url: string;
-	params: RequestParamDefinition[];
-	headerState: RequestHeaderDefinition[];
-	headers: Record<string, string>;
-	body: string;
-}
+export type { RequestChangedMessage, SendRequestMessage };
 
 export interface RequestWebviewHandlers {
 	extensionVersion?: string;
@@ -108,200 +56,148 @@ export function initializeRequestWebview(
 	webview.html = getWebviewHtml(webview, handlers.extensionVersion ?? '0.0.0');
 
 	const messageSubscription = webview.onDidReceiveMessage((message: unknown) => {
-		if (isWebviewReadyMessage(message)) {
-			void webview.postMessage({
-				type: 'workspaceTrust',
-				isTrusted: vscode.workspace.isTrusted,
-			});
-			void postEnvironmentTooltipSetting(webview);
-			void postTokenViewSetting(webview);
-			void postAutoGenerateStateSetting(webview);
-			handlers.onReady?.();
+		dispatchWebviewMessage(message);
+	});
+
+	function dispatchWebviewMessage(message: unknown): void {
+		const command = readWebviewMessage(message);
+		if (!command) {
 			return;
 		}
 
-		if (isRecord(message) && message.type === 'getOAuthRedirect') {
-			if (!preparingOAuthRedirect) {
-				preparingOAuthRedirect = true;
-				void getOAuthRedirectUri()
-					.then(
-						(uri) => {
-							oauthRedirectUrl = uri;
-							return webview.postMessage({ type: 'oauthRedirect', url: oauthRedirectUrl });
-						},
-						() => {
-							oauthRedirectUrl = '';
-							return webview.postMessage({ type: 'oauthRedirect', error: 'Unable to prepare the callback URL.' });
-						},
-					)
-					.then(() => {
-						preparingOAuthRedirect = false;
-					});
-			}
-			return;
-		}
-		if (isRecord(message) && message.type === 'copyOAuthToken') {
-			if (typeof message.token === 'string' && message.token.length > 0) {
-				void vscode.env.clipboard.writeText(message.token);
-			}
-			return;
-		}
-		if (isRecord(message) && message.type === 'copyOAuthRedirect') {
-			if (oauthRedirectUrl) {
-				void vscode.env.clipboard.writeText(oauthRedirectUrl);
-			}
-			return;
-		}
-
-		if (
-			isRecord(message) &&
-			message.type === 'getConfiguredOAuthToken' &&
-			typeof message.requestId === 'number' &&
-			Number.isSafeInteger(message.requestId) &&
-			typeof message.authorization === 'string'
-		) {
-			void postConfiguredOAuthToken(webview, handlers.onGetRequestUri?.(), message.requestId, message.authorization);
-			return;
-		}
-		if (
-			isRecord(message) &&
-			message.type === 'getEnvironmentFile' &&
-			typeof message.requestId === 'number' &&
-			Number.isSafeInteger(message.requestId) &&
-			(message.environment === undefined || isEnvironmentFileSettings(message.environment))
-		) {
-			const uri = handlers.onGetRequestUri?.();
-			if (uri) {
-				environmentSelections.set(uri.toString(), message.environment as EnvironmentFileSettings | undefined);
-			}
-			void postEnvironmentFile(webview, handlers.onGetRequestUri?.(), message.requestId);
-			return;
-		}
-		if (
-			isRecord(message) &&
-			message.type === 'chooseEnvironmentFile' &&
-			typeof message.requestId === 'number' &&
-			Number.isSafeInteger(message.requestId)
-		) {
-			void chooseEnvironmentFile(webview, handlers.onGetRequestUri?.(), message.requestId);
-			return;
-		}
-		if (isRecord(message) && message.type === 'openEnvironmentFile') {
-			void openEnvironmentFile(handlers.onGetRequestUri?.());
-			return;
-		}
-		if (isRequestChangedMessage(message)) {
-			const uri = handlers.onGetRequestUri?.();
-			if (uri) {
-				environmentSelections.set(uri.toString(), message.environment);
-			}
-			handlers.onRequestChanged?.(message);
-			return;
-		}
-		if (isRecord(message) && message.type === 'cancelOAuthToken') {
-			for (const [key, controller] of activeRequests) {
-				if (key < 0) {
-					controller.abort();
+		switch (command.type) {
+			case 'webviewReady':
+				void webview.postMessage({
+					type: 'workspaceTrust',
+					isTrusted: vscode.workspace.isTrusted,
+				});
+				void postEnvironmentTooltipSetting(webview);
+				void postTokenViewSetting(webview);
+				void postAutoGenerateStateSetting(webview);
+				handlers.onReady?.();
+				return;
+			case 'getOAuthRedirect':
+				if (!preparingOAuthRedirect) {
+					preparingOAuthRedirect = true;
+					void getOAuthRedirectUri()
+						.then(
+							(uri) => {
+								oauthRedirectUrl = uri;
+								return webview.postMessage({ type: 'oauthRedirect', url: oauthRedirectUrl });
+							},
+							() => {
+								oauthRedirectUrl = '';
+								return webview.postMessage({ type: 'oauthRedirect', error: 'Unable to prepare the callback URL.' });
+							},
+						)
+						.then(() => {
+							preparingOAuthRedirect = false;
+						});
 				}
-			}
-			return;
-		}
-		if (isCancelRequestMessage(message)) {
-			activeRequests.get(message.requestId)?.abort();
-			return;
-		}
-
-		if (isRecord(message) && message.type === 'openXProfile') {
-			void vscode.env.openExternal(vscode.Uri.parse('https://x.com/nickchecan'));
-			return;
-		}
-
-		if (isOpenRepositoryMessage(message)) {
-			void vscode.env.openExternal(vscode.Uri.parse('https://github.com/nickchecan/restcraft'));
-			return;
-		}
-
-		if (isOpenIssuesMessage(message)) {
-			void vscode.env.openExternal(vscode.Uri.parse('https://github.com/nickchecan/restcraft/issues'));
-			return;
-		}
-
-		if (isRecord(message) && message.type === 'openNetworkLog') {
-			void vscode.commands.executeCommand('restcraft.showNetworkLog');
-			return;
-		}
-
-		if (isRecord(message) && message.type === 'openNetworkHistory') {
-			void vscode.commands.executeCommand('restcraft.showNetworkHistory');
-			return;
-		}
-
-		if (isOpenSettingsMessage(message)) {
-			void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:nickchecan.restcraft');
-			return;
-		}
-
-		if (isResolveEnvironmentVariableMessage(message)) {
-			void handleResolveEnvironmentVariable(webview, message, handlers);
-			return;
-		}
-
-		if (isCheckEnvironmentVariablesMessage(message)) {
-			void handleCheckEnvironmentVariables(webview, message, handlers);
-			return;
-		}
-
-		if (isRecord(message) && message.type === 'getOAuthToken') {
-			if (
-				!Number.isSafeInteger(message.requestId) ||
-				typeof message.requestId !== 'number' ||
-				message.requestId < 0 ||
-				typeof message.url !== 'string' ||
-				typeof message.clientId !== 'string' ||
-				typeof message.clientSecret !== 'string' ||
-				typeof message.scope !== 'string' ||
-				(message.grantType !== undefined &&
-					message.grantType !== 'client_credentials' &&
-					message.grantType !== 'authorization_code') ||
-				(message.authorizationUrl !== undefined && typeof message.authorizationUrl !== 'string') ||
-				(message.state !== undefined && typeof message.state !== 'string') ||
-				(message.usePkce !== undefined && typeof message.usePkce !== 'boolean') ||
-				(message.clientAuthentication !== undefined &&
-					!['none', 'basic', 'body'].includes(message.clientAuthentication as string)) ||
-				(message.storeAccessToken !== undefined && typeof message.storeAccessToken !== 'boolean') ||
-				(message.accessTokenVariable !== undefined && typeof message.accessTokenVariable !== 'string')
-			) {
+				return;
+			case 'copyOAuthToken':
+				void vscode.env.clipboard.writeText(command.token);
+				return;
+			case 'copyOAuthRedirect':
+				if (oauthRedirectUrl) {
+					void vscode.env.clipboard.writeText(oauthRedirectUrl);
+				}
+				return;
+			case 'getConfiguredOAuthToken':
+				void postConfiguredOAuthToken(webview, handlers.onGetRequestUri?.(), command.requestId, command.authorization);
+				return;
+			case 'getEnvironmentFile': {
+				const uri = handlers.onGetRequestUri?.();
+				if (uri) {
+					environmentSelections.set(uri.toString(), command.environment);
+				}
+				void postEnvironmentFile(webview, handlers.onGetRequestUri?.(), command.requestId);
 				return;
 			}
-			void handleOAuthToken(
-				webview,
-				{
-					url: message.url,
-					clientId: message.clientId,
-					clientSecret: message.clientSecret,
-					scope: message.scope,
-					grantType: message.grantType === 'authorization_code' ? 'authorization_code' : 'client_credentials',
-					authorizationUrl: typeof message.authorizationUrl === 'string' ? message.authorizationUrl : '',
-					clientAuthentication:
-						message.clientAuthentication === 'basic' || message.clientAuthentication === 'body'
-							? message.clientAuthentication
-							: 'none',
-					state: typeof message.state === 'string' ? message.state : '',
-					usePkce: message.usePkce !== false,
-				},
-				message.requestId,
-				handlers,
-				activeRequests,
-				message.storeAccessToken === true,
-				typeof message.accessTokenVariable === 'string' ? message.accessTokenVariable : 'ACCESS_TOKEN',
-				(uri) => {
-					oauthRedirectUrl = uri;
-				},
-			);
-			return;
+			case 'chooseEnvironmentFile':
+				void chooseEnvironmentFile(webview, handlers.onGetRequestUri?.(), command.requestId);
+				return;
+			case 'openEnvironmentFile':
+				void openEnvironmentFile(handlers.onGetRequestUri?.());
+				return;
+			case 'requestChanged': {
+				const uri = handlers.onGetRequestUri?.();
+				if (uri) {
+					environmentSelections.set(uri.toString(), command.environment);
+				}
+				handlers.onRequestChanged?.(command);
+				return;
+			}
+			case 'cancelOAuthToken':
+				for (const [key, controller] of activeRequests) {
+					if (key < 0) {
+						controller.abort();
+					}
+				}
+				return;
+			case 'cancelRequest':
+				activeRequests.get(command.requestId)?.abort();
+				return;
+			case 'openXProfile':
+				void vscode.env.openExternal(vscode.Uri.parse('https://x.com/nickchecan'));
+				return;
+			case 'openRepository':
+				void vscode.env.openExternal(vscode.Uri.parse('https://github.com/nickchecan/restcraft'));
+				return;
+			case 'openIssues':
+				void vscode.env.openExternal(vscode.Uri.parse('https://github.com/nickchecan/restcraft/issues'));
+				return;
+			case 'openNetworkLog':
+				void vscode.commands.executeCommand('restcraft.showNetworkLog');
+				return;
+			case 'openNetworkHistory':
+				void vscode.commands.executeCommand('restcraft.showNetworkHistory');
+				return;
+			case 'openSettings':
+				void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:nickchecan.restcraft');
+				return;
+			case 'resolveEnvironmentVariable':
+				void handleResolveEnvironmentVariable(webview, command, handlers);
+				return;
+			case 'checkEnvironmentVariables':
+				void handleCheckEnvironmentVariables(webview, command, handlers);
+				return;
+			case 'getOAuthToken':
+				void handleOAuthToken(
+					webview,
+					{
+						url: command.url,
+						clientId: command.clientId,
+						clientSecret: command.clientSecret,
+						scope: command.scope,
+						grantType: command.grantType === 'authorization_code' ? 'authorization_code' : 'client_credentials',
+						authorizationUrl: command.authorizationUrl ?? '',
+						clientAuthentication:
+							command.clientAuthentication === 'basic' || command.clientAuthentication === 'body'
+								? command.clientAuthentication
+								: 'none',
+						state: command.state ?? '',
+						usePkce: command.usePkce !== false,
+					},
+					command.requestId,
+					handlers,
+					activeRequests,
+					command.storeAccessToken === true,
+					command.accessTokenVariable ?? 'ACCESS_TOKEN',
+					(uri) => {
+						oauthRedirectUrl = uri;
+					},
+				);
+				return;
+			case 'sendRequest':
+				void handleMessage(webview, command, handlers, activeRequests);
+				return;
+			default: {
+				const unreachable: never = command;
+				return unreachable;
+			}
 		}
-		void handleMessage(webview, message, handlers, activeRequests);
-	});
+	}
 	const trustSubscription = vscode.workspace.onDidGrantWorkspaceTrust(() => {
 		void webview.postMessage({
 			type: 'workspaceTrust',
@@ -450,14 +346,10 @@ export async function loadRequestInWebview(
  */
 async function handleMessage(
 	webview: vscode.Webview,
-	message: unknown,
+	message: SendRequestMessage,
 	handlers: RequestWebviewHandlers,
 	activeRequests: Map<number, AbortController>,
 ): Promise<void> {
-	if (!isSendRequestMessage(message)) {
-		return;
-	}
-
 	let controller: AbortController | undefined;
 	try {
 		if (!vscode.workspace.isTrusted) {
@@ -781,184 +673,6 @@ function isFileNotFoundError(error: unknown): boolean {
 	}
 
 	return error.code === 'FileNotFound';
-}
-
-/**
- * Validates a webview request execution message.
- */
-function isSendRequestMessage(message: unknown): message is SendRequestMessage {
-	if (!isRecord(message)) {
-		return false;
-	}
-
-	const candidate = message as Partial<SendRequestMessage>;
-
-	return (
-		candidate.type === 'sendRequest' &&
-		(candidate.automation === undefined || isResponseHeaderMappings(candidate.automation)) &&
-		typeof candidate.requestId === 'number' &&
-		Number.isSafeInteger(candidate.requestId) &&
-		typeof candidate.method === 'string' &&
-		typeof candidate.url === 'string' &&
-		(candidate.body === undefined || typeof candidate.body === 'string') &&
-		(candidate.headers === undefined || isStringRecord(candidate.headers))
-	);
-}
-
-function isCancelRequestMessage(message: unknown): message is CancelRequestMessage {
-	if (!isRecord(message)) {
-		return false;
-	}
-	const candidate = message as Partial<CancelRequestMessage>;
-	return (
-		candidate.type === 'cancelRequest' &&
-		typeof candidate.requestId === 'number' &&
-		Number.isSafeInteger(candidate.requestId)
-	);
-}
-
-/**
- * Validates the webview ready lifecycle message.
- */
-function isWebviewReadyMessage(message: unknown): message is WebviewReadyMessage {
-	if (!isRecord(message)) {
-		return false;
-	}
-
-	const candidate = message as Partial<WebviewReadyMessage>;
-
-	return candidate.type === 'webviewReady';
-}
-
-/**
- * Validates the footer repository link message.
- */
-function isOpenRepositoryMessage(message: unknown): message is OpenRepositoryMessage {
-	if (!isRecord(message)) {
-		return false;
-	}
-
-	const candidate = message as Partial<OpenRepositoryMessage>;
-
-	return candidate.type === 'openRepository';
-}
-
-/**
- * Validates the footer issues link message.
- */
-function isOpenIssuesMessage(message: unknown): message is OpenIssuesMessage {
-	if (!isRecord(message)) {
-		return false;
-	}
-
-	const candidate = message as Partial<OpenIssuesMessage>;
-
-	return candidate.type === 'openIssues';
-}
-
-/**
- * Validates the footer settings button message.
- */
-function isOpenSettingsMessage(message: unknown): message is OpenSettingsMessage {
-	if (!isRecord(message)) {
-		return false;
-	}
-
-	const candidate = message as Partial<OpenSettingsMessage>;
-
-	return candidate.type === 'openSettings';
-}
-
-/** Validates a targeted environment-variable hover lookup from the webview. */
-function isResolveEnvironmentVariableMessage(message: unknown): message is ResolveEnvironmentVariableMessage {
-	if (!isRecord(message)) {
-		return false;
-	}
-
-	const candidate = message as Partial<ResolveEnvironmentVariableMessage>;
-	return (
-		candidate.type === 'resolveEnvironmentVariable' &&
-		typeof candidate.requestId === 'number' &&
-		Number.isSafeInteger(candidate.requestId) &&
-		typeof candidate.name === 'string' &&
-		/^[A-Za-z_][A-Za-z0-9_]*$/.test(candidate.name)
-	);
-}
-
-/** Validates environment-variable presence checks sent from the webview. */
-function isCheckEnvironmentVariablesMessage(message: unknown): message is CheckEnvironmentVariablesMessage {
-	if (!isRecord(message)) {
-		return false;
-	}
-
-	const candidate = message as Partial<CheckEnvironmentVariablesMessage>;
-	return (
-		candidate.type === 'checkEnvironmentVariables' &&
-		typeof candidate.requestId === 'number' &&
-		Number.isSafeInteger(candidate.requestId) &&
-		Array.isArray(candidate.names) &&
-		candidate.names.length <= 100 &&
-		candidate.names.every((name) => typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
-	);
-}
-
-/**
- * Validates a request edit message before syncing it to the text document.
- */
-function isRequestChangedMessage(message: unknown): message is RequestChangedMessage {
-	if (!isRecord(message)) {
-		return false;
-	}
-
-	const candidate = message as Partial<RequestChangedMessage>;
-
-	return (
-		(candidate.environment === undefined || isEnvironmentFileSettings(candidate.environment)) &&
-		(candidate.authorization === undefined || isOAuthAuthorization(candidate.authorization)) &&
-		candidate.type === 'requestChanged' &&
-		(candidate.automation === undefined || isResponseHeaderMappings(candidate.automation)) &&
-		(candidate.authorizeBeforeSend === undefined || typeof candidate.authorizeBeforeSend === 'boolean') &&
-		(candidate.description === undefined || typeof candidate.description === 'string') &&
-		typeof candidate.name === 'string' &&
-		typeof candidate.method === 'string' &&
-		typeof candidate.url === 'string' &&
-		typeof candidate.body === 'string' &&
-		Array.isArray(candidate.params) &&
-		candidate.params.every(isRequestParamState) &&
-		Array.isArray(candidate.headerState) &&
-		candidate.headerState.every(isRequestHeaderState) &&
-		isStringRecord(candidate.headers)
-	);
-}
-
-/**
- * Validates one query parameter row from the webview.
- */
-function isRequestParamState(value: unknown): value is RequestParamDefinition {
-	if (!isRecord(value)) {
-		return false;
-	}
-
-	const candidate = value as Partial<RequestParamDefinition>;
-
-	return (
-		typeof candidate.name === 'string' && typeof candidate.value === 'string' && typeof candidate.enabled === 'boolean'
-	);
-}
-
-/**
- * Validates one header row from the webview.
- */
-function isRequestHeaderState(value: unknown): value is RequestHeaderDefinition {
-	if (!isRecord(value)) {
-		return false;
-	}
-
-	const candidate = value as Partial<RequestHeaderDefinition>;
-
-	return (
-		typeof candidate.name === 'string' && typeof candidate.value === 'string' && typeof candidate.enabled === 'boolean'
-	);
 }
 
 /** Retrieves a token only in response to the explicit webview button action. */
