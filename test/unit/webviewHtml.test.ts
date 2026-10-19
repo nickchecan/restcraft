@@ -1,4 +1,4 @@
-import { webcrypto } from 'node:crypto';
+import { createHash, webcrypto } from 'node:crypto';
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { runInNewContext } from 'vm';
@@ -7,6 +7,16 @@ import { buttonIcons } from '../../src/webview/buttonIcons';
 import { getWebviewHtml } from '../../src/webview/getWebviewHtml';
 
 suite('Webview HTML', () => {
+	test('keeps the workbench document stable aside from the per-render nonce', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const normalized = html
+			.replace(/nonce-[A-Za-z0-9]{32}/g, 'nonce-FIXED')
+			.replace(/nonce="[A-Za-z0-9]{32}"/g, 'nonce="FIXED"');
+		assert.strictEqual(
+			createHash('sha256').update(normalized).digest('hex'),
+			'd8156ad1088a4071263612e5f047a27535ac64cb7763e98788a0ce2a535c9566',
+		);
+	});
 	test('authorization divider limits dragging, supports keyboard resizing, and resets', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
 		const start = html.indexOf('let authorizationResizePointer;');
