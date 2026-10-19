@@ -10,10 +10,10 @@ import { getWebviewHtml } from '../../src/webview/getWebviewHtml';
 suite('Webview HTML', () => {
 	test('keeps the workbench document stable aside from the per-render nonce and embedded parser', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
-		const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html)?.[1];
+		const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/i.exec(html)?.[1];
 		const nonce = /script-src 'nonce-([A-Za-z0-9]{32})'/.exec(csp ?? '')?.[1];
 		assert.ok(nonce, 'CSP meta tag must declare a script nonce');
-		const scriptTags = [...html.matchAll(/<script\b[^>]*>/g)].map((match) => match[0]);
+		const scriptTags = [...html.matchAll(/<script\b[^>]*>/gi)].map((match) => match[0]);
 		assert.ok(scriptTags.length > 0, 'Workbench document must include a script');
 		for (const tag of scriptTags) {
 			assert.strictEqual(/\bnonce="([^"]*)"/.exec(tag)?.[1], nonce, 'Every script tag must use the CSP nonce');
@@ -114,7 +114,7 @@ suite('Webview HTML', () => {
 		assert.ok(html.includes('<option value="oauth2">OAuth 2.0</option>'));
 		assert.ok(html.includes('<option value="client_credentials">Client Credentials</option>'));
 		assert.ok(html.includes('<option value="authorization_code">Authorization Code</option>'));
-		const script = html.match(/<script[^>]*>([\s\S]*?)<\/script>/)?.[1];
+		const script = html.match(/<script\b[^>]*>([\s\S]*?)<\/script\s*[^>]*>/i)?.[1];
 		assert.ok(script);
 		assert.doesNotThrow(() => new Function(script));
 	});
