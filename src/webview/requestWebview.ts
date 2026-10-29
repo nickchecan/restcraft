@@ -8,6 +8,7 @@ import { buildOAuthTokenRequest, readOAuthAccessToken } from '../request/oauth';
 import { executeRequest, StreamListener } from '../request/requestRunner';
 import { AuthorizationCodeFields } from '../request/authorizationCode';
 import { getAuthorizationCodeToken, getOAuthRedirectUri } from './oauthCallback';
+import type { RedirectUriInfo } from './oauthRedirect';
 import {
 	ApiResponse,
 	EnvironmentFileSettings,
@@ -81,9 +82,9 @@ export function initializeRequestWebview(
 					preparingOAuthRedirect = true;
 					void getOAuthRedirectUri()
 						.then(
-							(uri) => {
-								oauthRedirectUrl = uri;
-								return webview.postMessage({ type: 'oauthRedirect', url: oauthRedirectUrl });
+							(info) => {
+								oauthRedirectUrl = info.uri;
+								return webview.postMessage({ type: 'oauthRedirect', url: info.uri, stable: info.stable });
 							},
 							() => {
 								oauthRedirectUrl = '';
@@ -184,8 +185,8 @@ export function initializeRequestWebview(
 					activeRequests,
 					command.storeAccessToken === true,
 					command.accessTokenVariable ?? 'ACCESS_TOKEN',
-					(uri) => {
-						oauthRedirectUrl = uri;
+					(info) => {
+						oauthRedirectUrl = info.uri;
 					},
 				);
 				return;
@@ -684,7 +685,7 @@ async function handleOAuthToken(
 	activeRequests: Map<number, AbortController>,
 	storeAccessToken = false,
 	accessTokenVariable = 'ACCESS_TOKEN',
-	onRedirect: (uri: string) => void = () => {},
+	onRedirect: (info: RedirectUriInfo) => void = () => {},
 ): Promise<void> {
 	// Negative IDs keep token retrieval separate from normal request cancellation IDs.
 	const requestUri = handlers.onGetRequestUri?.();
@@ -750,9 +751,9 @@ async function handleOAuthToken(
 		};
 		let token: string;
 		if (fields.grantType === 'authorization_code') {
-			token = await getAuthorizationCodeToken(resolvedFields, controller.signal, getRequestTimeout(), async (uri) => {
-				onRedirect(uri);
-				await webview.postMessage({ type: 'oauthRedirect', url: uri });
+			token = await getAuthorizationCodeToken(resolvedFields, controller.signal, getRequestTimeout(), async (info) => {
+				onRedirect(info);
+				await webview.postMessage({ type: 'oauthRedirect', url: info.uri, stable: info.stable });
 			});
 		} else {
 			const request = buildOAuthTokenRequest({

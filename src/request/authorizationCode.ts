@@ -1,6 +1,16 @@
 import { createHash, randomBytes } from 'node:crypto';
+import type { CallbackRelay } from '../webview/oauthRelay';
 import { ApiRequest, ApiResponse } from './types';
 import { OAuthTokenFields, readOAuthAccessToken } from './oauth';
+
+/** Replay window matches the relay TTL so a second callback is not published as unowned. */
+const COMPLETED_CALLBACK_TTL_MS = 60_000;
+
+/** Linux without a keyring cannot hand a callback to another window, so the hint points back at the owner. */
+const AUTHORIZATION_TIMEOUT_ERROR =
+	'Authorization timed out. Try getting a new access token. If several VS Code windows are open, return to the window that started sign-in, or focus it before approving in the browser.';
+
+export type CallbackResult = 'completed' | 'not-owned' | 'rejected' | 'already-completed';
 
 export interface AuthorizationCodeFields extends OAuthTokenFields {
 	authorizationUrl: string;
@@ -132,8 +142,14 @@ interface PendingCallback {
 /** Routes callbacks only to live attempts with matching state; codes are single-use. */
 export class AuthorizationCodeCallbacks {
 	private readonly pending = new Map<string, PendingCallback>();
+	private readonly finished = new Map<string, number>();
 
-	waitForCode(state: string, signal: AbortSignal, timeoutMs = 300000): Promise<string> {
+	waitForCode(
+		state: string,
+		signal: AbortSignal,
+		timeoutMs = 300000,
+		relay?: Pick<CallbackRelay, 'subscribe' | 'clear'>,
+	): Promise<string> {
 		if (signal.aborted) {
 			throw new Error('Token request cancelled.');
 		}
@@ -141,18 +157,21 @@ export class AuthorizationCodeCallbacks {
 			throw new Error('Another authorization attempt is using this State. Cancel it or generate a new State.');
 		}
 		return new Promise((resolve, reject) => {
+			const relayAbort = new AbortController();
 			const abort = () => this.cancelState(state);
-			const timer = setTimeout(
-				() => complete(undefined, new Error('Authorization timed out. Try getting a new access token.')),
-				timeoutMs,
-			);
+			const timer = setTimeout(() => complete(undefined, new Error(AUTHORIZATION_TIMEOUT_ERROR)), timeoutMs);
 			const complete = (code?: string, error?: Error) => {
 				if (this.pending.get(state)?.complete !== complete) {
 					return;
 				}
 				this.pending.delete(state);
+				this.rememberFinished(state);
 				clearTimeout(timer);
 				signal.removeEventListener('abort', abort);
+				relayAbort.abort();
+				if (relay) {
+					void relay.clear(state);
+				}
 				if (error) {
 					reject(error);
 				} else {
@@ -161,6 +180,21 @@ export class AuthorizationCodeCallbacks {
 			};
 			this.pending.set(state, { complete });
 			signal.addEventListener('abort', abort, { once: true });
+			if (!relay) {
+				return;
+			}
+			try {
+				relay.subscribe(state, relayAbort.signal).then(
+					(query) => {
+						this.handleCallback(query);
+					},
+					() => {
+						// Abort or a relay failure leaves the local callback in charge.
+					},
+				);
+			} catch {
+				// A synchronous relay failure must not block the same-window callback.
+			}
 		});
 	}
 
@@ -169,14 +203,15 @@ export class AuthorizationCodeCallbacks {
 		this.pending.get(state)?.complete(undefined, new Error('Token request cancelled.'));
 	}
 
-	handleCallback(query: string): boolean {
+	handleCallback(query: string): CallbackResult {
 		const params = new URLSearchParams(query);
 		if (params.getAll('state').length > 1) {
-			return false;
+			return 'rejected';
 		}
-		const pending = this.pending.get(params.get('state') ?? '');
+		const state = params.get('state') ?? '';
+		const pending = this.pending.get(state);
 		if (!pending) {
-			return false;
+			return this.isRecentlyFinished(state) ? 'already-completed' : 'not-owned';
 		}
 		if (params.has('error')) {
 			pending.complete(undefined, new Error('Authorization was denied or failed. Try again.'));
@@ -185,13 +220,35 @@ export class AuthorizationCodeCallbacks {
 		} else {
 			pending.complete(params.get('code')!);
 		}
-		return true;
+		return 'completed';
 	}
 
 	dispose(): void {
 		for (const pending of this.pending.values()) {
 			pending.complete(undefined, new Error('Token request cancelled.'));
 		}
+	}
+
+	private rememberFinished(state: string): void {
+		const now = Date.now();
+		this.finished.set(state, now);
+		for (const [key, finishedAt] of this.finished) {
+			if (finishedAt + COMPLETED_CALLBACK_TTL_MS < now) {
+				this.finished.delete(key);
+			}
+		}
+	}
+
+	private isRecentlyFinished(state: string): boolean {
+		const finishedAt = this.finished.get(state);
+		if (finishedAt === undefined) {
+			return false;
+		}
+		if (finishedAt + COMPLETED_CALLBACK_TTL_MS < Date.now()) {
+			this.finished.delete(state);
+			return false;
+		}
+		return true;
 	}
 }
 
@@ -200,6 +257,7 @@ export interface AuthorizationCodeDependencies {
 	getRedirectUri: () => Promise<string>;
 	openBrowser: (url: string) => PromiseLike<boolean>;
 	exchange: (request: ApiRequest, signal: AbortSignal) => Promise<ApiResponse>;
+	relay?: Pick<CallbackRelay, 'subscribe' | 'clear'>;
 }
 
 /** External effects are injected so the entire browser/callback/exchange flow is testable. */
@@ -229,7 +287,12 @@ export async function retrieveAuthorizationCodeToken(
 			state: (fields.state ? fields.state + '.' : '') + randomBytes(32).toString('base64url'),
 		};
 		const url = buildAuthorizationUrl(attemptFields, redirectUri, pkce?.challenge);
-		const codePromise = dependencies.callbacks.waitForCode(attemptFields.state, controller.signal);
+		const codePromise = dependencies.callbacks.waitForCode(
+			attemptFields.state,
+			controller.signal,
+			undefined,
+			dependencies.relay,
+		);
 		void codePromise.catch(() => {});
 		if (!(await dependencies.openBrowser(url))) {
 			throw new Error('Unable to open the browser for authorization.');

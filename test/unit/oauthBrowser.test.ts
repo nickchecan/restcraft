@@ -6,7 +6,7 @@ import { openOAuthBrowser } from '../../src/webview/oauthBrowser';
 suite('OAuth browser URL transport', () => {
 	test('preserves the encoded URL through the VS Code external opener', async () => {
 		// Arrange
-		const redirect = 'vscode://nickchecan.restcraft/oauth/callback?windowId=4&route=a%2Bb';
+		const redirect = 'https://vscode.dev/redirect?vscode-reqid=4&route=a%2Bb';
 		// Act
 		const url = buildAuthorizationUrl(
 			{

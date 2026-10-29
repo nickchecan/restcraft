@@ -22,9 +22,11 @@ suite('Webview HTML', () => {
 		const parserSource = createEventStreamParser.toString();
 		assert.strictEqual(html.split(parserSource).length, 2, 'Workbench script must embed createEventStreamParser once');
 		const normalized = html.replace(parserSource, 'PARSER').replaceAll(nonce, 'FIXED');
+		assert.ok(normalized.includes('This URL changes per request on the web.'));
+		assert.ok(normalized.includes('id="oauth-redirect-note"'));
 		assert.strictEqual(
 			createHash('sha256').update(normalized).digest('hex'),
-			'72f87873fa190a63484193c592a3e08fc4277c954f56561556bf6f6884110836',
+			'88686aecf226d742e00f90e972fe3eef044b9e0f230aaddc44b996ac770c06a7',
 		);
 	});
 	test('authorization divider limits dragging, supports keyboard resizing, and resets', () => {

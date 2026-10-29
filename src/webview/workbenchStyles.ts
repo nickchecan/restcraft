@@ -621,6 +621,13 @@ export const workbenchStyles = `
 				font-size: 12px;
 			}
 
+			#oauth-redirect-note {
+				grid-column: 1 / -1;
+				margin: 0;
+				color: var(--vscode-descriptionForeground);
+				font-size: 12px;
+			}
+
 			.oauth-token-content {
 				grid-row: 2;
 				min-width: 0;

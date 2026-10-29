@@ -92,6 +92,7 @@ export function workbenchMarkup(escapedExtensionVersion: string): string {
                         <input class="authorization-input" id="oauth-redirect-url" type="text" readonly placeholder="Preparing callback URL…">
                         <button id="oauth-copy-redirect" type="button" disabled>${buttonIcons.copy}<span>Copy</span></button>
                     </div>
+                    <p class="hidden" id="oauth-redirect-note"></p>
                     <label class="oauth-code-field hidden" for="oauth-authorization-url">Authorization URL</label>
                     <input class="authorization-input oauth-code-field hidden" id="oauth-authorization-url" type="text" autocomplete="off">
 					<label class="oauth-client-field hidden" for="oauth-url">Access Token URL</label>
