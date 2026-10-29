@@ -710,6 +710,16 @@ export function workbenchScript(): string {
                         document.getElementById('oauth-redirect-url').value = message.url || '';
                         document.getElementById('oauth-redirect-url').placeholder = message.error || 'Callback URL unavailable';
                         document.getElementById('oauth-copy-redirect').disabled = !message.url;
+                        const redirectNote = document.getElementById('oauth-redirect-note');
+                        if (redirectNote) {
+                            if (message.stable === false && message.url) {
+                                redirectNote.textContent = 'This URL changes per request on the web.';
+                                redirectNote.classList.remove('hidden');
+                            } else {
+                                redirectNote.textContent = '';
+                                redirectNote.classList.add('hidden');
+                            }
+                        }
                         return;
                     }
                 if (message.type === 'autoGenerateStateSetting') {
@@ -1761,6 +1771,13 @@ export function workbenchScript(): string {
                     oauthGetToken.disabled = oauthPending;
                     if (showCode && !oauthPending) {
                         vscode.postMessage({ type: 'getOAuthRedirect' });
+                    }
+                    if (!showCode) {
+                        const redirectNote = document.getElementById('oauth-redirect-note');
+                        if (redirectNote) {
+                            redirectNote.textContent = '';
+                            redirectNote.classList.add('hidden');
+                        }
                     }
 
 

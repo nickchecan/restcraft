@@ -138,11 +138,47 @@ when you click **Generate**; an empty field stays empty. Enable the global setti
 `restcraft.autoGenerateAuthorizationCodeState` to generate State when selecting
 the Authorization Code grant type if the field is empty. Switching grant types
 preserves existing State values, including saved values and environment references. This setting defaults to off and
-does not replace saved State values when reopening requests or opening the tab. The generated
-**Redirect URL** is read-only and has a **Copy** button for registering it with
-your provider. The provider must support the generated callback URL, normally
-`vscode://nickchecan.restcraft/oauth/callback` on desktop VS Code (Insiders and
-remote environments may use a different address). Use the complete generated URL.
+does not replace saved State values when reopening requests or opening the tab.
+
+The generated **Redirect URL** is read-only and has a **Copy** button. Register
+that exact value with your OAuth provider. The Authorization tab, the authorize
+request, and the token request all use the same string.
+
+On the desktop app, including Remote SSH, WSL, Dev Containers, and Codespaces
+opened in the desktop app, the redirect URI does not change between windows or
+reloads. Register one URI per product you use. Many providers allow several
+redirect URIs on the same client. If you previously registered a URL ending in
+`?windowId=...`, replace it. Those older values no longer match.
+
+| Product           | Redirect URI                                              |
+| ----------------- | --------------------------------------------------------- |
+| VS Code Stable    | `vscode://nickchecan.restcraft/oauth/callback`            |
+| VS Code Insiders  | `vscode-insiders://nickchecan.restcraft/oauth/callback`   |
+| VSCodium          | `vscodium://nickchecan.restcraft/oauth/callback`          |
+| VSCodium Insiders | `vscodium-insiders://nickchecan.restcraft/oauth/callback` |
+
+Other forks use their own scheme, from `vscode.env.uriScheme`. Copy the value
+shown in the Authorization tab for the product you are running.
+
+Several windows can stay open. The browser callback opens in the window that
+was focused last, and the window that started sign-in finishes the token
+exchange. The first time a window opens the callback, VS Code may ask **Allow
+extension to open this URI?** Choose Open, and tick **Do not ask me again for
+this extension**. That choice is stored per profile. To allow it in every
+profile, add
+`nickchecan.restcraft` to the user setting
+`extensions.confirmedUriHandlerExtensionIds`.
+
+On the web (vscode.dev, or a Codespace in the browser), the redirect URL changes
+per request and cannot be pre-registered as one fixed value. The Authorization
+tab says so. Copy the URL shown for the attempt you are about to start.
+
+On Linux without a keyring, VS Code keeps secrets in memory for that window
+only. Sign-in in the same window still works. A callback that arrives in a
+different window cannot be handed back, and the attempt times out after five
+minutes. The timeout tells you to return to the window that started sign-in, or
+to focus it before approving in the browser. A system keyring, or launching
+VS Code with `--password-store=basic`, restores the cross-window handoff.
 
 Click **Get new access token**, finish login/consent in your browser, and allow
 it to open VS Code when prompted. RestCraft displays the returned token and

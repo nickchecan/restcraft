@@ -36,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('restcraft.importBruno', importFromBruno),
-		registerOAuthCallback(context.extension.id),
+		registerOAuthCallback(context),
 		createRequestFile,
 		RequestEditorProvider.register(context, extensionVersion),
 	);
