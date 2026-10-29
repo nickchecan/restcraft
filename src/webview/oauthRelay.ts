@@ -172,7 +172,9 @@ export function createSecretRelay(
 					continue;
 				}
 				const entry = parseRelayEntry(raw);
-				if (!entry || isExpired(entry, now)) {
+				// A pending state is still wanted. createdAt belongs to the publisher's
+				// machine, which may not match this host across a remote window.
+				if (!entry || (isExpired(entry, now) && !pollers.has(entry.state))) {
 					try {
 						await deleteKey(key);
 					} catch {
@@ -252,9 +254,10 @@ export function createSecretRelay(
 							if (settled || raw === undefined) {
 								return;
 							}
-							const now = clock();
 							const entry = parseRelayEntry(raw);
-							if (!entry || entry.state !== state || isExpired(entry, now)) {
+							// The owner is waiting on this state, so do not apply the TTL here.
+							// createdAt is the publisher's clock and can be minutes off on Remote SSH, WSL, or a Dev Container.
+							if (!entry || entry.state !== state) {
 								try {
 									await deleteKey(key);
 								} catch {

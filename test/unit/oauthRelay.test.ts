@@ -95,6 +95,99 @@ suite('OAuth callback relay', () => {
 		}
 	});
 
+	test('the owner accepts an entry when the publisher clock is skewed either way', async () => {
+		const shared = createSharedStore();
+		const skew = 5 * 60_000;
+		const publisherInterval = createFakeInterval();
+		const ownerInterval = createFakeInterval();
+		let publisherNow = 1_700_000_000_000;
+		let ownerNow = publisherNow;
+		const publisher = createSecretRelay(
+			shared.store,
+			() => publisherNow,
+			publisherInterval.setIntervalFn,
+			publisherInterval.clearIntervalFn,
+		);
+		const owner = createSecretRelay(
+			shared.store,
+			() => ownerNow,
+			ownerInterval.setIntervalFn,
+			ownerInterval.clearIntervalFn,
+		);
+		try {
+			for (const ownerOffset of [skew, -skew]) {
+				publisherNow = 1_700_000_000_000;
+				ownerNow = publisherNow + ownerOffset;
+				const state = ownerOffset > 0 ? 'owner-ahead' : 'owner-behind';
+				const controller = new AbortController();
+				const pending = owner.subscribe(state, controller.signal);
+				await publisher.publish(`code=from-skew&state=${state}&access_token=tok`);
+				assert.strictEqual(await pending, `code=from-skew&state=${state}`);
+				assert.strictEqual(shared.values.has(relayKey(state)), false);
+				const stored = shared.published.find((entry) => entry.includes(state));
+				assert.ok(stored);
+				assert.ok(!stored.includes('access_token'));
+				assert.ok(!stored.includes('tok'));
+				controller.abort();
+			}
+			assert.strictEqual(ownerInterval.active(), 0);
+		} finally {
+			publisher.dispose();
+			owner.dispose();
+			shared.dispose();
+		}
+	});
+
+	test('sweep removes a stale unowned entry and keeps one this window is waiting on', async () => {
+		const shared = createSharedStore();
+		shared.setFireEvents(false);
+		const skew = 5 * 60_000;
+		let publisherNow = 1_700_000_000_000;
+		let ownerNow = publisherNow + skew;
+		const publisherInterval = createFakeInterval();
+		const ownerInterval = createFakeInterval();
+		const publisher = createSecretRelay(
+			shared.store,
+			() => publisherNow,
+			publisherInterval.setIntervalFn,
+			publisherInterval.clearIntervalFn,
+		);
+		const owner = createSecretRelay(
+			shared.store,
+			() => ownerNow,
+			ownerInterval.setIntervalFn,
+			ownerInterval.clearIntervalFn,
+		);
+		const controller = new AbortController();
+		try {
+			const pending = owner.subscribe('pending-state', controller.signal);
+			await publisher.publish('code=kept&state=pending-state&id_token=nope');
+			await shared.store.store(
+				relayKey('nobody'),
+				JSON.stringify({
+					v: 1,
+					state: 'nobody',
+					query: 'state=nobody&code=old',
+					createdAt: ownerNow - RELAY_TTL_MS - 1,
+				}),
+			);
+			await owner.sweep();
+			assert.strictEqual(shared.values.has(relayKey('nobody')), false);
+			assert.strictEqual(shared.values.has(relayKey('pending-state')), true);
+			ownerInterval.fire();
+			assert.strictEqual(await pending, 'code=kept&state=pending-state');
+			assert.strictEqual(shared.values.has(relayKey('pending-state')), false);
+			const stored = shared.published.find((entry) => entry.includes('pending-state'));
+			assert.ok(stored);
+			assert.ok(!stored.includes('id_token'));
+		} finally {
+			controller.abort();
+			publisher.dispose();
+			owner.dispose();
+			shared.dispose();
+		}
+	});
+
 	test('an unknown state is removed by sweep after the TTL and nothing throws', async () => {
 		const harness = createRelayHarness();
 		try {
@@ -236,6 +329,44 @@ function createFakeInterval(): {
 			}
 		},
 		active: () => callbacks.size,
+	};
+}
+
+function createSharedStore() {
+	const values = new Map<string, string>();
+	const published: string[] = [];
+	const emitter = new vscode.EventEmitter<vscode.SecretStorageChangeEvent>();
+	let fireEvents = true;
+	const store: RelayStore = {
+		get: (key) => Promise.resolve(values.get(key)),
+		store: (key, value) => {
+			values.set(key, value);
+			published.push(value);
+			if (fireEvents) {
+				emitter.fire({ key });
+			}
+			return Promise.resolve();
+		},
+		delete: (key) => {
+			values.delete(key);
+			if (fireEvents) {
+				emitter.fire({ key });
+			}
+			return Promise.resolve();
+		},
+		keys: () => Promise.resolve([...values.keys()]),
+		onDidChange: emitter.event,
+	};
+	return {
+		store,
+		values,
+		published,
+		setFireEvents(value: boolean) {
+			fireEvents = value;
+		},
+		dispose() {
+			emitter.dispose();
+		},
 	};
 }
 
