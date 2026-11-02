@@ -6,9 +6,8 @@ const variablePattern = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
  * Parses the simple `.env` format used beside `.api.json` request files.
  *
  * Supported lines are `NAME=value`, with blank lines and `#` comments ignored.
- * Values may be wrapped in matching single or double quotes; escape sequences
- * and shell expansion are intentionally not interpreted. Values that cannot
- * fit in one quoted line use a `$restcraft:` prefix plus a JSON string.
+ * Single-quoted and unquoted values are literal. Double quotes decode `\n`,
+ * `\r`, `\t`, `\"`, and `\\` only; any other backslash sequence stays as written.
  */
 export function parseEnvFile(content: string): Record<string, string> {
 	const values: Record<string, string> = {};
@@ -148,59 +147,104 @@ function isFormUrlEncoded(headers: Record<string, string>): boolean {
 	return false;
 }
 
-const encodedEnvPrefix = '$restcraft:';
+/** Backslash followed by a sequence this reader turns into a character. */
+const recognizedEscape = /\\(?:\\|n|r|t|")/;
 
-/**
- * Removes matching surrounding quotes from `.env` values.
- */
-function unquoteEnvValue(value: string): string {
+function decodeEnvValue(value: string): string {
 	if (value.length < 2) {
 		return value;
 	}
 
 	const quote = value[0];
 	const last = value[value.length - 1];
-
-	if ((quote === '"' || quote === "'") && last === quote) {
-		return value.slice(1, -1);
+	if (quote !== last || (quote !== '"' && quote !== "'")) {
+		return value;
 	}
 
-	return value;
-}
-
-function decodeEnvValue(value: string): string {
-	if (value.startsWith(encodedEnvPrefix)) {
-		try {
-			const parsed: unknown = JSON.parse(value.slice(encodedEnvPrefix.length));
-			if (typeof parsed === 'string') {
-				return parsed;
-			}
-		} catch {
-			/* Keep the literal text when the suffix is not a JSON string. */
-		}
+	const inner = value.slice(1, -1);
+	// Single quotes stay literal, matching files written before escape decoding.
+	if (quote === "'") {
+		return inner;
 	}
 
-	return unquoteEnvValue(value);
-}
-
-/** Quoted text the existing parser can round-trip without interpreting escapes. */
-function isLiteralEnvValue(value: string): boolean {
-	return /^[\x20-\x7e]*$/.test(value) && !(value.includes('"') && value.includes("'"));
+	return decodeDoubleQuoted(inner);
 }
 
 /**
- * Encodes one assignment.
+ * Decodes only the escapes we write.
  *
- * Multiline and other non-literal values become a single JSON string so they
- * cannot split into another `.env` line.
+ * `\T` and `\x` stay as two characters so an unknown sequence is not rewritten.
  */
+function decodeDoubleQuoted(value: string): string {
+	let decoded = '';
+	for (let index = 0; index < value.length; index++) {
+		const current = value[index];
+		const next = value[index + 1];
+		if (current !== '\\' || next === undefined) {
+			decoded += current;
+			continue;
+		}
+		if (next === 'n') {
+			decoded += '\n';
+		} else if (next === 'r') {
+			decoded += '\r';
+		} else if (next === 't') {
+			decoded += '\t';
+		} else if (next === '"') {
+			decoded += '"';
+		} else if (next === '\\') {
+			decoded += '\\';
+		} else {
+			decoded += `\\${next}`;
+		}
+		index++;
+	}
+	return decoded;
+}
+
+/**
+ * Printable values keep the previous quoting so rewritten files do not churn.
+ *
+ * A double-quoted value is escaped when it contains a sequence the reader
+ * decodes; single quotes can still hold a raw backslash.
+ */
+function isLegacyQuotedValue(value: string): boolean {
+	if (!/^[\x20-\x7e]*$/.test(value) || (value.includes('"') && value.includes("'"))) {
+		return false;
+	}
+	if (value.includes('"')) {
+		return true;
+	}
+	return !recognizedEscape.test(value);
+}
+
+function encodeDotenvDoubleQuoted(value: string): string {
+	let encoded = '';
+	for (const character of value) {
+		if (character === '\\') {
+			encoded += '\\\\';
+		} else if (character === '"') {
+			encoded += '\\"';
+		} else if (character === '\n') {
+			encoded += '\\n';
+		} else if (character === '\r') {
+			encoded += '\\r';
+		} else if (character === '\t') {
+			encoded += '\\t';
+		} else {
+			encoded += character;
+		}
+	}
+	return `"${encoded}"`;
+}
+
 function encodeEnvAssignment(name: string, value: string): string {
-	if (isLiteralEnvValue(value)) {
+	if (isLegacyQuotedValue(value)) {
 		const quote = value.includes('"') ? "'" : '"';
 		return `${name}=${quote}${value}${quote}`;
 	}
 
-	return `${name}=${encodedEnvPrefix}${JSON.stringify(value)}`;
+	return `${name}=${encodeDotenvDoubleQuoted(value)}`;
 }
 
 /**

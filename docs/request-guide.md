@@ -305,4 +305,4 @@ The **Automations** tab saves an optional `automation` array. Each row has `enab
 ]
 ```
 
-An empty header value clears the variable. A raw body is written even when it is empty. Printable values are quoted on one `.env` line. Newlines, other non-ASCII or control characters, and values containing both `"` and `'` are written as `$restcraft:` followed by a JSON string so the line stays valid and parses back to the same text.
+An empty header value clears the variable. A raw body is written even when it is empty. Printable values are quoted as before (`NAME="abc"`, or single quotes when the value contains `"`). Newlines, carriage returns, tabs, backslashes, and values containing both `"` and `'` are one double-quoted line using `\n`, `\r`, `\t`, `\\`, and `\"`, for example `NAME="line1\nline2"`. Other characters, including non-ASCII text, stay UTF-8 inside the quotes. Reading a double-quoted value decodes those five escapes. Any other backslash sequence, such as `\T` or `\x`, stays as written, as do single-quoted and unquoted values. An existing value such as `PATH_X="C:\temp"` is therefore read with a tab, and `PATH_X="C:\new"` is read with a newline.
