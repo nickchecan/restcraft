@@ -115,6 +115,7 @@ suite('Environment variable name case', () => {
 			url: { value: 'https://{{API_HOST}}/v1/{{baseUrl}}?old=1' },
 			readParamRows: () => [['user', '{{UserId}}']],
 			URL,
+			URLSearchParams,
 		};
 
 		// Act
@@ -164,6 +165,7 @@ suite('Environment variable name case', () => {
 			url: { value: url },
 			readParamRows: () => [['a', '1']],
 			URL,
+			URLSearchParams,
 		};
 
 		// Act
@@ -213,6 +215,67 @@ suite('Environment variable name case', () => {
 		// Assert
 		assert.strictEqual(serialized.url, 'https://rc0var.example.com/rc0var/{{path}}?q=rc0var&v={{a}}');
 		assert.strictEqual(resolved.url, 'https://rc0var.example.com/rc0var/items?q=rc0var&v=alpha');
+	});
+
+	test('keeps a variable origin when the path contains dot segments', () => {
+		// Arrange
+		const url = '{{baseUrl}}/../v2?a=1#section';
+
+		// Act
+		const same = serializeRequestUrl(url, [['a', '1']], false);
+		const edited = serializeRequestUrl(url, [['b', '2']], false);
+		const popped = serializeRequestUrl('{{baseUrl}}/..', [['a', '1']], false);
+
+		// Assert
+		assert.deepStrictEqual(same, { url: '{{baseUrl}}/../v2?a=1#section' });
+		assert.deepStrictEqual(edited, { url: '{{baseUrl}}/../v2?b=2#section' });
+		assert.deepStrictEqual(popped, { url: '{{baseUrl}}/..?a=1' });
+	});
+
+	test('accepts a port written after a variable origin in the file and the editor', () => {
+		// Arrange
+		const url = '{{baseUrl}}:8080/x';
+
+		// Act
+		const parsed = parseRequestFile(JSON.stringify({ name: 'Port', method: 'GET', url }));
+		const fromFile = serializeRequestUrl(url, undefined, true);
+		const fromEditor = serializeRequestUrl(url, [], false);
+		const edited = serializeRequestUrl(`${url}?a=1`, [['a', '2']], false);
+
+		// Assert
+		assert.strictEqual(parsed.url, url);
+		assert.deepStrictEqual(fromFile, { url });
+		assert.deepStrictEqual(fromEditor, { url });
+		assert.deepStrictEqual(edited, { url: '{{baseUrl}}:8080/x?a=2' });
+	});
+
+	test('trims the URL before reading query rows or dropping disabled ones', () => {
+		// Arrange
+		const url = '  {{baseUrl}}/x?a=1&b=2  ';
+
+		// Act
+		const rows = readQueryParamsFromUrl(url);
+		const sent = serializeRequestUrl(url, [['a', '1']], false);
+
+		// Assert
+		assert.deepStrictEqual(rows, [
+			['a', '1'],
+			['b', '2'],
+		]);
+		assert.deepStrictEqual(sent, { url: '{{baseUrl}}/x?a=1' });
+	});
+
+	test('does not treat a percent-decoded host as a placeholder', () => {
+		// Arrange
+		const url = 'https://rc0v%61r.example.com/{{a}}';
+
+		// Act
+		const serialized = serializeRequestUrl(url, undefined, true);
+		const resolved = resolveRequestVariables({ method: 'GET', url: serialized.url ?? '' }, { a: 'items' });
+
+		// Assert
+		assert.strictEqual(serialized.url, 'https://rc0var.example.com/{{a}}');
+		assert.strictEqual(resolved.url, 'https://rc0var.example.com/items');
 	});
 
 	test('canonicalizes ordinary URLs and still rejects non-http URLs', () => {

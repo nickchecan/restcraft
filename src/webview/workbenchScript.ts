@@ -2277,8 +2277,9 @@ export function workbenchScript(): string {
 				const readQueryParamsFromUrl = ${readQueryParamsFromUrl.toString()};
 
 				function readEnabledRequestUrl() {
-					const serialized = serializeRequestUrl(url.value, readParamRows(true), false);
-					return serialized.url ?? url.value;
+					const value = url.value.trim();
+					const serialized = serializeRequestUrl(value, readParamRows(true), false);
+					return serialized.url ?? value;
 				}
 
 				// Reads query parameter rows, optionally filtering to enabled rows.
@@ -2300,12 +2301,13 @@ export function workbenchScript(): string {
 
 				// Parses query parameters from the current URL input.
 				function readParamsFromUrl() {
-					return readQueryParamsFromUrl(url.value);
+					return readQueryParamsFromUrl(url.value.trim());
 				}
 
 				// Rewrites the URL query string from enabled parameter rows.
 				function updateUrlFromParams() {
-					const serialized = serializeRequestUrl(url.value, readParamRows(true), false);
+					const value = url.value.trim();
+					const serialized = serializeRequestUrl(value, readParamRows(true), false);
 					if (serialized.url !== undefined) {
 						url.value = serialized.url;
 					}
@@ -2362,7 +2364,7 @@ export function workbenchScript(): string {
                         } : undefined,
 						name: requestTitle.textContent || 'Untitled Request',
 						method: method.value,
-						url: url.value,
+						url: url.value.trim(),
 						params: readRequestParamState(),
 						headerState: readRequestHeaderState(),
 						headers: readRequestHeaders(),
