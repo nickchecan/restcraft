@@ -71,11 +71,283 @@ function readJsonPath(root: unknown, path: string): { found: true; value: unknow
 	return { found: true, value: current };
 }
 
-function formatJsonValue(value: unknown): string | undefined {
+/**
+ * Reads the original digits for an integer JSON.parse cannot keep.
+ *
+ * Values above 2^53 are rounded before a reviver runs, so the token is taken
+ * from the raw body instead.
+ */
+function rawIntegerText(source: string, path: string): string | undefined {
+	const steps = parseJsonPath(path);
+	if (!steps) {
+		return undefined;
+	}
+	let index = 0;
+	const length = source.length;
+	const skipSpace = () => {
+		while (index < length) {
+			const character = source[index];
+			if (character !== ' ' && character !== '\n' && character !== '\r' && character !== '\t') {
+				break;
+			}
+			index++;
+		}
+	};
+	const readString = (): string | undefined => {
+		if (source[index] !== '"') {
+			return undefined;
+		}
+		index++;
+		let text = '';
+		while (index < length) {
+			const character = source[index++];
+			if (character === '"') {
+				return text;
+			}
+			if (character !== '\\') {
+				text += character;
+				continue;
+			}
+			const escaped = source[index++];
+			if (escaped === 'u') {
+				const hex = source.slice(index, index + 4);
+				if (!/^[0-9a-fA-F]{4}$/.test(hex)) {
+					return undefined;
+				}
+				text += String.fromCharCode(Number.parseInt(hex, 16));
+				index += 4;
+			} else if (escaped === '"' || escaped === '\\' || escaped === '/') {
+				text += escaped;
+			} else if (escaped === 'n') {
+				text += '\n';
+			} else if (escaped === 'r') {
+				text += '\r';
+			} else if (escaped === 't') {
+				text += '\t';
+			} else if (escaped === 'b' || escaped === 'f') {
+				text += escaped;
+			} else {
+				return undefined;
+			}
+		}
+		return undefined;
+	};
+	const skipNumber = () => {
+		if (source[index] === '-') {
+			index++;
+		}
+		const start = index;
+		while (source[index] >= '0' && source[index] <= '9') {
+			index++;
+		}
+		if (index === start) {
+			return false;
+		}
+		if (source[index] === '.') {
+			index++;
+			while (source[index] >= '0' && source[index] <= '9') {
+				index++;
+			}
+		}
+		if (source[index] === 'e' || source[index] === 'E') {
+			index++;
+			if (source[index] === '+' || source[index] === '-') {
+				index++;
+			}
+			while (source[index] >= '0' && source[index] <= '9') {
+				index++;
+			}
+		}
+		return true;
+	};
+	const readNumber = (): string | undefined => {
+		const start = index;
+		return skipNumber() ? source.slice(start, index) : undefined;
+	};
+	const skipValue = (): boolean => {
+		skipSpace();
+		const character = source[index];
+		if (character === '"') {
+			return readString() !== undefined;
+		}
+		if (character === '{') {
+			return skipObject();
+		}
+		if (character === '[') {
+			return skipArray();
+		}
+		if (character === 't' || character === 'n') {
+			index += 4;
+			return true;
+		}
+		if (character === 'f') {
+			index += 5;
+			return true;
+		}
+		if (character === '-' || (character >= '0' && character <= '9')) {
+			return skipNumber();
+		}
+		return false;
+	};
+	const skipObject = (): boolean => {
+		index++;
+		skipSpace();
+		if (source[index] === '}') {
+			index++;
+			return true;
+		}
+		while (index < length) {
+			skipSpace();
+			if (readString() === undefined) {
+				return false;
+			}
+			skipSpace();
+			if (source[index] !== ':') {
+				return false;
+			}
+			index++;
+			if (!skipValue()) {
+				return false;
+			}
+			skipSpace();
+			if (source[index] === ',') {
+				index++;
+				continue;
+			}
+			if (source[index] === '}') {
+				index++;
+				return true;
+			}
+			return false;
+		}
+		return false;
+	};
+	const skipArray = (): boolean => {
+		index++;
+		skipSpace();
+		if (source[index] === ']') {
+			index++;
+			return true;
+		}
+		while (index < length) {
+			if (!skipValue()) {
+				return false;
+			}
+			skipSpace();
+			if (source[index] === ',') {
+				index++;
+				continue;
+			}
+			if (source[index] === ']') {
+				index++;
+				return true;
+			}
+			return false;
+		}
+		return false;
+	};
+	const walk = (depth: number): string | undefined => {
+		skipSpace();
+		if (depth === steps.length) {
+			const literal = readNumber();
+			if (literal !== undefined) {
+				return literal;
+			}
+			skipValue();
+			return undefined;
+		}
+		const step = steps[depth];
+		if (step.kind === 'key') {
+			if (source[index] !== '{') {
+				return undefined;
+			}
+			index++;
+			skipSpace();
+			let found: string | undefined;
+			if (source[index] === '}') {
+				index++;
+				return undefined;
+			}
+			while (index < length) {
+				skipSpace();
+				const key = readString();
+				if (key === undefined) {
+					return undefined;
+				}
+				skipSpace();
+				if (source[index] !== ':') {
+					return undefined;
+				}
+				index++;
+				if (key === step.key) {
+					const match = walk(depth + 1);
+					if (match !== undefined) {
+						found = match;
+					}
+				} else if (!skipValue()) {
+					return undefined;
+				}
+				skipSpace();
+				if (source[index] === ',') {
+					index++;
+					continue;
+				}
+				if (source[index] === '}') {
+					index++;
+					return found;
+				}
+				return undefined;
+			}
+			return undefined;
+		}
+		if (source[index] !== '[') {
+			return undefined;
+		}
+		index++;
+		skipSpace();
+		let item = 0;
+		let found: string | undefined;
+		if (source[index] === ']') {
+			index++;
+			return undefined;
+		}
+		while (index < length) {
+			if (item === step.index) {
+				const match = walk(depth + 1);
+				if (match !== undefined) {
+					found = match;
+				}
+			} else if (!skipValue()) {
+				return undefined;
+			}
+			item++;
+			skipSpace();
+			if (source[index] === ',') {
+				index++;
+				continue;
+			}
+			if (source[index] === ']') {
+				index++;
+				return found;
+			}
+			return undefined;
+		}
+		return undefined;
+	};
+	return walk(0);
+}
+
+function formatJsonValue(value: unknown, rawBody?: string, path?: string): string | undefined {
 	if (typeof value === 'string') {
 		return value;
 	}
 	if (typeof value === 'number' && Number.isFinite(value)) {
+		if (Number.isInteger(value) && !Number.isSafeInteger(value) && rawBody !== undefined && path !== undefined) {
+			const literal = rawIntegerText(rawBody, path);
+			if (literal) {
+				return literal;
+			}
+		}
 		return String(value);
 	}
 	if (typeof value === 'boolean' || value === null) {
@@ -162,7 +434,7 @@ function readAutomationValue(
 		return undefined;
 	}
 	const found = readJsonPath(jsonBody.value, attribute);
-	return found ? formatJsonValue(found.value) : undefined;
+	return found ? formatJsonValue(found.value, response.body, attribute) : undefined;
 }
 
 /** Collects values for enabled rows, validating every value before any environment write. */

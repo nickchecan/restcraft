@@ -54,12 +54,15 @@ export function workbenchScript(): string {
                 const automationRows = document.getElementById('automation-rows');
                 function readAutomation() {
                     return Array.from(automationRows.children).map(row => {
+                        const type = row.children[1].firstChild.value;
+                        const header = row.children[2].firstChild.value.trim();
+                        const variable = row.children[3].firstChild.value.trim();
                         const mapping = {
                             enabled: row.children[0].firstChild.checked,
-                            header: row.children[2].firstChild.value.trim(),
-                            variable: row.children[3].firstChild.value.trim(),
+                            // An invalid field would make the host drop the whole message.
+                            header: automationAttributeValid(type, header) ? header : '',
+                            variable: !variable || /^[A-Za-z_][A-Za-z0-9_]*$/.test(variable) ? variable : '',
                         };
-                        const type = row.children[1].firstChild.value;
                         if (type === 'json' || type === 'raw') {
                             mapping.type = type;
                         }
@@ -80,9 +83,11 @@ export function workbenchScript(): string {
                     const attribute = row.children[2].firstChild;
                     attribute.disabled = type === 'raw';
                     const value = attribute.value.trim();
-                    attribute.setCustomValidity(automationAttributeValid(type, value) ? '' : type === 'json'
+                    const message = automationAttributeValid(type, value) ? '' : type === 'json'
                         ? 'Enter a JSON path such as data.items[0].id.'
-                        : 'Enter a valid HTTP header name.');
+                        : 'Enter a valid HTTP header name.';
+                    attribute.setCustomValidity(message);
+                    attribute.title = message;
                 }
                 function addAutomationRow(mapping) {
                     const row = document.createElement('tr');
@@ -138,7 +143,9 @@ export function workbenchScript(): string {
                     variable.value = mapping.variable || '';
                     variable.addEventListener('input', () => {
                         const value = variable.value.trim();
-                        variable.setCustomValidity(!value || /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) ? '' : 'Enter a valid environment variable name.');
+                        const message = !value || /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) ? '' : 'Enter a valid environment variable name.';
+                        variable.setCustomValidity(message);
+                        variable.title = message;
                         notifyRequestChanged();
                     });
                     variableCell.appendChild(variable);

@@ -176,5 +176,11 @@ suite('Environment variables', () => {
 		assert.strictEqual(parseEnvFile("FOO='C:\\temp'\nBAR=C:\\temp\nBAZ='a\\nb'\n").BAZ, 'a\\nb');
 		assert.strictEqual(parseEnvFile(updateEnvValue('', 'BODY', 'café')).BODY, 'café');
 		assert.strictEqual(updateEnvValue('', 'BODY', 'café'), 'BODY="café"\n');
+		const separators = 'a\u2028b\u2029c';
+		const separatorStored = updateEnvValue('', 'BODY', separators);
+		assert.strictEqual(separatorStored, 'BODY="a\\u2028b\\u2029c"\n');
+		assert.strictEqual(separatorStored.includes('\u2028'), false);
+		assert.strictEqual(separatorStored.includes('\u2029'), false);
+		assert.strictEqual(parseEnvFile(separatorStored).BODY, separators);
 	});
 });

@@ -5,6 +5,7 @@ import { runInNewContext } from 'vm';
 
 import { buttonIcons } from '../../src/webview/buttonIcons';
 import { createEventStreamParser } from '../../src/webview/eventStream';
+import { isAutomationMappings } from '../../src/request/automation';
 import { getWebviewHtml } from '../../src/webview/getWebviewHtml';
 
 suite('Webview HTML', () => {
@@ -26,7 +27,7 @@ suite('Webview HTML', () => {
 		assert.ok(normalized.includes('id="oauth-redirect-note"'));
 		assert.strictEqual(
 			createHash('sha256').update(normalized).digest('hex'),
-			'0fefe0e57738eadd2f9da22bdc94cc899ee1f0cbc14eae5b7a0295e774ba60bb',
+			'21b445ae8ad3ad5c6230055991e2660d181960ce5a24887fc9844c15a89752ee',
 		);
 	});
 	test('authorization divider limits dragging, supports keyboard resizing, and resets', () => {
@@ -1217,7 +1218,9 @@ suite('Webview HTML', () => {
 				getAttribute(name: string) {
 					return element[name];
 				},
-				setCustomValidity() {},
+				setCustomValidity(message: string) {
+					element.validity = message;
+				},
 				remove() {},
 			};
 			Object.defineProperty(element, 'firstChild', {
@@ -1281,6 +1284,24 @@ suite('Webview HTML', () => {
 		jsonType.value = 'header';
 		jsonType.dispatch('change');
 		assert.strictEqual(cell(jsonRow, 2).disabled, false);
+		const headerType = cell(headerRow, 1);
+		headerType.value = 'json';
+		headerType.dispatch('change');
+		assert.strictEqual(cell(headerRow, 2).value, 'X-Request-Id');
+		assert.strictEqual(cell(headerRow, 2).validity, 'Enter a JSON path such as data.items[0].id.');
+		assert.strictEqual(cell(headerRow, 2).title, 'Enter a JSON path such as data.items[0].id.');
+		headerType.value = 'header';
+		headerType.dispatch('change');
+		cell(headerRow, 2).value = 'Not a header';
+		cell(headerRow, 2).dispatch('input');
+		assert.strictEqual(cell(headerRow, 2).validity, 'Enter a valid HTTP header name.');
+		assert.strictEqual(cell(headerRow, 2).value, 'Not a header');
+		jsonType.value = 'json';
+		jsonType.dispatch('change');
+		const posted = sandbox.readAutomationRef?.() ?? [];
+		assert.strictEqual(posted[0]?.header, '');
+		assert.strictEqual(posted[1]?.header, 'data.items[0].id');
+		assert.strictEqual(isAutomationMappings(posted), true);
 	});
 	test('header, param, and automation counts include disabled and partial rows but exclude blank rows', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');

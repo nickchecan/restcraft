@@ -7,7 +7,7 @@ const variablePattern = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
  *
  * Supported lines are `NAME=value`, with blank lines and `#` comments ignored.
  * Single-quoted and unquoted values are literal. Double quotes decode `\n`,
- * `\r`, `\t`, `\"`, and `\\` only; any other backslash sequence stays as written.
+ * `\r`, `\t`, `\"`, `\\`, `\u2028`, and `\u2029`; any other backslash sequence stays as written.
  */
 export function parseEnvFile(content: string): Record<string, string> {
 	const values: Record<string, string> = {};
@@ -184,6 +184,12 @@ function decodeDoubleQuoted(value: string): string {
 			decoded += current;
 			continue;
 		}
+		const unicode = value.slice(index + 1, index + 6);
+		if (unicode === 'u2028' || unicode === 'u2029') {
+			decoded += unicode === 'u2028' ? '\u2028' : '\u2029';
+			index += 5;
+			continue;
+		}
 		if (next === 'n') {
 			decoded += '\n';
 		} else if (next === 'r') {
@@ -231,6 +237,10 @@ function encodeDotenvDoubleQuoted(value: string): string {
 			encoded += '\\r';
 		} else if (character === '\t') {
 			encoded += '\\t';
+		} else if (character === '\u2028') {
+			encoded += '\\u2028';
+		} else if (character === '\u2029') {
+			encoded += '\\u2029';
 		} else {
 			encoded += character;
 		}

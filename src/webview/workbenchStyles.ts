@@ -464,6 +464,10 @@ export const workbenchStyles = `
 				cursor: not-allowed;
 			}
 
+			input.request-header-input:invalid {
+				border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+			}
+
 			.automation-type {
 				width: 148px;
 				min-width: 148px;

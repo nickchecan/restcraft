@@ -69,6 +69,28 @@ suite('Response automation', () => {
 		);
 	});
 
+	test('keeps JSON integer text above 2^53', () => {
+		const id = '12345678901234567890';
+		const body = `{"data":{"items":[{"id":${id}}],"other":1}}`;
+		const values = automationAssignments(
+			[
+				{ type: 'json', header: 'data.items[0].id', variable: 'ID', enabled: true },
+				{ type: 'json', header: 'data.other', variable: 'OTHER', enabled: true },
+			],
+			response({}, body),
+		);
+		assert.strictEqual(values.ID, id);
+		assert.notStrictEqual(values.ID, String(JSON.parse(body).data.items[0].id));
+		assert.strictEqual(values.OTHER, '1');
+		assert.strictEqual(
+			automationAssignments(
+				[{ type: 'json', header: 'id', variable: 'NEG', enabled: true }],
+				response({}, '{"id":-12345678901234567890}'),
+			).NEG,
+			'-12345678901234567890',
+		);
+	});
+
 	test('skips JSON mappings when the body is not JSON and still applies headers', () => {
 		const values = automationAssignments(
 			[
