@@ -1,3 +1,4 @@
+import { readQueryParamsFromUrl, serializeRequestUrl } from '../request/requestUrl';
 import { buttonIcons } from './buttonIcons';
 import { createEventStreamParser } from './eventStream';
 
@@ -2272,21 +2273,13 @@ export function workbenchScript(): string {
 				}
 
 				// Builds the executable URL using only enabled query parameters.
+				const serializeRequestUrl = ${serializeRequestUrl.toString()};
+				const readQueryParamsFromUrl = ${readQueryParamsFromUrl.toString()};
+
 				function readEnabledRequestUrl() {
-					let parsed;
-					try {
-						parsed = new URL(url.value);
-					} catch {
-						return url.value;
-					}
-
-					parsed.search = '';
-
-					for (const [name, value] of readParamRows(true)) {
-						parsed.searchParams.append(name, value);
-					}
-
-					return parsed.toString();
+					const value = url.value.trim();
+					const serialized = serializeRequestUrl(value, readParamRows(true), false);
+					return serialized.url ?? value;
 				}
 
 				// Reads query parameter rows, optionally filtering to enabled rows.
@@ -2308,29 +2301,16 @@ export function workbenchScript(): string {
 
 				// Parses query parameters from the current URL input.
 				function readParamsFromUrl() {
-					try {
-						return Array.from(new URL(url.value).searchParams.entries());
-					} catch {
-						return [];
-					}
+					return readQueryParamsFromUrl(url.value.trim());
 				}
 
 				// Rewrites the URL query string from enabled parameter rows.
 				function updateUrlFromParams() {
-					let parsed;
-					try {
-						parsed = new URL(url.value);
-					} catch {
-						return;
+					const value = url.value.trim();
+					const serialized = serializeRequestUrl(value, readParamRows(true), false);
+					if (serialized.url !== undefined) {
+						url.value = serialized.url;
 					}
-
-					parsed.search = '';
-
-					for (const [name, value] of readParamRows(true)) {
-						parsed.searchParams.append(name, value);
-					}
-
-					url.value = parsed.toString();
 				}
 
 				// Marks sections with values, including partial and disabled rows.
@@ -2384,7 +2364,7 @@ export function workbenchScript(): string {
                         } : undefined,
 						name: requestTitle.textContent || 'Untitled Request',
 						method: method.value,
-						url: url.value,
+						url: url.value.trim(),
 						params: readRequestParamState(),
 						headerState: readRequestHeaderState(),
 						headers: readRequestHeaders(),

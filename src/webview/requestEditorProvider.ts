@@ -6,6 +6,7 @@ import { isOAuthAuthorization, readOAuthAuthorization } from '../request/oauth';
 import { parseRequestFile } from '../request/requestFile';
 import { HttpMethod, isHttpMethod, RequestFileDefinition } from '../request/types';
 import { isEnvironmentFileSettings, copyEnvironmentFileSettings } from '../request/environmentSettings';
+import { readQueryParamsFromUrl } from '../request/requestUrl';
 import { isRecord } from '../shared/object';
 import {
 	executeRequestWithEnvironment,
@@ -224,15 +225,11 @@ function readDraftParams(params: unknown, url: string): RequestChangedMessage['p
  * Derives draft parameter rows from a URL if it can be parsed.
  */
 function readDraftParamsFromUrl(url: string): RequestChangedMessage['params'] {
-	try {
-		return Array.from(new URL(url).searchParams.entries()).map(([name, value]) => ({
-			name,
-			value,
-			enabled: true,
-		}));
-	} catch {
-		return [];
-	}
+	return readQueryParamsFromUrl(url).map(([name, value]) => ({
+		name,
+		value,
+		enabled: true,
+	}));
 }
 
 /**

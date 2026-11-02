@@ -9,15 +9,16 @@ import {
 } from './types';
 import { isOAuthAuthorization, readOAuthAuthorization } from './oauth';
 import { isEnvironmentFileSettings, copyEnvironmentFileSettings } from './environmentSettings';
+import { readQueryParamsFromUrl, serializeRequestUrl } from './requestUrl';
 import { isRecord } from '../shared/object';
 
 /**
  * Parses and validates the canonical `.api.json` request file format.
  *
  * The returned shape is normalized for the UI: methods are uppercase, URLs are
- * serialized through `URL`, execution headers derive from enabled rows, missing body becomes
- * `null`, and query params/header state are derived for older files that only
- * contain `url` or `headers`.
+ * serialized through `URL` with variable names left unchanged, execution headers
+ * derive from enabled rows, missing body becomes `null`, and query params and
+ * header state are derived for older files that only contain `url` or `headers`.
  */
 export function parseRequestFile(content: string): RequestFileDefinition {
 	let parsed: unknown;
@@ -113,19 +114,17 @@ function readMethod(value: Record<string, unknown>): HttpMethod {
  */
 function readUrl(value: Record<string, unknown>): string {
 	const url = readRequiredString(value, 'url');
+	const serialized = serializeRequestUrl(url, undefined, true);
 
-	let parsed: URL;
-	try {
-		parsed = new URL(url);
-	} catch {
-		throw new Error('Request file property "url" must be a valid URL.');
-	}
-
-	if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+	if (serialized.error === 'protocol') {
 		throw new Error('Request file property "url" must use http or https.');
 	}
 
-	return parsed.toString();
+	if (!serialized.url) {
+		throw new Error('Request file property "url" must be a valid URL.');
+	}
+
+	return serialized.url;
 }
 
 /**
@@ -257,7 +256,7 @@ function readParam(param: unknown): RequestParamDefinition {
  * Derives enabled query parameter rows from the request URL.
  */
 function readParamsFromUrl(url: string): RequestParamDefinition[] {
-	return Array.from(new URL(url).searchParams.entries()).map(([name, value]) => ({
+	return readQueryParamsFromUrl(url).map(([name, value]) => ({
 		name,
 		value,
 		enabled: true,
