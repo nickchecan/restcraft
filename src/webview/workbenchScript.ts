@@ -1,3 +1,4 @@
+import { serializeRequestUrl } from '../request/requestUrl';
 import { buttonIcons } from './buttonIcons';
 import { createEventStreamParser } from './eventStream';
 
@@ -2272,21 +2273,11 @@ export function workbenchScript(): string {
 				}
 
 				// Builds the executable URL using only enabled query parameters.
+				const serializeRequestUrl = ${serializeRequestUrl.toString()};
+
 				function readEnabledRequestUrl() {
-					let parsed;
-					try {
-						parsed = new URL(url.value);
-					} catch {
-						return url.value;
-					}
-
-					parsed.search = '';
-
-					for (const [name, value] of readParamRows(true)) {
-						parsed.searchParams.append(name, value);
-					}
-
-					return parsed.toString();
+					const serialized = serializeRequestUrl(url.value, readParamRows(true), false);
+					return serialized.url ?? url.value;
 				}
 
 				// Reads query parameter rows, optionally filtering to enabled rows.
@@ -2317,20 +2308,10 @@ export function workbenchScript(): string {
 
 				// Rewrites the URL query string from enabled parameter rows.
 				function updateUrlFromParams() {
-					let parsed;
-					try {
-						parsed = new URL(url.value);
-					} catch {
-						return;
+					const serialized = serializeRequestUrl(url.value, readParamRows(true), false);
+					if (serialized.url !== undefined) {
+						url.value = serialized.url;
 					}
-
-					parsed.search = '';
-
-					for (const [name, value] of readParamRows(true)) {
-						parsed.searchParams.append(name, value);
-					}
-
-					url.value = parsed.toString();
 				}
 
 				// Marks sections with values, including partial and disabled rows.
