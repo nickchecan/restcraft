@@ -1,3 +1,4 @@
+import { jsonPathPattern } from '../request/automation';
 import { buttonIcons } from './buttonIcons';
 import { createEventStreamParser } from './eventStream';
 
@@ -52,48 +53,106 @@ export function workbenchScript(): string {
                 const automationPanel = document.getElementById('request-automation-panel');
                 const automationRows = document.getElementById('automation-rows');
                 function readAutomation() {
-                    return Array.from(automationRows.children).map(row => ({
-                        enabled: row.children[0].firstChild.checked,
-                        header: row.children[1].firstChild.value.trim(),
-                        variable: row.children[2].firstChild.value.trim(),
-                    }));
+                    return Array.from(automationRows.children).map(row => {
+                        const mapping = {
+                            enabled: row.children[0].firstChild.checked,
+                            header: row.children[2].firstChild.value.trim(),
+                            variable: row.children[3].firstChild.value.trim(),
+                        };
+                        const type = row.children[1].firstChild.value;
+                        if (type === 'json' || type === 'raw') {
+                            mapping.type = type;
+                        }
+                        return mapping;
+                    });
+                }
+                function automationAttributeValid(type, value) {
+                    if (!value || type === 'raw') {
+                        return true;
+                    }
+                    if (type === 'json') {
+                        return ${jsonPathPattern}.test(value);
+                    }
+                    return /^[A-Za-z0-9!#$%&'*+.^_|~-]+$/.test(value);
+                }
+                function syncAutomationRow(row) {
+                    const type = row.children[1].firstChild.value;
+                    const attribute = row.children[2].firstChild;
+                    attribute.disabled = type === 'raw';
+                    const value = attribute.value.trim();
+                    attribute.setCustomValidity(automationAttributeValid(type, value) ? '' : type === 'json'
+                        ? 'Enter a JSON path such as data.items[0].id.'
+                        : 'Enter a valid HTTP header name.');
                 }
                 function addAutomationRow(mapping) {
                     const row = document.createElement('tr');
-                    for (const field of ['enabled', 'header', 'variable']) {
-                        const cell = document.createElement('td');
-                        const input = document.createElement('input');
-                        input.type = field === 'enabled' ? 'checkbox' : 'text';
-                        input.className = field === 'enabled' ? 'request-header-enabled' : 'request-header-input';
-                        if (field === 'enabled') { cell.className = 'request-header-enabled-cell'; }
-                        else { input.placeholder = field === 'header' ? 'Response header' : 'Environment variable'; }
-                        input.setAttribute('aria-label', field === 'header' ? 'Response header' : field === 'variable' ? 'Environment variable' : 'Enable mapping');
-                        if (field === 'enabled') { input.checked = mapping.enabled; }
-                        else { input.value = mapping[field]; }
-                        input.addEventListener('input', () => {
-                            const value = input.value.trim();
-                            const valid = field === 'enabled' || !value || (field === 'variable'
-                                ? /^[A-Za-z_][A-Za-z0-9_]*$/.test(value)
-                                : /^[A-Za-z0-9!#$%&'*+.^_|~-]+$/.test(value));
-                            input.setCustomValidity(valid ? '' : 'Enter a valid ' + (field === 'variable' ? 'environment variable name.' : 'HTTP header name.'));
-                            notifyRequestChanged();
-                        });
-                        input.addEventListener('change', () => {
-                            updateRequestRowEnabledState(row, row.children[0].firstChild.checked);
-                            notifyRequestChanged();
-                        });
-                        cell.appendChild(input);
-                        row.appendChild(cell);
+                    const enabledCell = document.createElement('td');
+                    const enabled = document.createElement('input');
+                    enabled.type = 'checkbox';
+                    enabled.className = 'request-header-enabled';
+                    enabledCell.className = 'request-header-enabled-cell';
+                    enabled.setAttribute('aria-label', 'Enable mapping');
+                    enabled.checked = mapping.enabled;
+                    enabled.addEventListener('change', () => {
+                        updateRequestRowEnabledState(row, enabled.checked);
+                        notifyRequestChanged();
+                    });
+                    enabledCell.appendChild(enabled);
+                    row.appendChild(enabledCell);
+                    const typeCell = document.createElement('td');
+                    const type = document.createElement('select');
+                    type.className = 'automation-type';
+                    type.setAttribute('aria-label', 'Type');
+                    for (const option of [['header', 'Header'], ['json', 'Body (JSON)'], ['raw', 'Body (Raw)']]) {
+                        const item = document.createElement('option');
+                        item.value = option[0];
+                        item.textContent = option[1];
+                        type.appendChild(item);
                     }
-                    const cell = document.createElement('td');
+                    type.value = mapping.type === 'json' || mapping.type === 'raw' ? mapping.type : 'header';
+                    type.addEventListener('change', () => {
+                        syncAutomationRow(row);
+                        notifyRequestChanged();
+                    });
+                    typeCell.appendChild(type);
+                    row.appendChild(typeCell);
+                    const attributeCell = document.createElement('td');
+                    const attribute = document.createElement('input');
+                    attribute.type = 'text';
+                    attribute.className = 'request-header-input';
+                    attribute.placeholder = 'Response attribute';
+                    attribute.setAttribute('aria-label', 'Response attribute');
+                    attribute.value = mapping.header || '';
+                    attribute.addEventListener('input', () => {
+                        syncAutomationRow(row);
+                        notifyRequestChanged();
+                    });
+                    attributeCell.appendChild(attribute);
+                    row.appendChild(attributeCell);
+                    const variableCell = document.createElement('td');
+                    const variable = document.createElement('input');
+                    variable.type = 'text';
+                    variable.className = 'request-header-input';
+                    variable.placeholder = 'Environment variable';
+                    variable.setAttribute('aria-label', 'Environment variable');
+                    variable.value = mapping.variable || '';
+                    variable.addEventListener('input', () => {
+                        const value = variable.value.trim();
+                        variable.setCustomValidity(!value || /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) ? '' : 'Enter a valid environment variable name.');
+                        notifyRequestChanged();
+                    });
+                    variableCell.appendChild(variable);
+                    row.appendChild(variableCell);
+                    const removeCell = document.createElement('td');
                     const remove = document.createElement('button');
                     remove.type = 'button';
                     remove.className = 'request-header-remove';
                     remove.ariaLabel = 'Remove mapping';
                     remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>';
                     remove.addEventListener('click', () => { row.remove(); notifyRequestChanged(); });
-                    cell.appendChild(remove);
-                    row.appendChild(cell);
+                    removeCell.appendChild(remove);
+                    row.appendChild(removeCell);
+                    syncAutomationRow(row);
                     updateRequestRowEnabledState(row, mapping.enabled);
                     automationRows.appendChild(row);
                 }

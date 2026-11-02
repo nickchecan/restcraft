@@ -19,6 +19,7 @@ Request files use the `.api.json` extension and support:
 | `authorization`       | No       | OAuth configuration; see below.                                                                                                             |
 | `environment`         | No       | Nearest or manual environment selection; see below.                                                                                         |
 | `authorizeBeforeSend` | No       | Retrieve an OAuth token before each send; defaults to false.                                                                                |
+| `automation`          | No       | Rows that copy a response header, JSON value, or raw body into a `.env` variable. See below.                                                |
 
 When `params` is omitted, RestCraft backfills enabled params from the query string in `url` for compatibility with older request files. After editing query params in the custom editor, RestCraft saves the `params` array so enabled and disabled states are remembered when the request is reopened.
 
@@ -285,3 +286,23 @@ API and environment references are treated as plain text.
 ```json
 "description": "Retrieves a demo access token.\nUse before calling the protected API."
 ```
+
+## Response automation
+
+The **Automations** tab saves an optional `automation` array. Each row has `enabled`, `header`, and `variable`. `header` is the response attribute. `type` is `json` or `raw` when set. A missing `type`, or `"type": "header"`, means a response header, and the editor saves header rows without `type`.
+
+**Header** copies the named response header. Matching ignores case. A missing header leaves the variable unchanged.
+
+**Body (JSON)** reads `header` as a case-sensitive dot path with array indexes, such as `data.items[0].id`. Segments are identifiers (a letter or underscore, then letters, digits, or underscores) and optional `[0]` indexes. `[0].id` selects from an array body. Strings are stored as text, numbers and booleans as their string form (`1`, `true`), `null` as `null`, and objects or arrays as compact JSON. A missing path, or a body that is not JSON, leaves the variable unchanged.
+
+**Body (Raw)** stores the entire response body. The attribute is ignored.
+
+```json
+"automation": [
+  { "enabled": true, "header": "X-Session-Token", "variable": "SESSION_TOKEN" },
+  { "enabled": true, "type": "json", "header": "data.items[0].id", "variable": "ITEM_ID" },
+  { "enabled": true, "type": "raw", "header": "", "variable": "RESPONSE_BODY" }
+]
+```
+
+An empty header value clears the variable. A raw body is written even when it is empty. Printable values are quoted on one `.env` line. Newlines, other non-ASCII or control characters, and values containing both `"` and `'` are written as `$restcraft:` followed by a JSON string so the line stays valid and parses back to the same text.

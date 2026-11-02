@@ -129,6 +129,14 @@ suite('Environment variables', () => {
 		assert.strictEqual(updateEnvValue('OTHER=keep', 'MY_TOKEN', 'abc'), 'OTHER=keep\nMY_TOKEN="abc"\n');
 		assert.strictEqual(parseEnvFile(updateEnvValue('', 'ACCESS_TOKEN', 'abc')).ACCESS_TOKEN, 'abc');
 		assert.throws(() => updateEnvValue('', 'INVALID NAME', 'abc'), /variable name/);
-		assert.throws(() => updateEnvValue('', 'ACCESS_TOKEN', 'abc\nINJECT=value'), /unsupported/);
+		const injected = updateEnvValue('', 'ACCESS_TOKEN', 'abc\nINJECT=value');
+		assert.strictEqual(injected.includes('\nINJECT='), false);
+		assert.strictEqual(parseEnvFile(injected).ACCESS_TOKEN, 'abc\nINJECT=value');
+		assert.strictEqual(parseEnvFile(injected).INJECT, undefined);
+		assert.strictEqual(parseEnvFile('FOO="C:\\new"\n').FOO, 'C:\\new');
+		const prefixed = '$restcraft:"x"';
+		const storedPrefix = updateEnvValue('', 'FOO', prefixed);
+		assert.strictEqual(storedPrefix, 'FOO=\'$restcraft:"x"\'\n');
+		assert.strictEqual(parseEnvFile(storedPrefix).FOO, prefixed);
 	});
 });

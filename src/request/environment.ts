@@ -7,7 +7,8 @@ const variablePattern = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
  *
  * Supported lines are `NAME=value`, with blank lines and `#` comments ignored.
  * Values may be wrapped in matching single or double quotes; escape sequences
- * and shell expansion are intentionally not interpreted.
+ * and shell expansion are intentionally not interpreted. Values that cannot
+ * fit in one quoted line use a `$restcraft:` prefix plus a JSON string.
  */
 export function parseEnvFile(content: string): Record<string, string> {
 	const values: Record<string, string> = {};
@@ -32,7 +33,7 @@ export function parseEnvFile(content: string): Record<string, string> {
 			continue;
 		}
 
-		values[name] = unquoteEnvValue(value);
+		values[name] = decodeEnvValue(value);
 	}
 
 	return values;
@@ -147,6 +148,8 @@ function isFormUrlEncoded(headers: Record<string, string>): boolean {
 	return false;
 }
 
+const encodedEnvPrefix = '$restcraft:';
+
 /**
  * Removes matching surrounding quotes from `.env` values.
  */
@@ -163,6 +166,41 @@ function unquoteEnvValue(value: string): string {
 	}
 
 	return value;
+}
+
+function decodeEnvValue(value: string): string {
+	if (value.startsWith(encodedEnvPrefix)) {
+		try {
+			const parsed: unknown = JSON.parse(value.slice(encodedEnvPrefix.length));
+			if (typeof parsed === 'string') {
+				return parsed;
+			}
+		} catch {
+			/* Keep the literal text when the suffix is not a JSON string. */
+		}
+	}
+
+	return unquoteEnvValue(value);
+}
+
+/** Quoted text the existing parser can round-trip without interpreting escapes. */
+function isLiteralEnvValue(value: string): boolean {
+	return /^[\x20-\x7e]*$/.test(value) && !(value.includes('"') && value.includes("'"));
+}
+
+/**
+ * Encodes one assignment.
+ *
+ * Multiline and other non-literal values become a single JSON string so they
+ * cannot split into another `.env` line.
+ */
+function encodeEnvAssignment(name: string, value: string): string {
+	if (isLiteralEnvValue(value)) {
+		const quote = value.includes('"') ? "'" : '"';
+		return `${name}=${quote}${value}${quote}`;
+	}
+
+	return `${name}=${encodedEnvPrefix}${JSON.stringify(value)}`;
 }
 
 /**
@@ -184,15 +222,7 @@ export function updateEnvValue(content: string, name: string, value: string): st
 	if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
 		throw new Error('Enter a valid environment variable name (letters, numbers, and underscores).');
 	}
-	// Quoting must round-trip through our simple parser without newline injection.
-	if (!/^[\x20-\x7e]*$/.test(value)) {
-		throw new Error('Environment value contains unsupported characters.');
-	}
-	const quote = value.includes('"') ? "'" : '"';
-	if (value.includes(quote)) {
-		throw new Error('Environment value cannot be safely stored in .env.');
-	}
-	const assignment = `${name}=${quote}${value}${quote}`;
+	const assignment = encodeEnvAssignment(name, value);
 	const eol = content.includes('\r\n') ? '\r\n' : '\n';
 	const lines = content.split(/\r?\n/);
 	let found = false;

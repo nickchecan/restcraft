@@ -49,14 +49,23 @@ export interface EnvironmentFileSettings {
 
 export type TokenView = 'raw' | 'decoded' | 'hidden';
 
-export interface ResponseHeaderMapping {
+export type AutomationType = 'header' | 'json' | 'raw';
+
+/**
+ * One Automations row.
+ *
+ * `type` is omitted for headers so older files stay valid. `header` is the
+ * response attribute: a header name, a JSON path, or ignored text for `raw`.
+ */
+export interface AutomationMapping {
+	type?: AutomationType;
 	header: string;
 	variable: string;
 	enabled: boolean;
 }
 
 export interface RequestFileDefinition {
-	automation?: ResponseHeaderMapping[];
+	automation?: AutomationMapping[];
 	authorizeBeforeSend?: boolean;
 	description?: string;
 	name: string;

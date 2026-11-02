@@ -1,4 +1,4 @@
-import { isResponseHeaderMappings } from '../request/automation';
+import { isAutomationMappings } from '../request/automation';
 import { isEnvironmentFileSettings } from '../request/environmentSettings';
 import { isOAuthAuthorization } from '../request/oauth';
 import {
@@ -6,12 +6,12 @@ import {
 	OAuthAuthorizationDefinition,
 	RequestHeaderDefinition,
 	RequestParamDefinition,
-	ResponseHeaderMapping,
+	AutomationMapping,
 } from '../request/types';
 import { isRecord, isStringRecord } from '../shared/object';
 
 export interface SendRequestMessage {
-	automation?: ResponseHeaderMapping[];
+	automation?: AutomationMapping[];
 	type: 'sendRequest';
 	requestId: number;
 	method: string;
@@ -21,7 +21,7 @@ export interface SendRequestMessage {
 }
 
 export interface RequestChangedMessage {
-	automation?: ResponseHeaderMapping[];
+	automation?: AutomationMapping[];
 	authorizeBeforeSend?: boolean;
 	description?: string;
 	type: 'requestChanged';
@@ -186,7 +186,7 @@ function isRequestChangedMessage(
 	return (
 		(message.environment === undefined || isEnvironmentFileSettings(message.environment)) &&
 		(message.authorization === undefined || isOAuthAuthorization(message.authorization)) &&
-		(message.automation === undefined || isResponseHeaderMappings(message.automation)) &&
+		(message.automation === undefined || isAutomationMappings(message.automation)) &&
 		(message.authorizeBeforeSend === undefined || typeof message.authorizeBeforeSend === 'boolean') &&
 		(message.description === undefined || typeof message.description === 'string') &&
 		typeof message.name === 'string' &&
@@ -230,7 +230,7 @@ function isSendRequestMessage(
 	message: Record<string, unknown>,
 ): message is Record<string, unknown> & SendRequestMessage {
 	return (
-		(message.automation === undefined || isResponseHeaderMappings(message.automation)) &&
+		(message.automation === undefined || isAutomationMappings(message.automation)) &&
 		isSafeRequestId(message.requestId) &&
 		typeof message.method === 'string' &&
 		typeof message.url === 'string' &&

@@ -459,6 +459,16 @@ export const workbenchStyles = `
 				min-width: 0;
 			}
 
+			input.request-header-input:disabled {
+				opacity: 0.45;
+				cursor: not-allowed;
+			}
+
+			.automation-type {
+				width: 148px;
+				min-width: 148px;
+			}
+
 			.request-header-remove {
 				display: inline-flex;
 				align-items: center;

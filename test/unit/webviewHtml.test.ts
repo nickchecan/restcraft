@@ -26,7 +26,7 @@ suite('Webview HTML', () => {
 		assert.ok(normalized.includes('id="oauth-redirect-note"'));
 		assert.strictEqual(
 			createHash('sha256').update(normalized).digest('hex'),
-			'88686aecf226d742e00f90e972fe3eef044b9e0f230aaddc44b996ac770c06a7',
+			'0fefe0e57738eadd2f9da22bdc94cc899ee1f0cbc14eae5b7a0295e774ba60bb',
 		);
 	});
 	test('authorization divider limits dragging, supports keyboard resizing, and resets', () => {
@@ -1166,6 +1166,121 @@ suite('Webview HTML', () => {
 		context.authorizeBeforeSend.checked = false;
 		runInNewContext('updateRequestTabIndicators();', context);
 		assert.strictEqual(tabs[4].populated, false);
+	});
+	test('automation rows show type, then response attribute, and disable the attribute for raw bodies', () => {
+		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');
+		const panel = html.slice(
+			html.indexOf('id="request-automation-panel"'),
+			html.indexOf('id="request-settings-panel"'),
+		);
+		const enabled = panel.indexOf('>Enabled<');
+		const type = panel.indexOf('>Type<');
+		const attribute = panel.indexOf('>Response attribute<');
+		const variable = panel.indexOf('>Environment variable<');
+		assert.ok(enabled < type && type < attribute && attribute < variable);
+		assert.ok(!panel.includes('Response header'));
+		assert.ok(!panel.includes('Response Header'));
+		const start = html.indexOf('function readAutomation()');
+		const end = html.indexOf("document.getElementById('automation-add')", start);
+		const listeners = new WeakMap<object, Map<string, Array<() => void>>>();
+		const createElement = (tag: string) => {
+			const element: Record<string, unknown> = {
+				tag,
+				className: '',
+				type: '',
+				placeholder: '',
+				value: '',
+				checked: false,
+				disabled: false,
+				textContent: '',
+				innerHTML: '',
+				children: [] as Array<Record<string, unknown>>,
+				classList: { toggle: () => {} },
+				appendChild(child: Record<string, unknown>) {
+					(element.children as Array<Record<string, unknown>>).push(child);
+				},
+				addEventListener(event: string, handler: () => void) {
+					const events = listeners.get(element) ?? new Map<string, Array<() => void>>();
+					const handlers = events.get(event) ?? [];
+					handlers.push(handler);
+					events.set(event, handlers);
+					listeners.set(element, events);
+				},
+				dispatch(event: string) {
+					for (const handler of listeners.get(element)?.get(event) ?? []) {
+						handler();
+					}
+				},
+				setAttribute(name: string, value: string) {
+					element[name] = value;
+				},
+				getAttribute(name: string) {
+					return element[name];
+				},
+				setCustomValidity() {},
+				remove() {},
+			};
+			Object.defineProperty(element, 'firstChild', {
+				get: () => (element.children as Array<Record<string, unknown>>)[0],
+			});
+			return element;
+		};
+		const automationRows = createElement('tbody');
+		const sandbox = {
+			document: { createElement },
+			automationRows,
+			notifyRequestChanged: () => {},
+			updateRequestRowEnabledState: () => {},
+			readAutomationRef: undefined as (() => Array<Record<string, unknown>>) | undefined,
+			addAutomationRowRef: undefined as ((mapping: Record<string, unknown>) => void) | undefined,
+		};
+		runInNewContext(
+			`${html.slice(start, end)}\nreadAutomationRef = readAutomation;\naddAutomationRowRef = addAutomationRow;`,
+			sandbox,
+		);
+		sandbox.addAutomationRowRef?.({ enabled: true, header: 'X-Request-Id', variable: 'REQUEST_ID' });
+		sandbox.addAutomationRowRef?.({ enabled: true, type: 'json', header: 'data.items[0].id', variable: 'ITEM_ID' });
+		sandbox.addAutomationRowRef?.({ enabled: true, type: 'raw', header: 'data.id', variable: 'BODY' });
+		const rows = automationRows.children as Array<
+			Record<string, unknown> & { children: Array<Record<string, unknown>> }
+		>;
+		assert.deepStrictEqual(
+			rows.map((row) => (row.children as Array<{ firstChild: { tag: string } }>).map((cell) => cell.firstChild.tag)),
+			[
+				['input', 'select', 'input', 'input', 'button'],
+				['input', 'select', 'input', 'input', 'button'],
+				['input', 'select', 'input', 'input', 'button'],
+			],
+		);
+		const [headerRow, jsonRow, rawRow] = rows;
+		const cell = (row: (typeof rows)[number], index: number) =>
+			row.children[index].firstChild as Record<string, unknown> & {
+				children: Array<Record<string, unknown>>;
+				dispatch: (event: string) => void;
+			};
+		assert.strictEqual(cell(headerRow, 0).type, 'checkbox');
+		assert.strictEqual(cell(headerRow, 1)['aria-label'], 'Type');
+		assert.deepStrictEqual(
+			cell(headerRow, 1).children.map((option) => option.textContent),
+			['Header', 'Body (JSON)', 'Body (Raw)'],
+		);
+		assert.strictEqual(cell(headerRow, 2).placeholder, 'Response attribute');
+		assert.strictEqual(cell(headerRow, 2)['aria-label'], 'Response attribute');
+		assert.strictEqual(cell(headerRow, 2).disabled, false);
+		assert.strictEqual(cell(headerRow, 3)['aria-label'], 'Environment variable');
+		assert.strictEqual(cell(jsonRow, 2).disabled, false);
+		assert.strictEqual(cell(rawRow, 2).disabled, true);
+		const saved = sandbox.readAutomationRef?.();
+		assert.strictEqual(saved?.[0].type, undefined);
+		assert.strictEqual(saved?.[1].type, 'json');
+		assert.strictEqual(saved?.[2].type, 'raw');
+		const jsonType = cell(jsonRow, 1);
+		jsonType.value = 'raw';
+		jsonType.dispatch('change');
+		assert.strictEqual(cell(jsonRow, 2).disabled, true);
+		jsonType.value = 'header';
+		jsonType.dispatch('change');
+		assert.strictEqual(cell(jsonRow, 2).disabled, false);
 	});
 	test('header, param, and automation counts include disabled and partial rows but exclude blank rows', () => {
 		const html = getWebviewHtml({} as vscode.Webview, '1.2.3');

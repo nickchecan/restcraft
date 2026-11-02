@@ -1,4 +1,4 @@
-import { responseHeaderAssignments } from '../request/automation';
+import { automationAssignments } from '../request/automation';
 import * as vscode from 'vscode';
 import { isAbsolute, posix } from 'path';
 import { isEnvironmentFileSettings, copyEnvironmentFileSettings, isTokenView } from '../request/environmentSettings';
@@ -380,7 +380,7 @@ async function handleMessage(
 
 		let automationError: string | undefined;
 		try {
-			const assignments = responseHeaderAssignments(message.automation ?? [], response.headers);
+			const assignments = automationAssignments(message.automation ?? [], response);
 			if (Object.keys(assignments).length) {
 				const uri = requestUri;
 				if (!uri) {

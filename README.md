@@ -113,19 +113,32 @@ Open VS Code Settings and search for **RestCraft**.
 - [Release notes](https://github.com/nickchecan/restcraft/releases)
 - [Development and testing](https://github.com/nickchecan/restcraft/blob/main/docs/development.md)
 
-### Response header automation
+### Response automation
 
-In a request's **Automations** tab, add mappings from response header names (for example,
-`X-Session-Token`) to environment variable names (for example, `SESSION_TOKEN`). Each enabled,
-complete mapping runs after a user-triggered request finishes, for any HTTP status code. Header
-names match without regard to case; missing headers leave existing variables unchanged.
-Use `{{SESSION_TOKEN}}` in subsequent requests.
+In a request's **Automations** tab, each row copies part of the response into an environment
+variable after a user-triggered request finishes, for any HTTP status code. Use `{{SESSION_TOKEN}}`
+in later requests. **Type** chooses what **Response attribute** means:
 
-Mappings are saved with the request as an optional `automation` array:
+- **Header** copies the named response header. Names match without regard to case. A missing header
+  leaves the variable unchanged. Saved rows with no `type` are headers.
+- **Body (JSON)** reads one value from a JSON response body. The attribute is a case-sensitive dot
+  path with array indexes, such as `data.items[0].id`. Each segment is an identifier (a letter or
+  underscore, then letters, digits, or underscores) plus optional indexes such as `[0]`. A path may
+  start with an index when the body is an array, such as `[0].id`. Strings are written as text.
+  Numbers and booleans use their string form (`1`, `true`). `null` is written as `null`. Objects
+  and arrays are compact JSON text. A missing path, or a body that is not JSON, leaves the variable
+  unchanged.
+- **Body (Raw)** copies the whole response body, including an empty body. The attribute input is
+  disabled and ignored.
+
+Rows are saved as an optional `automation` array. The attribute is stored in `header`. Header rows
+omit `type`, and an explicit `"type": "header"` is saved back without it.
 
 ```json
 "automation": [
-  { "header": "X-Session-Token", "variable": "SESSION_TOKEN", "enabled": true }
+  { "enabled": true, "header": "X-Session-Token", "variable": "SESSION_TOKEN" },
+  { "enabled": true, "type": "json", "header": "data.items[0].id", "variable": "ITEM_ID" },
+  { "enabled": true, "type": "raw", "header": "", "variable": "RESPONSE_BODY" }
 ]
 ```
 
@@ -133,6 +146,8 @@ Writes use the request's environment selection in **Settings**: the nearest `.en
 manual file. In nearest mode, a missing `.env` is created beside the request; manual mode never
 falls back to another file. Save or load a request file first. Automation requires a trusted
 workspace and refuses to overwrite an environment file with unsaved edits. Existing comments,
-unrelated variables, and line endings are preserved. Empty header values clear the mapped value;
-values that cannot safely round-trip through the `.env` parser are rejected. A write failure
+unrelated variables, and line endings are preserved. An empty header value clears the mapped
+variable. Values that fit in one quoted `.env` line are quoted as before. Newlines, other characters
+outside printable ASCII, and values that contain both quote characters are stored on one line as
+`$restcraft:` plus a JSON string, so the file stays valid and the value round-trips. A write failure
 shows a warning while keeping the received response available.

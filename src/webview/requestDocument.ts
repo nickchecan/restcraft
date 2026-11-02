@@ -1,3 +1,4 @@
+import { automationForPersistence } from '../request/automation';
 import { headersForPersistence, readOAuthAuthorization } from '../request/oauth';
 import { copyEnvironmentFileSettings } from '../request/environmentSettings';
 import { isRecord } from '../shared/object';
@@ -26,7 +27,7 @@ export function createUpdatedRequestDocumentText(
 	parsed.url = message.url;
 	parsed.params = message.params;
 	if (message.automation?.length) {
-		parsed.automation = message.automation;
+		parsed.automation = automationForPersistence(message.automation);
 	} else {
 		delete parsed.automation;
 	}

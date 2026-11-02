@@ -213,9 +213,9 @@ export function workbenchMarkup(escapedExtensionVersion: string): string {
 				</div>
 			</div>
 			<div class="request-panel-content hidden" id="request-automation-panel" role="tabpanel" aria-labelledby="request-automation-tab">
-				<p>After each completed request, copy response headers to the selected .env file. Header names are case-insensitive. Missing headers leave variables unchanged. All HTTP status codes apply.</p>
-				<table class="request-headers-table" aria-label="Response header automation">
-					<thead><tr><th scope="col"><span class="sr-only">Enabled</span></th><th scope="col">Response header</th><th scope="col">Environment variable</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+				<p>After each completed request, copy a response header, a JSON value, or the raw body into the selected .env file. Missing headers and missing JSON values leave variables unchanged. All HTTP status codes apply.</p>
+				<table class="request-headers-table" aria-label="Response automation">
+					<thead><tr><th scope="col"><span class="sr-only">Enabled</span></th><th scope="col">Type</th><th scope="col">Response attribute</th><th scope="col">Environment variable</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
 					<tbody id="automation-rows"></tbody>
 				</table>
 				<button class="request-header-add" id="automation-add" type="button">${buttonIcons.add}<span>Add Mapping</span></button>

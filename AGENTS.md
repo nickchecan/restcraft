@@ -228,7 +228,7 @@ The default build task is `watch`, defined in `.vscode/tasks.json`, and it runs:
   - `headerState`: canonical ordered `{ name, value, enabled }` header entries
   - `headers`: legacy string-valued object accepted on read; canonical saves use `headerState` instead
   - `body`: any JSON value, stored as `null` when absent in the editor
-  - Optional `description`, `authorization`, `environment`, and `authorizeBeforeSend` fields; follow `src/request/types.ts`, parser validation, and README examples for their shapes
+  - Optional `description`, `authorization`, `environment`, `authorizeBeforeSend`, and `automation` fields; follow `src/request/types.ts`, parser validation, and README examples for their shapes
 - Preserve disabled parameters and headers in the saved file, but omit them from execution. Keep legacy request loading compatible.
 - Environment references use `{{VARIABLE_NAME}}`. Nearest mode searches the request directory and then parents up to the containing workspace root, using the first `.env` found without merging files. Manual mode uses the selected path and does not fall back when it is missing; relative paths resolve from the request directory.
 - Reading environment values, OAuth operations, and sending requests require a trusted workspace. Keep secrets out of diagnostics and generated HTML.

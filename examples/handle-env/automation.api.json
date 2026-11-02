@@ -16,6 +16,18 @@
 			"enabled": true,
 			"header": "location",
 			"variable": "LOCATIONS"
+		},
+		{
+			"enabled": true,
+			"type": "json",
+			"header": "id",
+			"variable": "POST_ID"
+		},
+		{
+			"enabled": true,
+			"type": "raw",
+			"header": "",
+			"variable": "RESPONSE_BODY"
 		}
 	]
 }
