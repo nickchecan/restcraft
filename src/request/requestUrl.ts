@@ -24,6 +24,15 @@ export function serializeRequestUrl(
 	const trimmed = url.trim();
 	const tokens = new Map<string, string>();
 	const parts = [trimmed, ...(query ?? []).flatMap(([name, value]) => [name, value])];
+	// Host parsing percent-decodes and applies IDNA before restore. A stray `%`
+	// makes decodeURIComponent throw for the whole string, so also record the
+	// URL the parser would actually serialize after placeholders are removed.
+	let normalized = '';
+	try {
+		normalized = new URL(trimmed.replace(/\{\{\s*[A-Za-z_][A-Za-z0-9_]*\s*\}\}/g, '')).href;
+	} catch {
+		normalized = '';
+	}
 	const haystack = parts
 		.flatMap((part) => {
 			try {
@@ -32,6 +41,7 @@ export function serializeRequestUrl(
 				return [part];
 			}
 		})
+		.concat(normalized)
 		.join('\n')
 		.toLowerCase();
 	let serial = 0;
@@ -88,7 +98,12 @@ export function serializeRequestUrl(
 	try {
 		parsed = new URL(shieldedUrl);
 	} catch {
-		if (query === undefined && isSubstitutableHttpUrl(trimmed)) {
+		// Query rows are read from the text even when the URL is not absolute.
+		// Rebuild that query without requiring the parser to accept the rest.
+		if (query !== undefined) {
+			return { url: replaceQuery(trimmed) };
+		}
+		if (isSubstitutableHttpUrl(trimmed)) {
 			return { url: trimmed };
 		}
 		return { error: 'invalid' };

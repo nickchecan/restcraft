@@ -265,9 +265,61 @@ suite('Environment variable name case', () => {
 		assert.deepStrictEqual(sent, { url: '{{baseUrl}}/x?a=1' });
 	});
 
+	test('drops a disabled query row when the URL itself cannot be parsed', () => {
+		// Arrange
+		const hostAndPort = 'https://{{host}}:{{port}}/x?a=1&b=2#section';
+		const localhostPort = 'http://localhost:{{port}}/x?a=1&b=2';
+
+		// Act
+		const hostSent = serializeRequestUrl(hostAndPort, [['a', '1']], false);
+		const localSent = serializeRequestUrl(localhostPort, [['a', '1']], false);
+
+		// Assert
+		assert.deepStrictEqual(readQueryParamsFromUrl(hostAndPort), [
+			['a', '1'],
+			['b', '2'],
+		]);
+		assert.deepStrictEqual(readQueryParamsFromUrl(localhostPort), [
+			['a', '1'],
+			['b', '2'],
+		]);
+		assert.deepStrictEqual(hostSent, { url: 'https://{{host}}:{{port}}/x?a=1#section' });
+		assert.deepStrictEqual(localSent, { url: 'http://localhost:{{port}}/x?a=1' });
+		assert.strictEqual(
+			parseRequestFile(JSON.stringify({ name: 'Host port', method: 'GET', url: hostAndPort })).url,
+			hostAndPort,
+		);
+	});
+
 	test('does not treat a percent-decoded host as a placeholder', () => {
 		// Arrange
 		const url = 'https://rc0v%61r.example.com/{{a}}';
+
+		// Act
+		const serialized = serializeRequestUrl(url, undefined, true);
+		const resolved = resolveRequestVariables({ method: 'GET', url: serialized.url ?? '' }, { a: 'items' });
+
+		// Assert
+		assert.strictEqual(serialized.url, 'https://rc0var.example.com/{{a}}');
+		assert.strictEqual(resolved.url, 'https://rc0var.example.com/items');
+	});
+
+	test('does not treat a host decoded beside a stray percent sign as a placeholder', () => {
+		// Arrange
+		const url = 'https://rc0v%61r.example.com/{{a}}?q=100%';
+
+		// Act
+		const saved = serializeRequestUrl(url, undefined, true);
+		const sent = serializeRequestUrl(url, undefined, false);
+
+		// Assert
+		assert.strictEqual(saved.url, 'https://rc0var.example.com/{{a}}?q=100%');
+		assert.strictEqual(sent.url, 'https://rc0var.example.com/{{a}}?q=100%');
+	});
+
+	test('does not treat a fullwidth host mapped to the placeholder text as a variable', () => {
+		// Arrange
+		const url = 'https://ｒｃ0var.example.com/{{a}}';
 
 		// Act
 		const serialized = serializeRequestUrl(url, undefined, true);
