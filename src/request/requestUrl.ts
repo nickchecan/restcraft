@@ -88,7 +88,10 @@ export function serializeRequestUrl(
 	const shieldedUrl = shield(trimmed);
 	// A leading token is the unresolved origin, not an absolute URL.
 	if ([...tokens.keys()].some((token) => shieldedUrl.startsWith(token))) {
-		if (!isSubstitutableHttpUrl(trimmed)) {
+		// A variable port such as {{host}}:{{port}} is not a valid URL yet.
+		// Reject that only when storing the URL. Query rows are still edited
+		// from the text, so rebuild the query instead of leaving disabled rows in place.
+		if (query === undefined && !isSubstitutableHttpUrl(trimmed)) {
 			return { error: 'invalid' };
 		}
 		return { url: query === undefined ? trimmed : replaceQuery(trimmed) };

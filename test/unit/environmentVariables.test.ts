@@ -265,6 +265,24 @@ suite('Environment variable name case', () => {
 		assert.deepStrictEqual(sent, { url: '{{baseUrl}}/x?a=1' });
 	});
 
+	test('drops a disabled query row when the origin and port are both variables', () => {
+		// Arrange
+		const url = '{{host}}:{{port}}/x?a=1&b=2';
+
+		// Act
+		const sent = serializeRequestUrl(url, [['a', '1']], false);
+		const withFragment = serializeRequestUrl(`${url}#f`, [['a', '1']], false);
+
+		// Assert
+		assert.deepStrictEqual(readQueryParamsFromUrl(url), [
+			['a', '1'],
+			['b', '2'],
+		]);
+		assert.deepStrictEqual(sent, { url: '{{host}}:{{port}}/x?a=1' });
+		assert.deepStrictEqual(withFragment, { url: '{{host}}:{{port}}/x?a=1#f' });
+		assert.deepStrictEqual(serializeRequestUrl(url, undefined, true), { error: 'invalid' });
+	});
+
 	test('drops a disabled query row when the URL itself cannot be parsed', () => {
 		// Arrange
 		const hostAndPort = 'https://{{host}}:{{port}}/x?a=1&b=2#section';
