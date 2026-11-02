@@ -3,7 +3,7 @@ import { runInNewContext } from 'vm';
 
 import { parseEnvFile, resolveRequestVariables } from '../../src/request/environment';
 import { parseRequestFile } from '../../src/request/requestFile';
-import { serializeRequestUrl } from '../../src/request/requestUrl';
+import { readQueryParamsFromUrl, serializeRequestUrl } from '../../src/request/requestUrl';
 import { workbenchScript } from '../../src/webview/workbenchScript';
 
 const variables = parseEnvFile('baseUrl=https://api.example.com\nAPI_HOST=edge.example.com\nUserId=42\n');
@@ -138,6 +138,81 @@ suite('Environment variable name case', () => {
 		assert.strictEqual(resolved.url, 'https://edge.example.com/v1/https://api.example.com?user=42');
 		assert.strictEqual(resolved.headers?.['X-User'], '42');
 		assert.strictEqual(resolved.body, '{"user":"42","host":"edge.example.com"}');
+	});
+
+	test('drops a disabled query row on a variable-first URL and reloads the table', () => {
+		// Arrange
+		const url = '{{baseUrl}}/x?a=1&b=2';
+		const script = workbenchScript();
+		const helpers = script.slice(
+			script.indexOf('const serializeRequestUrl = '),
+			script.indexOf('function readEnabledRequestUrl()'),
+		);
+		const readEnabled = script.slice(
+			script.indexOf('function readEnabledRequestUrl()'),
+			script.indexOf('function readParamRows'),
+		);
+		const readParams = script.slice(
+			script.indexOf('function readParamsFromUrl()'),
+			script.indexOf('function updateUrlFromParams()'),
+		);
+		const updateUrl = script.slice(
+			script.indexOf('function updateUrlFromParams()'),
+			script.indexOf('function updateRequestTabIndicators'),
+		);
+		const context = {
+			url: { value: url },
+			readParamRows: () => [['a', '1']],
+			URL,
+		};
+
+		// Act
+		const sent = serializeRequestUrl(url, [['a', '1']], false);
+		const parsed = parseRequestFile(JSON.stringify({ name: 'Query', method: 'GET', url }));
+		const workbench = runInNewContext(
+			`${helpers}\n${readEnabled}\n${readParams}\n${updateUrl}\nconst loaded = readParamsFromUrl();\nconst sentUrl = readEnabledRequestUrl();\nupdateUrlFromParams();\n({ loaded, sentUrl, saved: url.value })`,
+			context,
+		) as { loaded: Array<[string, string]>; sentUrl: string; saved: string };
+
+		// Assert
+		assert.deepStrictEqual(sent, { url: '{{baseUrl}}/x?a=1' });
+		assert.deepStrictEqual(parsed.params, [
+			{ name: 'a', value: '1', enabled: true },
+			{ name: 'b', value: '2', enabled: true },
+		]);
+		assert.deepStrictEqual(JSON.parse(JSON.stringify(workbench.loaded)) as Array<[string, string]>, [
+			['a', '1'],
+			['b', '2'],
+		]);
+		assert.strictEqual(workbench.sentUrl, '{{baseUrl}}/x?a=1');
+		assert.strictEqual(workbench.saved, '{{baseUrl}}/x?a=1');
+		assert.deepStrictEqual(readQueryParamsFromUrl(url), [
+			['a', '1'],
+			['b', '2'],
+		]);
+	});
+
+	test('does not restore a placeholder onto a literal rc0var in the host, path, or query', () => {
+		// Arrange
+		const url = 'https://RC0VAR.example.com/rc0var/{{path}}';
+
+		// Act
+		const serialized = serializeRequestUrl(
+			url,
+			[
+				['q', 'rc0var'],
+				['v', '{{a}}'],
+			],
+			false,
+		);
+		const resolved = resolveRequestVariables(
+			{ method: 'GET', url: serialized.url ?? '' },
+			{ path: 'items', a: 'alpha' },
+		);
+
+		// Assert
+		assert.strictEqual(serialized.url, 'https://rc0var.example.com/rc0var/{{path}}?q=rc0var&v={{a}}');
+		assert.strictEqual(resolved.url, 'https://rc0var.example.com/rc0var/items?q=rc0var&v=alpha');
 	});
 
 	test('canonicalizes ordinary URLs and still rejects non-http URLs', () => {

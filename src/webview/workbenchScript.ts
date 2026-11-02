@@ -1,4 +1,4 @@
-import { serializeRequestUrl } from '../request/requestUrl';
+import { readQueryParamsFromUrl, serializeRequestUrl } from '../request/requestUrl';
 import { buttonIcons } from './buttonIcons';
 import { createEventStreamParser } from './eventStream';
 
@@ -2274,6 +2274,7 @@ export function workbenchScript(): string {
 
 				// Builds the executable URL using only enabled query parameters.
 				const serializeRequestUrl = ${serializeRequestUrl.toString()};
+				const readQueryParamsFromUrl = ${readQueryParamsFromUrl.toString()};
 
 				function readEnabledRequestUrl() {
 					const serialized = serializeRequestUrl(url.value, readParamRows(true), false);
@@ -2299,11 +2300,7 @@ export function workbenchScript(): string {
 
 				// Parses query parameters from the current URL input.
 				function readParamsFromUrl() {
-					try {
-						return Array.from(new URL(url.value).searchParams.entries());
-					} catch {
-						return [];
-					}
+					return readQueryParamsFromUrl(url.value);
 				}
 
 				// Rewrites the URL query string from enabled parameter rows.

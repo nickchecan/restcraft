@@ -9,7 +9,7 @@ import {
 } from './types';
 import { isOAuthAuthorization, readOAuthAuthorization } from './oauth';
 import { isEnvironmentFileSettings, copyEnvironmentFileSettings } from './environmentSettings';
-import { serializeRequestUrl } from './requestUrl';
+import { readQueryParamsFromUrl, serializeRequestUrl } from './requestUrl';
 import { isRecord } from '../shared/object';
 
 /**
@@ -256,13 +256,9 @@ function readParam(param: unknown): RequestParamDefinition {
  * Derives enabled query parameter rows from the request URL.
  */
 function readParamsFromUrl(url: string): RequestParamDefinition[] {
-	try {
-		return Array.from(new URL(url).searchParams.entries()).map(([name, value]) => ({
-			name,
-			value,
-			enabled: true,
-		}));
-	} catch {
-		return [];
-	}
+	return readQueryParamsFromUrl(url).map(([name, value]) => ({
+		name,
+		value,
+		enabled: true,
+	}));
 }

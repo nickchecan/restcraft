@@ -3,7 +3,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { runInNewContext } from 'vm';
 
-import { serializeRequestUrl } from '../../src/request/requestUrl';
+import { readQueryParamsFromUrl, serializeRequestUrl } from '../../src/request/requestUrl';
 import { buttonIcons } from '../../src/webview/buttonIcons';
 import { createEventStreamParser } from '../../src/webview/eventStream';
 import { getWebviewHtml } from '../../src/webview/getWebviewHtml';
@@ -22,17 +22,20 @@ suite('Webview HTML', () => {
 		// Function#toString() follows the compiler (tsc here, esbuild in the bundle). Pin the HTML around it.
 		const parserSource = createEventStreamParser.toString();
 		const serializerSource = serializeRequestUrl.toString();
+		const querySource = readQueryParamsFromUrl.toString();
 		assert.strictEqual(html.split(parserSource).length, 2, 'Workbench script must embed createEventStreamParser once');
 		assert.strictEqual(html.split(serializerSource).length, 2, 'Workbench script must embed serializeRequestUrl once');
+		assert.strictEqual(html.split(querySource).length, 2, 'Workbench script must embed readQueryParamsFromUrl once');
 		const normalized = html
 			.replace(parserSource, 'PARSER')
 			.replace(serializerSource, 'SERIALIZER')
+			.replace(querySource, 'QUERY')
 			.replaceAll(nonce, 'FIXED');
 		assert.ok(normalized.includes('This URL changes per request on the web.'));
 		assert.ok(normalized.includes('id="oauth-redirect-note"'));
 		assert.strictEqual(
 			createHash('sha256').update(normalized).digest('hex'),
-			'd94d855007345a0e196a86fd6b3123dd5f950b5fa6a44ecf45b31b92052b022a',
+			'b896f9c8c46a700be517da3ac60817b65bc63f6fd93d5efdfafb9c83a1bf36fd',
 		);
 	});
 	test('authorization divider limits dragging, supports keyboard resizing, and resets', () => {
