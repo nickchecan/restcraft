@@ -147,12 +147,13 @@ manual file. In nearest mode, a missing `.env` is created beside the request; ma
 falls back to another file. Save or load a request file first. Automation requires a trusted
 workspace and refuses to overwrite an environment file with unsaved edits. Existing comments,
 unrelated variables, and line endings are preserved. An empty header value clears the mapped
-variable. Printable values are quoted as before (`NAME="abc"`, or single quotes when the value
-contains `"`). Newlines, carriage returns, tabs, backslashes, and values that contain both quote
-characters are one double-quoted line using `\n`, `\r`, `\t`, `\\`, and `\"`, for example
+variable. Plain printable values stay double-quoted (`NAME="abc"`). A value with a backslash or a
+double quote, and no newline, carriage return, tab, or single quote, is single-quoted so it stays
+literal (`PATH_X='C:\temp'`). Newlines, carriage returns, tabs, and values that contain both quote
+characters are one escaped double-quoted line using `\n`, `\r`, `\t`, `\\`, and `\"`, for example
 `NAME="line1\nline2"`. U+2028 and U+2029 are written as `\u2028` and `\u2029`. Other characters,
 including non-ASCII text, stay UTF-8 inside the quotes.
 Reading a double-quoted value decodes those escapes and the two line separators. Any other backslash sequence, such as
-`\T` or `\x`, stays as written, as do single-quoted and unquoted values. An existing value such as
-`PATH_X="C:\temp"` is therefore read with a tab, and `PATH_X="C:\new"` is read with a newline.
+`\T` or `\x`, stays as written, as do single-quoted and unquoted values. An existing double-quoted
+value such as `PATH_X="C:\temp"` is therefore read with a tab, and `PATH_X="C:\new"` is read with a newline.
 A write failure shows a warning while keeping the received response available.

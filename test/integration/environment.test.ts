@@ -136,15 +136,22 @@ suite('Environment variables', () => {
 	});
 
 	test('round-trips dotenv escapes and leaves other values literal', () => {
-		const pretty = '{\n  "id": "abc"\n}\n';
+		const pretty = '{\n  "quote": "say \\"hi\\"",\n  "path": "C:\\\\temp"\n}\n';
 		const prettyStored = updateEnvValue('', 'BODY', pretty);
-		assert.strictEqual(prettyStored, 'BODY="{\\n  \\"id\\": \\"abc\\"\\n}\\n"\n');
+		assert.strictEqual(
+			prettyStored,
+			'BODY="{\\n  \\"quote\\": \\"say \\\\\\"hi\\\\\\"\\",\\n  \\"path\\": \\"C:\\\\\\\\temp\\"\\n}\\n"\n',
+		);
 		assert.strictEqual(parseEnvFile(prettyStored).BODY, pretty);
 		assert.strictEqual(prettyStored.split('\n').length, 2);
 
 		const quoted = 'say "hi"';
 		assert.strictEqual(updateEnvValue('', 'TOKEN', quoted), 'TOKEN=\'say "hi"\'\n');
 		assert.strictEqual(parseEnvFile(updateEnvValue('', 'TOKEN', quoted)).TOKEN, quoted);
+		assert.strictEqual(updateEnvValue('', 'PATH_X', 'C:\\temp'), "PATH_X='C:\\temp'\n");
+		assert.strictEqual(parseEnvFile(updateEnvValue('', 'PATH_X', 'C:\\temp')).PATH_X, 'C:\\temp');
+		assert.strictEqual(updateEnvValue('', 'PATH_X', 'C:\\new'), "PATH_X='C:\\new'\n");
+		assert.strictEqual(parseEnvFile(updateEnvValue('', 'PATH_X', 'C:\\new')).PATH_X, 'C:\\new');
 
 		const bothQuotes = 'it\'s "fine"';
 		const bothStored = updateEnvValue('', 'TOKEN', bothQuotes);
@@ -153,9 +160,9 @@ suite('Environment variables', () => {
 
 		const slashed = 'C:\\temp\\';
 		const slashStored = updateEnvValue('', 'PATH_X', slashed);
-		assert.strictEqual(slashStored, 'PATH_X="C:\\\\temp\\\\"\n');
+		assert.strictEqual(slashStored, "PATH_X='C:\\temp\\'\n");
 		assert.strictEqual(parseEnvFile(slashStored).PATH_X, slashed);
-		assert.strictEqual(updateEnvValue('', 'PATH_X', 'end\\'), 'PATH_X="end\\"\n');
+		assert.strictEqual(updateEnvValue('', 'PATH_X', 'end\\'), "PATH_X='end\\'\n");
 		assert.strictEqual(parseEnvFile(updateEnvValue('', 'PATH_X', 'end\\')).PATH_X, 'end\\');
 
 		const spaced = 'a\tb\r\nc';
@@ -166,7 +173,7 @@ suite('Environment variables', () => {
 		assert.strictEqual(updateEnvValue('', 'TOKEN', 'abc'), 'TOKEN="abc"\n');
 		assert.strictEqual(updateEnvValue('', 'TOKEN', 'a b'), 'TOKEN="a b"\n');
 		assert.strictEqual(updateEnvValue('', 'TOKEN', "it's"), 'TOKEN="it\'s"\n');
-		assert.strictEqual(updateEnvValue('', 'PATH_X', 'C:\\Users'), 'PATH_X="C:\\Users"\n');
+		assert.strictEqual(updateEnvValue('', 'PATH_X', 'C:\\Users'), "PATH_X='C:\\Users'\n");
 		assert.strictEqual(parseEnvFile('PATH_X="C:\\Users"\n').PATH_X, 'C:\\Users');
 		assert.strictEqual(parseEnvFile('FOO="a\\Tb\\xc"\n').FOO, 'a\\Tb\\xc');
 		assert.strictEqual(parseEnvFile('PATH_X="C:\\temp"\n').PATH_X, 'C:\temp');

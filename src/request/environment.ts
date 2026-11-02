@@ -147,9 +147,6 @@ function isFormUrlEncoded(headers: Record<string, string>): boolean {
 	return false;
 }
 
-/** Backslash followed by a sequence this reader turns into a character. */
-const recognizedEscape = /\\(?:\\|n|r|t|")/;
-
 function decodeEnvValue(value: string): string {
 	if (value.length < 2) {
 		return value;
@@ -208,20 +205,25 @@ function decodeDoubleQuoted(value: string): string {
 	return decoded;
 }
 
+/** Two-character sequences the double-quote reader turns into one character. */
+const decodedDoubleQuoteEscape = /\\(?:\\|n|r|t|")/;
+
 /**
- * Printable values keep the previous quoting so rewritten files do not churn.
+ * Single quotes keep a backslash literal.
  *
- * A double-quoted value is escaped when it contains a sequence the reader
- * decodes; single quotes can still hold a raw backslash.
+ * Escaped double quotes are for real newlines, returns, tabs, line separators,
+ * both quote characters, or a backslash that cannot sit in single quotes.
  */
-function isLegacyQuotedValue(value: string): boolean {
-	if (!/^[\x20-\x7e]*$/.test(value) || (value.includes('"') && value.includes("'"))) {
-		return false;
-	}
-	if (value.includes('"')) {
-		return true;
-	}
-	return !recognizedEscape.test(value);
+function needsEscapedDoubleQuotes(value: string): boolean {
+	return (
+		value.includes('\n') ||
+		value.includes('\r') ||
+		value.includes('\t') ||
+		value.includes('\u2028') ||
+		value.includes('\u2029') ||
+		(value.includes('"') && value.includes("'")) ||
+		(value.includes("'") && decodedDoubleQuoteEscape.test(value))
+	);
 }
 
 function encodeDotenvDoubleQuoted(value: string): string {
@@ -249,11 +251,12 @@ function encodeDotenvDoubleQuoted(value: string): string {
 }
 
 function encodeEnvAssignment(name: string, value: string): string {
-	if (isLegacyQuotedValue(value)) {
-		const quote = value.includes('"') ? "'" : '"';
-		return `${name}=${quote}${value}${quote}`;
+	if (!needsEscapedDoubleQuotes(value) && (value.includes('\\') || value.includes('"')) && !value.includes("'")) {
+		return `${name}='${value}'`;
 	}
-
+	if (!needsEscapedDoubleQuotes(value)) {
+		return `${name}="${value}"`;
+	}
 	return `${name}=${encodeDotenvDoubleQuoted(value)}`;
 }
 
