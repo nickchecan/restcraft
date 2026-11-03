@@ -383,7 +383,6 @@ export function workbenchScript(): string {
 			const responseSize = document.getElementById('response-size');
 			const responseHeaders = document.getElementById('response-headers');
 			const responseRawContent = document.getElementById('response-raw-content');
-			const responseRawLines = document.getElementById('response-raw-lines');
 			const responseRaw = document.getElementById('response-raw');
 			const responsePreview = document.getElementById('response-preview');
 			const responsePreviewEmpty = document.getElementById('response-preview-empty');
@@ -395,7 +394,6 @@ export function workbenchScript(): string {
 			const footerSettingsButton = document.getElementById('footer-settings-button');
 			const editorFooter = document.querySelector('.editor-footer');
 				const responseBodyContent = document.getElementById('response-body-content');
-				const responseBodyLines = document.getElementById('response-body-lines');
 				const responseBody = document.getElementById('response-body');
 				const streamEvents = document.getElementById('stream-events');
 				const streamEventList = document.getElementById('stream-event-list');
@@ -612,30 +610,6 @@ export function workbenchScript(): string {
 			previewTab.addEventListener('click', () => {
 				showResponseTab('preview');
 			});
-
-				responseBodyContent.addEventListener('mousemove', (event) => {
-					if (!streamParser) { updateScrollablePreHoverLine(responseBodyContent, responseBody, event); }
-				});
-
-				responseBodyContent.addEventListener('mouseleave', () => {
-					clearHoverLine(responseBodyContent);
-				});
-
-			responseBodyContent.addEventListener('scroll', () => {
-				clearHoverLine(responseBodyContent);
-			});
-
-				responseRawContent.addEventListener('mousemove', (event) => {
-					updateScrollablePreHoverLine(responseRawContent, responseRaw, event);
-				});
-
-				responseRawContent.addEventListener('mouseleave', () => {
-					clearHoverLine(responseRawContent);
-				});
-
-				responseRawContent.addEventListener('scroll', () => {
-					clearHoverLine(responseRawContent);
-				});
 
             // Wait for the existing token result handler to update output and header rows.
             function authorizeForSend() {
@@ -1251,28 +1225,6 @@ export function workbenchScript(): string {
 
 					const lineIndex = Math.floor(y / metrics.lineHeight);
 					const top = textEditor.offsetTop + metrics.paddingTop + (lineIndex * metrics.lineHeight) - textEditor.scrollTop;
-					setHoverLine(container, top, metrics.lineHeight);
-				}
-
-				// Positions the hover-line highlight for scrollable response blocks.
-				function updateScrollablePreHoverLine(container, textEditor, event) {
-					const editorRect = textEditor.getBoundingClientRect();
-
-					if (event.clientY < editorRect.top || event.clientY > editorRect.bottom) {
-						clearHoverLine(container);
-						return;
-					}
-
-					const metrics = getTextMetrics(textEditor);
-					const y = event.clientY - editorRect.top - metrics.paddingTop;
-
-					if (y < 0) {
-						clearHoverLine(container);
-						return;
-					}
-
-					const lineIndex = Math.floor(y / metrics.lineHeight);
-					const top = textEditor.offsetTop + metrics.paddingTop + (lineIndex * metrics.lineHeight);
 					setHoverLine(container, top, metrics.lineHeight);
 				}
 
@@ -2511,6 +2463,35 @@ export function workbenchScript(): string {
 						.replace(/>/g, '&gt;');
 				}
 
+			// Paints one response line so its number, code, and hover share the same row.
+			function renderResponseLines(container, content, highlightJson) {
+				const lines = content.split('\\n');
+				const digits = String(Math.max(lines.length, 1)).length;
+				container.style.setProperty('--response-gutter', 'max(44px, calc(' + digits + 'ch + 16px))');
+				container.replaceChildren();
+
+				for (let index = 0; index < lines.length; index++) {
+					const row = document.createElement('div');
+					const number = document.createElement('span');
+					const code = document.createElement('span');
+					const line = lines[index];
+					row.className = 'response-line';
+					number.className = 'response-line-number';
+					number.setAttribute('aria-hidden', 'true');
+					number.textContent = String(index + 1);
+					code.className = 'response-line-code';
+
+					if (highlightJson) {
+						code.innerHTML = formatJsonHighlight(line);
+					} else {
+						code.textContent = line;
+					}
+
+					row.append(number, code);
+					container.append(row);
+				}
+			}
+
 			// Sets formatted response body text and line numbers.
 			function setBodyContent(content, highlightJson) {
 				streamParser = undefined;
@@ -2518,19 +2499,12 @@ export function workbenchScript(): string {
 				streamEvents.classList.add('hidden');
 				responseBodyContent.classList.remove('events-mode');
 				streamEventList.replaceChildren();
-				if (highlightJson) {
-					responseBody.innerHTML = formatJsonHighlight(content);
-				} else {
-					responseBody.textContent = content;
-				}
-
-				responseBodyLines.textContent = formatLineNumbers(content);
+				renderResponseLines(responseBody, content, highlightJson);
 			}
 
 			// Sets raw response body text and line numbers.
 			function setRawContent(content) {
-				responseRaw.textContent = content;
-				responseRawLines.textContent = formatLineNumbers(content);
+				renderResponseLines(responseRaw, content, false);
 			}
 
 			// Formats and renders response body content based on headers.

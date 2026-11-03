@@ -3,6 +3,7 @@ import { runInNewContext } from 'vm';
 
 import { workbenchMarkup } from '../../src/webview/workbenchMarkup';
 import { workbenchScript } from '../../src/webview/workbenchScript';
+import { workbenchStyles } from '../../src/webview/workbenchStyles';
 
 function errorText(error: unknown): string {
 	if (error instanceof Error) {
@@ -86,6 +87,107 @@ suite('Request editor tabs', () => {
 		}
 	});
 });
+
+suite('Response line alignment', () => {
+	test('keeps each body and raw line number, code text, and hover on one row', () => {
+		// Arrange
+		const page = createWorkbenchPage(workbenchMarkup('1.12.3'));
+		const payload = {
+			id: 7,
+			short: 'ok',
+			token: `T${'X'.repeat(220)}`,
+			sentence: `${'alpha '.repeat(12).trim()} end`,
+			nested: { a: 1, b: false },
+		};
+		const rawBody = JSON.stringify(payload);
+		const pretty = JSON.stringify(payload, null, 2);
+		const plain = `short\n\n${'y'.repeat(240)}`;
+
+		// Act
+		let initError: unknown;
+		try {
+			runInNewContext(workbenchScript(), page.sandbox, { filename: 'workbench.js' });
+		} catch (error) {
+			initError = error;
+		}
+		let renderError: unknown;
+		try {
+			page.dispatch({
+				type: 'requestComplete',
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: { 'Content-Type': 'application/json' },
+					body: rawBody,
+				},
+			});
+		} catch (error) {
+			renderError = error;
+		}
+
+		// Assert
+		assert.ok(initError === undefined, errorText(initError));
+		assert.ok(renderError === undefined, errorText(renderError));
+		assertResponseRows(page.element('response-body'), pretty.split('\n'), true);
+		assertResponseRows(page.element('response-raw'), rawBody.split('\n'), false);
+		const sharedStart = workbenchStyles.indexOf('.response-line-number,');
+		const sharedRule = workbenchStyles.slice(sharedStart, workbenchStyles.indexOf('}', sharedStart));
+		assert.ok(sharedRule.includes('.response-line-code'));
+		assert.ok(sharedRule.includes('font-family: var(--vscode-editor-font-family)'));
+		assert.ok(sharedRule.includes('font-size: var(--vscode-editor-font-size)'));
+		assert.ok(sharedRule.includes('line-height: 1.45'));
+		assert.ok(workbenchStyles.includes('.response-line:hover {'));
+		const highlighted = page
+			.element('response-body')
+			.querySelectorAll('.response-line-code')
+			.find((code) => code.innerHTML.includes('json-token-string'));
+		assert.ok(highlighted, 'Expected JSON token highlighting inside a response line.');
+
+		page.dispatch({
+			type: 'requestComplete',
+			response: {
+				status: 200,
+				statusText: 'OK',
+				headers: { 'Content-Type': 'text/plain' },
+				body: plain,
+			},
+		});
+		assertResponseRows(page.element('response-body'), plain.split('\n'), false);
+		assertResponseRows(page.element('response-raw'), plain.split('\n'), false);
+		assert.strictEqual(
+			page.element('response-body').querySelectorAll('.response-line')[1].querySelector('.response-line-code')
+				?.textContent,
+			'',
+		);
+		assert.strictEqual(
+			page.element('response-body').querySelectorAll('.response-line')[2].querySelector('.response-line-code')
+				?.textContent,
+			'y'.repeat(240),
+		);
+	});
+});
+
+function assertResponseRows(host: WorkbenchElement, lines: string[], highlighted: boolean): void {
+	const rows = host.querySelectorAll('.response-line');
+	assert.strictEqual(rows.length, lines.length);
+	rows.forEach((row, index) => {
+		const number = row.querySelector('.response-line-number');
+		const code = row.querySelector('.response-line-code');
+		assert.ok(number, `Missing line number on row ${index + 1}`);
+		assert.ok(code, `Missing line code on row ${index + 1}`);
+		assert.strictEqual(number.getAttribute('aria-hidden'), 'true');
+		assert.strictEqual(number.textContent, String(index + 1));
+		assert.strictEqual(
+			row.children.filter(
+				(child) => child.classList.contains('response-line-number') || child.classList.contains('response-line-code'),
+			).length,
+			2,
+		);
+		if (!highlighted) {
+			assert.strictEqual(code.textContent, lines[index]);
+		}
+	});
+}
 
 interface WorkbenchDocument {
 	byId: Map<string, WorkbenchElement>;
@@ -276,6 +378,10 @@ class WorkbenchElement {
 		}
 		this.parentElement.children = this.parentElement.children.filter((child) => child !== this);
 		this.parentElement = null;
+	}
+
+	public removeAttribute(name: string): void {
+		this.attributes.delete(name);
 	}
 
 	public replaceChildren(...nodes: WorkbenchElement[]): void {
@@ -530,6 +636,7 @@ function createWorkbenchPage(html: string): {
 	dispatch: (message: unknown) => void;
 	click: (id: string) => void;
 	value: (id: string) => string;
+	element: (id: string) => WorkbenchElement;
 	tab: (id: string) => { selected: string | null; hidden: boolean };
 } {
 	const doc = parseWorkbenchHtml(html);
@@ -544,6 +651,11 @@ function createWorkbenchPage(html: string): {
 		querySelector: (selector: string) => doc.root.querySelector(selector),
 		querySelectorAll: (selector: string) => doc.root.querySelectorAll(selector),
 		createElement: (tag: string) => new WorkbenchElement(tag, doc),
+		createTextNode: (text: string) => {
+			const node = new WorkbenchElement('#text', doc);
+			node.textContent = text;
+			return node;
+		},
 		addEventListener: listen,
 	};
 	const sandbox: Record<string, unknown> = {
@@ -607,6 +719,11 @@ function createWorkbenchPage(html: string): {
 			const element = doc.byId.get(id);
 			assert.ok(element, `Missing #${id}`);
 			element.click();
+		},
+		element: (id) => {
+			const element = doc.byId.get(id);
+			assert.ok(element, `Missing #${id}`);
+			return element;
 		},
 		value: (id) => doc.byId.get(id)?.value ?? '',
 		tab: (id) => {
