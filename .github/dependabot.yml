@@ -12,6 +12,11 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: 'chore'
+    ignore:
+      - dependency-name: '@types/vscode'
+        update-types:
+          - 'version-update:semver-minor'
+          - 'version-update:semver-major'
 
   - package-ecosystem: 'github-actions'
     directory: '/'
