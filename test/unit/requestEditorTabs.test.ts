@@ -1,8 +1,8 @@
 import * as assert from 'assert';
-import * as vscode from 'vscode';
 import { runInNewContext } from 'vm';
 
-import { getWebviewHtml } from '../../src/webview/getWebviewHtml';
+import { workbenchMarkup } from '../../src/webview/workbenchMarkup';
+import { workbenchScript } from '../../src/webview/workbenchScript';
 
 function errorText(error: unknown): string {
 	if (error instanceof Error) {
@@ -55,15 +55,12 @@ const voidElements = new Set([
 suite('Request editor tabs', () => {
 	test('switches Authorization, Headers, and Body after loading an empty-URL OAuth request', () => {
 		// Arrange
-		const html = getWebviewHtml({ cspSource: 'test' } as vscode.Webview, '1.12.2');
-		const script = html.match(/<script\b[^>]*>([\s\S]*?)<\/script>/i)?.[1];
-		assert.ok(script, 'Workbench document must include its script');
-		const page = createWorkbenchPage(html);
+		const page = createWorkbenchPage(workbenchMarkup('1.12.2'));
 
 		// Act
 		let initError: unknown;
 		try {
-			runInNewContext(script, page.sandbox, { filename: 'workbench.js' });
+			runInNewContext(workbenchScript(), page.sandbox, { filename: 'workbench.js' });
 		} catch (error) {
 			initError = error;
 		}
@@ -101,7 +98,22 @@ class ClassList {
 	public constructor(private readonly element: WorkbenchElement) {}
 
 	public syncFrom(className: string): void {
-		this.names = new Set(className.split(/\s+/).filter((name) => name.length > 0));
+		const names: string[] = [];
+		let current = '';
+		for (const char of className) {
+			if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+				if (current.length > 0) {
+					names.push(current);
+					current = '';
+				}
+			} else {
+				current += char;
+			}
+		}
+		if (current.length > 0) {
+			names.push(current);
+		}
+		this.names = new Set(names);
 	}
 
 	public add(...names: string[]): void {
@@ -395,16 +407,99 @@ function elementMatches(element: WorkbenchElement, selector: string): boolean {
 	});
 }
 
-function parseWorkbenchHtml(html: string): WorkbenchDocument {
+function isMarkupSpace(char: string): boolean {
+	return char === ' ' || char === '\t' || char === '\n' || char === '\r';
+}
+
+function collapseWhitespace(value: string): string {
+	let collapsed = '';
+	let previousSpace = false;
+	for (const char of value) {
+		if (isMarkupSpace(char)) {
+			if (!previousSpace) {
+				collapsed += ' ';
+			}
+			previousSpace = true;
+			continue;
+		}
+		previousSpace = false;
+		collapsed += char;
+	}
+	return collapsed;
+}
+
+function readAttributes(element: WorkbenchElement, source: string): void {
+	let index = 0;
+	while (index < source.length) {
+		while (index < source.length && isMarkupSpace(source[index])) {
+			index += 1;
+		}
+		if (index >= source.length || source[index] === '/') {
+			return;
+		}
+		const nameStart = index;
+		while (index < source.length && !isMarkupSpace(source[index]) && source[index] !== '=') {
+			index += 1;
+		}
+		const name = source.slice(nameStart, index);
+		let value = '';
+		if (source[index] === '=') {
+			index += 1;
+			if (source[index] === '"') {
+				const end = source.indexOf('"', index + 1);
+				value = source.slice(index + 1, end === -1 ? source.length : end);
+				index = end === -1 ? source.length : end + 1;
+			} else {
+				const valueStart = index;
+				while (index < source.length && !isMarkupSpace(source[index])) {
+					index += 1;
+				}
+				value = source.slice(valueStart, index);
+			}
+		}
+		element.setAttribute(name, value);
+		if (name === 'checked') {
+			element.checked = true;
+		}
+		if (name === 'disabled') {
+			element.disabled = true;
+		}
+		if (name === 'hidden') {
+			element.hidden = true;
+		}
+	}
+}
+
+function parseWorkbenchHtml(markup: string): WorkbenchDocument {
 	const doc = { byId: new Map<string, WorkbenchElement>(), root: undefined as unknown as WorkbenchElement };
 	doc.root = new WorkbenchElement('document', doc);
 	const stack = [doc.root];
-	const source = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
-	const tokens = /<!--[\s\S]*?-->|<\/([a-zA-Z0-9]+)>|<([a-zA-Z0-9]+)([^>]*)>|([^<]+)/g;
-	let match: RegExpExecArray | null;
-	while ((match = tokens.exec(source))) {
-		if (match[1]) {
-			const tag = match[1].toUpperCase();
+	let cursor = 0;
+	while (cursor < markup.length) {
+		const open = markup.indexOf('<', cursor);
+		if (open === -1) {
+			const text = collapseWhitespace(markup.slice(cursor));
+			if (text.trim()) {
+				stack[stack.length - 1].addText(text);
+			}
+			break;
+		}
+		if (open > cursor) {
+			const text = collapseWhitespace(markup.slice(cursor, open));
+			if (text.trim()) {
+				stack[stack.length - 1].addText(text);
+			}
+		}
+		if (markup.startsWith('<!--', open)) {
+			const end = markup.indexOf('-->', open + 4);
+			cursor = end === -1 ? markup.length : end + 3;
+			continue;
+		}
+		const close = markup.indexOf('>', open + 1);
+		const raw = markup.slice(open + 1, close === -1 ? markup.length : close);
+		cursor = close === -1 ? markup.length : close + 1;
+		if (raw.startsWith('/')) {
+			const tag = raw.slice(1).trim().toUpperCase();
 			for (let index = stack.length - 1; index > 0; index -= 1) {
 				const node = stack.pop();
 				if (node?.tagName === tag) {
@@ -413,35 +508,18 @@ function parseWorkbenchHtml(html: string): WorkbenchDocument {
 			}
 			continue;
 		}
-		if (match[2]) {
-			const element = new WorkbenchElement(match[2], doc);
-			const attrs = match[3] ?? '';
-			const attrTokens = /([^\s=]+)(?:="([^"]*)")?/g;
-			let attr: RegExpExecArray | null;
-			while ((attr = attrTokens.exec(attrs))) {
-				if (attr[1] === '/') {
-					continue;
-				}
-				element.setAttribute(attr[1], attr[2] ?? '');
-				if (attr[1] === 'checked') {
-					element.checked = true;
-				}
-				if (attr[1] === 'disabled') {
-					element.disabled = true;
-				}
-				if (attr[1] === 'hidden') {
-					element.hidden = true;
-				}
-			}
-			stack[stack.length - 1].append(element);
-			const selfClosing = attrs.trim().endsWith('/') || voidElements.has(match[2].toLowerCase());
-			if (!selfClosing) {
-				stack.push(element);
-			}
-			continue;
+		const selfClosing = raw.endsWith('/');
+		const body = (selfClosing ? raw.slice(0, -1) : raw).trim();
+		let nameEnd = 0;
+		while (nameEnd < body.length && !isMarkupSpace(body[nameEnd])) {
+			nameEnd += 1;
 		}
-		if (match[4]?.trim()) {
-			stack[stack.length - 1].addText(match[4].replace(/\s+/g, ' '));
+		const name = body.slice(0, nameEnd);
+		const element = new WorkbenchElement(name, doc);
+		readAttributes(element, body.slice(nameEnd));
+		stack[stack.length - 1].append(element);
+		if (!selfClosing && !voidElements.has(name.toLowerCase())) {
+			stack.push(element);
 		}
 	}
 	return doc;
