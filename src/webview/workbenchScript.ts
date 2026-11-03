@@ -424,7 +424,7 @@ export function workbenchScript(): string {
 				let textMeasureContext;
 				let activeAuthorizationType = 'none';
 				let activeRequestBodyType = 'raw';
-				renderRequestParamsFromUrl();
+				// Query rows are rendered at the end of this script, after readQueryParamsFromUrl exists.
 				renderRequestHeaders({});
 				updateResponseAreaBounds();
 				window.addEventListener('resize', updateResponseAreaBounds);
@@ -2712,5 +2712,9 @@ export function workbenchScript(): string {
 
 			return JSON.stringify(body, null, 2);
 		}
+
+		// readQueryParamsFromUrl is a const above this line. Calling it during the
+		// earlier startup sequence threw before Authorization, Headers, and Body clicks bound.
+		renderRequestParamsFromUrl();
 	`;
 }
