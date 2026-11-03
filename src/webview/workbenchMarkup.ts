@@ -261,8 +261,12 @@ export function workbenchMarkup(escapedExtensionVersion: string): string {
 			</div>
 			<div class="response-panel-content" id="body-panel" role="tabpanel" aria-labelledby="body-tab">
 				<div class="response-body-content" id="response-body-content">
-					<pre class="response-line-numbers" id="response-body-lines" aria-hidden="true">1</pre>
-					<pre class="response-content" id="response-body">(empty)</pre>
+					<div class="response-lines" id="response-body">
+						<div class="response-line">
+							<span class="response-line-number" aria-hidden="true">1</span>
+							<span class="response-line-code">(empty)</span>
+						</div>
+					</div>
 					<div class="stream-events hidden" id="stream-events">
 						<div class="stream-tools">
 							<button type="button" id="stream-expand">Expand all</button>
@@ -278,8 +282,12 @@ export function workbenchMarkup(escapedExtensionVersion: string): string {
 			</div>
 			<div class="response-panel-content hidden" id="raw-panel" role="tabpanel" aria-labelledby="raw-tab">
 				<div class="response-body-content" id="response-raw-content">
-					<pre class="response-line-numbers" id="response-raw-lines" aria-hidden="true">1</pre>
-					<pre class="response-content" id="response-raw">(empty)</pre>
+					<div class="response-lines" id="response-raw">
+						<div class="response-line">
+							<span class="response-line-number" aria-hidden="true">1</span>
+							<span class="response-line-code">(empty)</span>
+						</div>
+					</div>
 				</div>
 			</div>
 			<div class="response-panel-content hidden" id="preview-panel" role="tabpanel" aria-labelledby="preview-tab">
