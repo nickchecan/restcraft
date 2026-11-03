@@ -165,7 +165,116 @@ suite('Response line alignment', () => {
 			'y'.repeat(240),
 		);
 	});
+
+	test('appends streamed raw chunks without rebuilding earlier rows', () => {
+		// Arrange
+		const page = createWorkbenchPage(workbenchMarkup('1.12.3'));
+		runInNewContext(workbenchScript(), page.sandbox, { filename: 'workbench.js' });
+		startStreamedRequest(page);
+		const raw = page.element('response-raw');
+		const chunks = ['hel', 'lo\nwor', 'ld\n', 'end'];
+		const streamed = chunks.join('');
+
+		// Act
+		dispatchStreamChunk(page, chunks[0]);
+		const firstRow = raw.querySelector('.response-line');
+		assert.ok(firstRow, 'Expected the first streamed row.');
+		for (const chunk of chunks.slice(1)) {
+			dispatchStreamChunk(page, chunk);
+			assert.strictEqual(raw.querySelectorAll('.response-line')[0], firstRow);
+		}
+
+		// Assert
+		const lines = streamed.split('\n');
+		assertResponseRows(raw, lines, false);
+		const rendered = raw
+			.querySelectorAll('.response-line')
+			.map((row) => row.querySelector('.response-line-code')?.textContent);
+		page.dispatch({
+			type: 'requestComplete',
+			response: {
+				status: 200,
+				statusText: 'OK',
+				headers: { 'Content-Type': 'text/plain' },
+				body: streamed,
+			},
+		});
+		const rebuilt = page
+			.element('response-raw')
+			.querySelectorAll('.response-line')
+			.map((row) => row.querySelector('.response-line-code')?.textContent);
+		assert.deepStrictEqual(rebuilt, rendered);
+		assert.deepStrictEqual(rebuilt, lines);
+	});
+
+	test('renders rows below the line limit and one plain block above it', () => {
+		// Arrange
+		const page = createWorkbenchPage(workbenchMarkup('1.12.3'));
+		runInNewContext(workbenchScript(), page.sandbox, { filename: 'workbench.js' });
+		const limit = Number(/const RESPONSE_LINE_ROW_LIMIT = (\d+)/.exec(workbenchScript())?.[1]);
+		assert.strictEqual(limit, 5000);
+		const below = ['alpha', 'beta', 'gamma'].join('\n');
+
+		// Act
+		dispatchPlainResponse(page, below);
+
+		// Assert
+		assertResponseRows(page.element('response-body'), below.split('\n'), false);
+		assertResponseRows(page.element('response-raw'), below.split('\n'), false);
+		assert.strictEqual(page.element('response-body').querySelector('.response-plain'), null);
+		assert.strictEqual(page.element('response-raw').querySelector('.response-plain'), null);
+
+		const above = Array.from({ length: limit + 1 }, (_item, index) => `L${index}`).join('\n');
+		dispatchPlainResponse(page, above);
+		assert.strictEqual(page.element('response-body').querySelectorAll('.response-line').length, 0);
+		assert.strictEqual(page.element('response-raw').querySelectorAll('.response-line').length, 0);
+		assert.strictEqual(page.element('response-body').querySelector('.response-plain')?.textContent, above);
+		assert.strictEqual(page.element('response-raw').querySelector('.response-plain')?.textContent, above);
+
+		startStreamedRequest(page);
+		const head = Array.from({ length: limit - 1 }, (_item, index) => `s${index}`).join('\n');
+		dispatchStreamChunk(page, head);
+		assert.strictEqual(page.element('response-raw').querySelectorAll('.response-line').length, limit - 1);
+		dispatchStreamChunk(page, '\nextra\nmore');
+		const streamed = `${head}\nextra\nmore`;
+		assert.strictEqual(page.element('response-raw').querySelectorAll('.response-line').length, 0);
+		assert.strictEqual(page.element('response-raw').querySelector('.response-plain')?.textContent, streamed);
+	});
 });
+
+function dispatchPlainResponse(page: { dispatch: (message: unknown) => void }, body: string): void {
+	page.dispatch({
+		type: 'requestComplete',
+		response: {
+			status: 200,
+			statusText: 'OK',
+			headers: { 'Content-Type': 'text/plain' },
+			body,
+		},
+	});
+}
+
+function startStreamedRequest(page: {
+	dispatch: (message: unknown) => void;
+	element: (id: string) => WorkbenchElement;
+}): void {
+	page.dispatch({ type: 'workspaceTrust', isTrusted: true });
+	page.element('url').value = 'https://example.com/stream';
+	page.element('request-form').emit('submit');
+}
+
+function dispatchStreamChunk(page: { dispatch: (message: unknown) => void }, chunk: string): void {
+	page.dispatch({
+		type: 'requestStream',
+		requestId: 1,
+		update: {
+			chunk,
+			headers: { 'Content-Type': 'text/event-stream' },
+			status: 200,
+			statusText: 'OK',
+		},
+	});
+}
 
 function assertResponseRows(host: WorkbenchElement, lines: string[], highlighted: boolean): void {
 	const rows = host.querySelectorAll('.response-line');
@@ -256,7 +365,8 @@ class WorkbenchElement {
 	public readonly tagName: string;
 	public readonly attributes = new Map<string, string>();
 	public readonly classList: ClassList;
-	public readonly style = { setProperty: () => undefined };
+	public readonly style = { setProperty: () => undefined, removeProperty: () => undefined };
+	public isFragment = false;
 	public children: WorkbenchElement[] = [];
 	public parentElement: WorkbenchElement | null = null;
 	public checked = false;
@@ -274,7 +384,10 @@ class WorkbenchElement {
 	private text = '';
 	private storedValue = '';
 	private storedClassName = '';
-	private readonly listeners = new Map<string, Array<(event: { type: string; target: WorkbenchElement }) => void>>();
+	private readonly listeners = new Map<
+		string,
+		Array<(event: { type: string; target: WorkbenchElement; preventDefault: () => void }) => void>
+	>();
 
 	public constructor(
 		tag: string,
@@ -340,7 +453,10 @@ class WorkbenchElement {
 		return this.attributes.has(name) ? (this.attributes.get(name) ?? null) : null;
 	}
 
-	public addEventListener(type: string, handler: (event: { type: string; target: WorkbenchElement }) => void): void {
+	public addEventListener(
+		type: string,
+		handler: (event: { type: string; target: WorkbenchElement; preventDefault: () => void }) => void,
+	): void {
 		const handlers = this.listeners.get(type) ?? [];
 		handlers.push(handler);
 		this.listeners.set(type, handlers);
@@ -348,13 +464,19 @@ class WorkbenchElement {
 
 	public click(): void {
 		for (const handler of this.listeners.get('click') ?? []) {
-			handler({ type: 'click', target: this });
+			handler({ type: 'click', target: this, preventDefault: () => undefined });
+		}
+	}
+
+	public emit(type: string, event: Record<string, unknown> = {}): void {
+		for (const handler of this.listeners.get(type) ?? []) {
+			handler({ type, target: this, preventDefault: () => undefined, ...event });
 		}
 	}
 
 	public append(...nodes: WorkbenchElement[]): void {
 		for (const node of nodes) {
-			this.adopt(node);
+			this.adoptNode(node);
 		}
 	}
 
@@ -391,7 +513,7 @@ class WorkbenchElement {
 		this.children = [];
 		this.text = '';
 		for (const node of nodes) {
-			this.adopt(node);
+			this.adoptNode(node);
 		}
 	}
 
@@ -452,6 +574,17 @@ class WorkbenchElement {
 		}
 		node.parentElement = this;
 		this.children.push(node);
+	}
+
+	private adoptNode(node: WorkbenchElement): void {
+		if (node.isFragment) {
+			for (const child of [...node.children]) {
+				this.adopt(child);
+			}
+			node.children = [];
+			return;
+		}
+		this.adopt(node);
 	}
 }
 
@@ -651,6 +784,11 @@ function createWorkbenchPage(html: string): {
 		querySelector: (selector: string) => doc.root.querySelector(selector),
 		querySelectorAll: (selector: string) => doc.root.querySelectorAll(selector),
 		createElement: (tag: string) => new WorkbenchElement(tag, doc),
+		createDocumentFragment: () => {
+			const fragment = new WorkbenchElement('#fragment', doc);
+			fragment.isFragment = true;
+			return fragment;
+		},
 		createTextNode: (text: string) => {
 			const node = new WorkbenchElement('#text', doc);
 			node.textContent = text;

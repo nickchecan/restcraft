@@ -1036,6 +1036,23 @@ export const workbenchStyles = `
 				user-select: text;
 			}
 
+			.response-lines-plain {
+				padding: 0;
+			}
+
+			.response-plain {
+				margin: 0;
+				padding: 12px;
+				box-sizing: border-box;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				font-family: var(--vscode-editor-font-family);
+				font-size: var(--vscode-editor-font-size);
+				line-height: 1.45;
+				color: var(--vscode-editor-foreground);
+				user-select: text;
+			}
+
 			.response-headers-content {
 				min-height: 220px;
 				max-height: max(160px, var(--response-area-max-height, calc(100vh - 320px)));

@@ -763,10 +763,17 @@ export function workbenchScript(): string {
                 }
                 if (message.type === 'requestStream') {
 					if (message.requestId !== activeRequestId || !requestInProgress) { return; }
-					if (!streamParser) { beginEventStream(); }
-					streamBody += message.update.chunk;
-					streamParser(message.update.chunk);
-					setRawContent(streamBody || '(empty)');
+					const chunk = typeof message.update.chunk === 'string' ? message.update.chunk : '';
+					if (!streamParser) {
+						beginEventStream();
+						streamBody += chunk;
+						streamParser(chunk);
+						renderResponseLines(responseRaw, streamBody, false);
+					} else {
+						streamBody += chunk;
+						streamParser(chunk);
+						appendResponseLines(responseRaw, chunk);
+					}
 					responseSize.textContent = formatResponseSize(streamBody);
 					renderResponseHeaders(message.update.headers);
 					setResponseStatus('Streaming: ' + message.update.status + ' ' + message.update.statusText);
@@ -2463,33 +2470,138 @@ export function workbenchScript(): string {
 						.replace(/>/g, '&gt;');
 				}
 
+			// 5,000 lines is 15,000 nodes per view. A 100,002-line JSON body created about
+			// 600,000 nodes and spent 706ms inserting them, so larger payloads use one block.
+			const RESPONSE_LINE_ROW_LIMIT = 5000;
+			const responseRenderState = new WeakMap();
+
+			function readResponseRenderState(container) {
+				let state = responseRenderState.get(container);
+				if (!state) {
+					state = { mode: 'empty', lineCount: 0, lastPartial: '', plain: null };
+					responseRenderState.set(container, state);
+				}
+				return state;
+			}
+
+			function updateResponseGutter(container, lineCount) {
+				const digits = String(Math.max(lineCount, 1)).length;
+				container.style.setProperty('--response-gutter', 'max(44px, calc(' + digits + 'ch + 16px))');
+			}
+
+			function createResponseLineRow(lineNumber, line, highlightJson) {
+				const row = document.createElement('div');
+				const number = document.createElement('span');
+				const code = document.createElement('span');
+				row.className = 'response-line';
+				number.className = 'response-line-number';
+				number.setAttribute('aria-hidden', 'true');
+				number.textContent = String(lineNumber);
+				code.className = 'response-line-code';
+				if (highlightJson) {
+					code.innerHTML = formatJsonHighlight(line);
+				} else {
+					code.textContent = line;
+				}
+				row.append(number, code);
+				return row;
+			}
+
+			function readRenderedResponseText(container) {
+				const state = readResponseRenderState(container);
+				if (state.mode === 'block' && state.plain) {
+					return state.plain.textContent || '';
+				}
+				const rows = container.querySelectorAll('.response-line');
+				const lines = [];
+				for (let index = 0; index < rows.length; index++) {
+					const code = rows[index].querySelector('.response-line-code');
+					lines.push(code ? code.textContent : '');
+				}
+				return lines.join('\\n');
+			}
+
+			function appendPlainText(plain, chunk) {
+				const node = plain.firstChild;
+				if (node && node.appendData) {
+					node.appendData(chunk);
+					return;
+				}
+				plain.textContent = (plain.textContent || '') + chunk;
+			}
+
+			function renderResponseBlock(container, content) {
+				const plain = document.createElement('pre');
+				plain.className = 'response-plain';
+				plain.textContent = content;
+				container.classList.add('response-lines-plain');
+				container.replaceChildren(plain);
+				const state = readResponseRenderState(container);
+				state.mode = 'block';
+				state.lineCount = 0;
+				state.lastPartial = '';
+				state.plain = plain;
+			}
+
 			// Paints one response line so its number, code, and hover share the same row.
 			function renderResponseLines(container, content, highlightJson) {
 				const lines = content.split('\\n');
-				const digits = String(Math.max(lines.length, 1)).length;
-				container.style.setProperty('--response-gutter', 'max(44px, calc(' + digits + 'ch + 16px))');
-				container.replaceChildren();
-
-				for (let index = 0; index < lines.length; index++) {
-					const row = document.createElement('div');
-					const number = document.createElement('span');
-					const code = document.createElement('span');
-					const line = lines[index];
-					row.className = 'response-line';
-					number.className = 'response-line-number';
-					number.setAttribute('aria-hidden', 'true');
-					number.textContent = String(index + 1);
-					code.className = 'response-line-code';
-
-					if (highlightJson) {
-						code.innerHTML = formatJsonHighlight(line);
-					} else {
-						code.textContent = line;
-					}
-
-					row.append(number, code);
-					container.append(row);
+				if (lines.length > RESPONSE_LINE_ROW_LIMIT) {
+					renderResponseBlock(container, content);
+					return;
 				}
+				const fragment = document.createDocumentFragment();
+				for (let index = 0; index < lines.length; index++) {
+					fragment.append(createResponseLineRow(index + 1, lines[index], highlightJson));
+				}
+				container.classList.remove('response-lines-plain');
+				container.replaceChildren(fragment);
+				updateResponseGutter(container, lines.length);
+				const state = readResponseRenderState(container);
+				state.mode = 'rows';
+				state.lineCount = lines.length;
+				state.lastPartial = lines.length ? lines[lines.length - 1] : '';
+				state.plain = null;
+			}
+
+			// Extends a streamed raw view by the new chunk without rebuilding earlier rows.
+			function appendResponseLines(container, chunk) {
+				const state = readResponseRenderState(container);
+				if (state.mode === 'block') {
+					appendPlainText(state.plain, chunk);
+					return;
+				}
+				if (state.mode !== 'rows' || state.lineCount === 0) {
+					renderResponseLines(container, chunk, false);
+					return;
+				}
+				const parts = chunk.split('\\n');
+				const nextCount = state.lineCount + parts.length - 1;
+				if (nextCount > RESPONSE_LINE_ROW_LIMIT) {
+					renderResponseBlock(container, readRenderedResponseText(container) + chunk);
+					return;
+				}
+				const rows = container.querySelectorAll('.response-line');
+				const lastRow = rows[rows.length - 1];
+				const code = lastRow ? lastRow.querySelector('.response-line-code') : null;
+				if (!lastRow || !code) {
+					renderResponseLines(container, readRenderedResponseText(container) + chunk, false);
+					return;
+				}
+				const extended = state.lastPartial + parts[0];
+				code.textContent = extended;
+				if (parts.length === 1) {
+					state.lastPartial = extended;
+					return;
+				}
+				const fragment = document.createDocumentFragment();
+				for (let index = 1; index < parts.length; index++) {
+					fragment.append(createResponseLineRow(state.lineCount + index, parts[index], false));
+				}
+				container.append(fragment);
+				state.lineCount += parts.length - 1;
+				state.lastPartial = parts[parts.length - 1];
+				updateResponseGutter(container, state.lineCount);
 			}
 
 			// Sets formatted response body text and line numbers.
