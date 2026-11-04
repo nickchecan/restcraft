@@ -8,5 +8,8 @@ export default defineConfig([
 	{
 		label: 'integration',
 		files: 'out/test/integration/**/*.test.js',
+		// File decoration watchers only see workspace folders. The other integration
+		// tests use temporary directories outside this folder.
+		workspaceFolder: '.',
 	},
 ]);

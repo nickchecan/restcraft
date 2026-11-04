@@ -31,7 +31,12 @@
 	"activationEvents": [
 		"onCustomEditor:restcraft.requestEditor",
 		"onCommand:restcraft.createRequestFile",
-		"onUri"
+		"onUri",
+		"onLanguage:restcraft-request",
+		"workspaceContains:**/*.api.json"
+	],
+	"extensionDependencies": [
+		"vscode.json-language-features"
 	],
 	"capabilities": {
 		"untrustedWorkspaces": {
@@ -61,6 +66,20 @@
 		],
 		"languages": [
 			{
+				"id": "restcraft-request",
+				"aliases": [
+					"RestCraft Request"
+				],
+				"extensions": [
+					".api.json"
+				],
+				"configuration": "./syntaxes/restcraft-request.language-configuration.json",
+				"icon": {
+					"light": "./media/request-icon-light.svg",
+					"dark": "./media/request-icon-dark.svg"
+				}
+			},
+			{
 				"id": "restcraft-network-log",
 				"aliases": [
 					"RestCraft Network Log"
@@ -69,9 +88,101 @@
 		],
 		"grammars": [
 			{
+				"language": "restcraft-request",
+				"scopeName": "source.json.restcraft.request",
+				"path": "./syntaxes/restcraft-request.tmLanguage.json"
+			},
+			{
 				"language": "restcraft-network-log",
 				"scopeName": "source.restcraft-network-log",
 				"path": "./syntaxes/restcraft-network-log.tmLanguage.json"
+			}
+		],
+		"jsonLanguageParticipants": [
+			{
+				"languageId": "restcraft-request"
+			}
+		],
+		"colors": [
+			{
+				"id": "restcraft.method.get",
+				"description": "Foreground color for GET request files in the Explorer and editor tabs.",
+				"defaults": {
+					"dark": "#3FB950",
+					"light": "#1A7F37",
+					"highContrast": "#3CFF8A",
+					"highContrastLight": "#116329"
+				}
+			},
+			{
+				"id": "restcraft.method.post",
+				"description": "Foreground color for POST request files in the Explorer and editor tabs.",
+				"defaults": {
+					"dark": "#E3B341",
+					"light": "#9A6700",
+					"highContrast": "#FFD700",
+					"highContrastLight": "#7A4F00"
+				}
+			},
+			{
+				"id": "restcraft.method.put",
+				"description": "Foreground color for PUT request files in the Explorer and editor tabs.",
+				"defaults": {
+					"dark": "#58A6FF",
+					"light": "#0969DA",
+					"highContrast": "#6CB6FF",
+					"highContrastLight": "#044289"
+				}
+			},
+			{
+				"id": "restcraft.method.delete",
+				"description": "Foreground color for DELETE request files in the Explorer and editor tabs.",
+				"defaults": {
+					"dark": "#F85149",
+					"light": "#CF222E",
+					"highContrast": "#FF8080",
+					"highContrastLight": "#A40E26"
+				}
+			},
+			{
+				"id": "restcraft.method.query",
+				"description": "Foreground color for QUERY request files in the Explorer and editor tabs.",
+				"defaults": {
+					"dark": "#39C5CF",
+					"light": "#0E7C86",
+					"highContrast": "#4EFFFF",
+					"highContrastLight": "#0A5C64"
+				}
+			},
+			{
+				"id": "restcraft.method.patch",
+				"description": "Foreground color for PATCH request files in the Explorer and editor tabs.",
+				"defaults": {
+					"dark": "#BC8CFF",
+					"light": "#8250DF",
+					"highContrast": "#E2B3FF",
+					"highContrastLight": "#6639BA"
+				}
+			},
+			{
+				"id": "restcraft.method.head",
+				"description": "Foreground color for HEAD request files in the Explorer and editor tabs.",
+				"defaults": {
+					"dark": "#F0883E",
+					"light": "#BC4C00",
+					"highContrast": "#FFB000",
+					"highContrastLight": "#8A3800"
+				}
+			},
+			{
+				"id": "restcraft.method.options",
+				"description": "Foreground color for OPTIONS request files in the Explorer and editor tabs.",
+				"defaults": {
+					"dark": "#C9D1D9",
+					"light": "#57606A",
+					"highContrast": "#FFFFFF",
+					"highContrastLight": "#424A53"
+				}
 			}
 		],
 		"customEditors": [
@@ -86,6 +197,14 @@
 				"priority": "default"
 			}
 		],
+		"configurationDefaults": {
+			"[restcraft-request]": {
+				"editor.quickSuggestions": {
+					"strings": true
+				},
+				"editor.suggest.insertMode": "replace"
+			}
+		},
 		"configuration": {
 			"title": "RestCraft",
 			"properties": {
@@ -100,6 +219,16 @@
 					"default": 30000,
 					"minimum": 0,
 					"description": "Maximum time in milliseconds to wait for an API request. Set to 0 to disable the timeout."
+				},
+				"restcraft.showMethodBadge": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show a two-letter HTTP method badge on .api.json files in the Explorer and editor tabs."
+				},
+				"restcraft.showMethodColor": {
+					"type": "boolean",
+					"default": true,
+					"description": "Color .api.json file names and badges by HTTP method in the Explorer and editor tabs."
 				},
 				"restcraft.suppressInsecureCredentialWarning": {
 					"type": "boolean",

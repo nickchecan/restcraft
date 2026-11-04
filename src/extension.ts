@@ -7,10 +7,11 @@ import { registerNetworkHistory } from './webview/networkHistoryPanel';
 import { setNetworkLogSink } from './request/networkLog';
 import { readPackageVersion } from './extensionVersion';
 import { registerOAuthCallback } from './webview/oauthCallback';
+import { RequestFileDecorationProvider } from './request/requestFileDecoration';
 import { RequestEditorProvider } from './webview/requestEditorProvider';
 
 /**
- * Registers RestCraft commands, the custom request editor, and OAuth callback handler.
+ * Registers RestCraft commands, the custom request editor, file decorations, and OAuth callback handler.
  *
  * Activation intentionally does only lightweight setup. Work that reads files,
  * opens panels, or parses requests is deferred until the user invokes a command
@@ -33,12 +34,15 @@ export function activate(context: vscode.ExtensionContext) {
 	const extensionVersion = readExtensionVersion(context);
 
 	const createRequestFile = vscode.commands.registerCommand('restcraft.createRequestFile', createAndOpenRequestFile);
+	const requestFileDecorations = new RequestFileDecorationProvider();
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('restcraft.importBruno', importFromBruno),
 		registerOAuthCallback(context),
 		createRequestFile,
 		RequestEditorProvider.register(context, extensionVersion),
+		requestFileDecorations,
+		vscode.window.registerFileDecorationProvider(requestFileDecorations),
 	);
 }
 

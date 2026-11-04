@@ -16,6 +16,7 @@ Create, save, and send HTTP API requests inside Visual Studio Code. RestCraft gi
 ## Features
 
 - **File-based requests:** create and share readable `.api.json` files with names and descriptions, right beside your code.
+- **Explorer identity:** `.api.json` files use a RestCraft icon and show the request method as a badge and color in the Explorer and editor tabs.
 - **Request editor:** GET, POST, PUT, PATCH, DELETE, HEAD, and OPTIONS; ordered query parameters and headers; saved disabled entries; tab counts and indicators for configured fields.
 - **Flexible bodies:** raw, JSON, text, XML, HTML, and form URL encoded, with JSON beautification.
 - **Response inspection:** status, duration, size, formatted body, headers, raw text, and a sandboxed HTML preview.
@@ -105,6 +106,10 @@ Open VS Code Settings and search for **RestCraft**.
 | `restcraft.defaultTokenView`                   | `raw`   | Show raw, decoded, or hidden token output. JWT decoding does not verify signatures. |
 | `restcraft.autoGenerateAuthorizationCodeState` | `false` | Generate state when selecting Authorization Code if the field is empty.             |
 | `restcraft.suppressInsecureCredentialWarning`  | `false` | Suppress the warning about credentials sent to remote servers over HTTP.            |
+| `restcraft.showMethodBadge`                    | `true`  | Show a two-letter method badge on `.api.json` files.                                |
+| `restcraft.showMethodColor`                    | `true`  | Color `.api.json` file names and badges by HTTP method.                             |
+
+Badges and colors apply when the top-level `method` is GET, POST, PUT, DELETE, QUERY, PATCH, HEAD, or OPTIONS. Those methods show as GT, PO, PU, DE, QU, PA, HE, and OP. Invalid JSON, a missing method, or an unknown method leaves the file undecorated. The badge and color settings refresh the Explorer immediately and can be turned off independently.
 
 ## More help
 

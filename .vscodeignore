@@ -21,5 +21,6 @@ esbuild.js
 **/*.ts
 **/.vscode-test.*
 examples/**/.env
+restcraft-decorations-*/
 docs/**
 test/**
