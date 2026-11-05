@@ -47,13 +47,19 @@ suite('Request language editor', function () {
 
 	test('formats request files with the built-in JSON formatter', async () => {
 		// Arrange
+		const restcraft = vscode.extensions.getExtension('nickchecan.restcraft');
+		assert.ok(restcraft, 'The development extension must be installed in the Extension Host.');
+		await restcraft.activate();
+		await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+		assert.ok(
+			!vscode.workspace.textDocuments.some((document) => document.languageId === 'json'),
+			'Format Document must run without a json document open in this session.',
+		);
 		const uri = vscode.Uri.joinPath(directory, 'compact.api.json');
 		await vscode.workspace.fs.writeFile(uri, Buffer.from('{"method":"GET","url":"https://example.com"}'));
-		const jsonFeatures = vscode.extensions.getExtension('vscode.json-language-features');
-		assert.ok(jsonFeatures, 'The built-in JSON language features extension must be installed.');
-		await jsonFeatures.activate();
 		const document = await vscode.workspace.openTextDocument(uri);
 		assert.strictEqual(document.languageId, 'restcraft-request');
+		assert.ok(vscode.extensions.getExtension('vscode.json-language-features')?.isActive);
 
 		// Act
 		const edits = await vscode.commands.executeCommand<vscode.TextEdit[]>('vscode.executeFormatDocumentProvider', uri, {
