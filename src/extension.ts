@@ -40,6 +40,7 @@ export function activate(context: vscode.ExtensionContext) {
 		createRequestFile,
 		RequestEditorProvider.register(context, extensionVersion),
 	);
+	void activateJsonLanguageFeatures();
 }
 
 /**
@@ -58,4 +59,23 @@ export function deactivate() {}
  */
 function readExtensionVersion(context: vscode.ExtensionContext): string {
 	return readPackageVersion(context.extension.packageJSON);
+}
+
+/**
+ * Starts the built-in JSON language service so request files can be validated
+ * and formatted without opening a separate JSON document.
+ *
+ * RestCraft does not depend on that extension. A disabled or missing service
+ * is ignored so the rest of the extension still activates.
+ */
+async function activateJsonLanguageFeatures(): Promise<void> {
+	const extension = vscode.extensions.getExtension('vscode.json-language-features');
+	if (!extension) {
+		return;
+	}
+	try {
+		await extension.activate();
+	} catch (error) {
+		console.error('RestCraft could not activate the JSON language service.', error);
+	}
 }

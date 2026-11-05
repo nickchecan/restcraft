@@ -31,7 +31,8 @@
 	"activationEvents": [
 		"onCustomEditor:restcraft.requestEditor",
 		"onCommand:restcraft.createRequestFile",
-		"onUri"
+		"onUri",
+		"onLanguage:restcraft-request"
 	],
 	"capabilities": {
 		"untrustedWorkspaces": {
@@ -61,6 +62,20 @@
 		],
 		"languages": [
 			{
+				"id": "restcraft-request",
+				"aliases": [
+					"RestCraft Request"
+				],
+				"extensions": [
+					".api.json"
+				],
+				"configuration": "./syntaxes/restcraft-request.language-configuration.json",
+				"icon": {
+					"light": "./media/request-icon-light.svg",
+					"dark": "./media/request-icon-dark.svg"
+				}
+			},
+			{
 				"id": "restcraft-network-log",
 				"aliases": [
 					"RestCraft Network Log"
@@ -69,9 +84,19 @@
 		],
 		"grammars": [
 			{
+				"language": "restcraft-request",
+				"scopeName": "source.json.restcraft.request",
+				"path": "./syntaxes/restcraft-request.tmLanguage.json"
+			},
+			{
 				"language": "restcraft-network-log",
 				"scopeName": "source.restcraft-network-log",
 				"path": "./syntaxes/restcraft-network-log.tmLanguage.json"
+			}
+		],
+		"jsonLanguageParticipants": [
+			{
+				"languageId": "restcraft-request"
 			}
 		],
 		"customEditors": [
@@ -86,6 +111,14 @@
 				"priority": "default"
 			}
 		],
+		"configurationDefaults": {
+			"[restcraft-request]": {
+				"editor.quickSuggestions": {
+					"strings": true
+				},
+				"editor.suggest.insertMode": "replace"
+			}
+		},
 		"configuration": {
 			"title": "RestCraft",
 			"properties": {
