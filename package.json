@@ -35,9 +35,6 @@
 		"onLanguage:restcraft-request",
 		"workspaceContains:**/*.api.json"
 	],
-	"extensionDependencies": [
-		"vscode.json-language-features"
-	],
 	"capabilities": {
 		"untrustedWorkspaces": {
 			"supported": "limited",

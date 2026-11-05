@@ -98,7 +98,7 @@ suite('Request method decorations', () => {
 		assert.strictEqual(grammarDocument.patterns[0].include, 'source.json');
 		assert.deepStrictEqual(manifest.contributes.jsonLanguageParticipants, [{ languageId: 'restcraft-request' }]);
 		assert.strictEqual(manifest.contributes.jsonValidation, undefined);
-		assert.ok(manifest.extensionDependencies.includes('vscode.json-language-features'));
+		assert.ok(!manifest.extensionDependencies?.includes('vscode.json-language-features'));
 		assert.deepStrictEqual(manifest.activationEvents.slice(0, 3), [
 			'onCustomEditor:restcraft.requestEditor',
 			'onCommand:restcraft.createRequestFile',
