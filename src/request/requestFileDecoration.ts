@@ -22,15 +22,28 @@ export class RequestFileDecorationProvider implements vscode.FileDecorationProvi
 		this.disposable = vscode.Disposable.from(
 			this.onDidChangeFileDecorationsEmitter,
 			watcher,
-			watcher.onDidCreate((uri) => this.onDidChangeFileDecorationsEmitter.fire(uri)),
-			watcher.onDidChange((uri) => this.onDidChangeFileDecorationsEmitter.fire(uri)),
-			watcher.onDidDelete((uri) => this.onDidChangeFileDecorationsEmitter.fire(uri)),
+			watcher.onDidCreate((uri) => this.refresh(uri)),
+			watcher.onDidChange((uri) => this.refresh(uri)),
+			watcher.onDidDelete((uri) => this.refresh(uri)),
+			vscode.workspace.onDidOpenTextDocument((document) => this.refresh(document.uri)),
+			vscode.workspace.onDidChangeTextDocument((event) => this.refresh(event.document.uri)),
+			vscode.workspace.onDidSaveTextDocument((document) => this.refresh(document.uri)),
 			vscode.workspace.onDidChangeConfiguration((event) => {
 				if (event.affectsConfiguration(showMethodBadgeSetting) || event.affectsConfiguration(showMethodColorSetting)) {
 					this.onDidChangeFileDecorationsEmitter.fire(undefined);
 				}
 			}),
 		);
+	}
+
+	/**
+	 * The workspace file watcher does not see request files outside a workspace
+	 * folder. Open documents still need a badge, including unsaved edits.
+	 */
+	private refresh(uri: vscode.Uri): void {
+		if (uri.path.toLowerCase().endsWith('.api.json')) {
+			this.onDidChangeFileDecorationsEmitter.fire(uri);
+		}
 	}
 
 	public dispose(): void {
@@ -56,17 +69,22 @@ export class RequestFileDecorationProvider implements vscode.FileDecorationProvi
 			return undefined;
 		}
 
-		let content: Uint8Array;
-		try {
-			content = await vscode.workspace.fs.readFile(uri);
-		} catch {
-			return undefined;
+		const openDocument = vscode.workspace.textDocuments.find((document) => document.uri.toString() === uri.toString());
+		let text: string;
+		if (openDocument) {
+			text = openDocument.getText();
+		} else {
+			try {
+				text = new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
+			} catch {
+				return undefined;
+			}
 		}
 		if (token.isCancellationRequested) {
 			return undefined;
 		}
 
-		const decoration = readMethodDecoration(new TextDecoder().decode(content));
+		const decoration = readMethodDecoration(text);
 		if (!decoration) {
 			return undefined;
 		}

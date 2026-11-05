@@ -154,6 +154,51 @@ suite('Request file decorations', function () {
 		assert.strictEqual(deleted, undefined);
 	});
 
+	test('refreshes an open request file outside the workspace when it opens, changes, and saves', async () => {
+		// Arrange
+		const outside = vscode.Uri.file(path.join(tmpdir(), `restcraft-outside-${process.pid}-${Date.now()}.api.json`));
+		const writtenAt = events.length;
+		await vscode.workspace.fs.writeFile(outside, Buffer.from('{"method":"GET"}'));
+		await new Promise((resolve) => setTimeout(resolve, 200));
+		assert.ok(
+			!events.slice(writtenAt).some((value) => eventIncludes(value, outside)),
+			'A file outside the workspace must not refresh through the workspace watcher.',
+		);
+
+		try {
+			// Act
+			const openedAt = events.length;
+			const document = await vscode.workspace.openTextDocument(outside);
+			await waitForNewEvent(events, openedAt, (value) => eventIncludes(value, outside));
+			const opened = await provider.provideFileDecoration(outside, cancellation.token);
+
+			const changedAt = events.length;
+			const edit = new vscode.WorkspaceEdit();
+			edit.replace(
+				outside,
+				new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+				'{"method":"POST"}',
+			);
+			await vscode.workspace.applyEdit(edit);
+			await waitForNewEvent(events, changedAt, (value) => eventIncludes(value, outside));
+			const edited = await provider.provideFileDecoration(outside, cancellation.token);
+			const diskBeforeSave = new TextDecoder().decode(await vscode.workspace.fs.readFile(outside));
+
+			const savedAt = events.length;
+			assert.strictEqual(await document.save(), true);
+			await waitForNewEvent(events, savedAt, (value) => eventIncludes(value, outside));
+			const diskAfterSave = new TextDecoder().decode(await vscode.workspace.fs.readFile(outside));
+
+			// Assert
+			assert.strictEqual(opened?.badge, 'GT');
+			assert.strictEqual(edited?.badge, 'PO');
+			assert.match(diskBeforeSave, /GET/);
+			assert.match(diskAfterSave, /POST/);
+		} finally {
+			await vscode.workspace.fs.delete(outside);
+		}
+	});
+
 	test('keeps request files on the JSON language and leaves plain JSON files unchanged', async () => {
 		// Arrange
 		const requestUri = vscode.Uri.joinPath(directory, 'get-users.api.json');
