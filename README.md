@@ -16,6 +16,7 @@ Create, save, and send HTTP API requests inside Visual Studio Code. RestCraft gi
 ## Features
 
 - **File-based requests:** create and share readable `.api.json` files with names and descriptions, right beside your code.
+- **Explorer identity:** `.api.json` files use a RestCraft icon in the Explorer and editor tabs.
 - **Request editor:** GET, POST, PUT, PATCH, DELETE, HEAD, and OPTIONS; ordered query parameters and headers; saved disabled entries; tab counts and indicators for configured fields.
 - **Flexible bodies:** raw, JSON, text, XML, HTML, and form URL encoded, with JSON beautification.
 - **Response inspection:** status, duration, size, formatted body, headers, raw text, and a sandboxed HTML preview.
@@ -105,6 +106,19 @@ Open VS Code Settings and search for **RestCraft**.
 | `restcraft.defaultTokenView`                   | `raw`   | Show raw, decoded, or hidden token output. JWT decoding does not verify signatures. |
 | `restcraft.autoGenerateAuthorizationCodeState` | `false` | Generate state when selecting Authorization Code if the field is empty.             |
 | `restcraft.suppressInsecureCredentialWarning`  | `false` | Suppress the warning about credentials sent to remote servers over HTTP.            |
+
+## Editing the request JSON
+
+`.api.json` files use the `restcraft-request` language so they can have their own icon. VS Code's JSON language service still checks syntax and formats these files. Settings scoped to `[json]` do not. RestCraft copies the built-in JSON editor defaults: quick suggestions inside strings, and suggestions that replace the current text.
+
+Copy any other `[json]` settings, such as tab size or format on save, under `[restcraft-request]`. Prettier's extension formats `json` and `jsonc` documents and does not select this language. Opt in with:
+
+```json
+"[restcraft-request]": {
+  "editor.defaultFormatter": "esbenp.prettier-vscode"
+},
+"prettier.documentSelectors": ["**/*.api.json"]
+```
 
 ## More help
 

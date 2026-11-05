@@ -24,5 +24,7 @@ suite('Extension activation', () => {
 		);
 		assert.ok(commands.includes('restcraft.showNetworkHistory'));
 		assert.ok(commands.includes('restcraft.showNetworkLog'));
+		const dependencies = extension.packageJSON.extensionDependencies as string[] | undefined;
+		assert.ok(!dependencies?.includes('vscode.json-language-features'));
 	});
 });
