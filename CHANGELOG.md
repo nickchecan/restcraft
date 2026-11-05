@@ -6,6 +6,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+- `.api.json` files use the `restcraft-request` language. `[json]` editor settings no longer apply. Copy them under `[restcraft-request]`. The built-in JSON formatter still formats request files. Prettier needs `editor.defaultFormatter` for `[restcraft-request]` and `**/*.api.json` in `prettier.documentSelectors`.
 - Added a command for creating a new `.api.json` request file from the current directory.
 - Added a README badge linking to the latest GitHub release.
 

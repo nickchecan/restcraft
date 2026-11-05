@@ -109,7 +109,20 @@ Open VS Code Settings and search for **RestCraft**.
 | `restcraft.showMethodBadge`                    | `true`  | Show a two-letter method badge on `.api.json` files.                                |
 | `restcraft.showMethodColor`                    | `true`  | Color `.api.json` file names and badges by HTTP method.                             |
 
-Badges and colors apply when the top-level `method` is GET, POST, PUT, DELETE, QUERY, PATCH, HEAD, or OPTIONS. Those methods show as GT, PO, PU, DE, QU, PA, HE, and OP. Invalid JSON, a missing method, or an unknown method leaves the file undecorated. The badge and color settings refresh the Explorer immediately and can be turned off independently.
+Badges and colors apply when the top-level `method` is GET, POST, PUT, DELETE, QUERY, PATCH, HEAD, or OPTIONS. Those methods show as GT, PO, PU, DE, QU, PA, HE, and OP. Invalid JSON, a missing method, or an unknown method leaves the file undecorated. The badge and color settings refresh the Explorer immediately and can be turned off independently. Open request files refresh as you edit or save them, including files that are outside the workspace.
+
+## Editing the request JSON
+
+`.api.json` files use the `restcraft-request` language so they can have their own icon. VS Code's JSON language service still checks syntax and formats these files. Settings scoped to `[json]` do not. RestCraft copies the built-in JSON editor defaults: quick suggestions inside strings, and suggestions that replace the current text.
+
+Copy any other `[json]` settings, such as tab size or format on save, under `[restcraft-request]`. Prettier's extension formats `json` and `jsonc` documents and does not select this language. Opt in with:
+
+```json
+"[restcraft-request]": {
+  "editor.defaultFormatter": "esbenp.prettier-vscode"
+},
+"prettier.documentSelectors": ["**/*.api.json"]
+```
 
 ## More help
 

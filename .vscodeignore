@@ -22,5 +22,6 @@ esbuild.js
 **/.vscode-test.*
 examples/**/.env
 restcraft-decorations-*/
+restcraft-language-*/
 docs/**
 test/**
