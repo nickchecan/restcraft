@@ -39,7 +39,6 @@ suite('Request language', () => {
 			'onCommand:restcraft.createRequestFile',
 			'onUri',
 			'onLanguage:restcraft-request',
-			'workspaceContains:**/*.api.json',
 		]);
 		assert.strictEqual(manifest.contributes.customEditors[0].selector[0].filenamePattern, '*.api.json');
 		assert.strictEqual(manifest.contributes.customEditors[0].viewType, 'restcraft.requestEditor');

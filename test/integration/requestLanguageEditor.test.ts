@@ -49,6 +49,7 @@ suite('Request language editor', function () {
 		const restcraft = vscode.extensions.getExtension('nickchecan.restcraft');
 		assert.ok(restcraft, 'The development extension must be installed in the Extension Host.');
 		await restcraft.activate();
+		await waitForJsonLanguageFeatures();
 		await vscode.commands.executeCommand('workbench.action.closeAllEditors');
 		assert.ok(
 			!vscode.workspace.textDocuments.some((document) => document.languageId === 'json'),
@@ -86,6 +87,16 @@ suite('Request language editor', function () {
 		assert.strictEqual(document.languageId, 'json');
 	});
 });
+
+async function waitForJsonLanguageFeatures(): Promise<void> {
+	const extension = vscode.extensions.getExtension('vscode.json-language-features');
+	assert.ok(extension, 'The built-in JSON language service must be installed.');
+	const deadline = Date.now() + 10000;
+	while (!extension.isActive && Date.now() < deadline) {
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+	assert.ok(extension.isActive, 'RestCraft should start the JSON language service.');
+}
 
 function applyTextEdits(document: vscode.TextDocument, edits: readonly vscode.TextEdit[]): string {
 	const ordered = [...edits].sort((left, right) => right.range.start.compareTo(left.range.start));

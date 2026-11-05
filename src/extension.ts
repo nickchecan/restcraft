@@ -16,7 +16,7 @@ import { RequestEditorProvider } from './webview/requestEditorProvider';
  * opens panels, or parses requests is deferred until the user invokes a command
  * or opens a `.api.json` document.
  */
-export async function activate(context: vscode.ExtensionContext) {
+export function activate(context: vscode.ExtensionContext) {
 	const networkHistory = new NetworkHistory();
 	const networkOutput = vscode.window.createOutputChannel('Restcraft Network', 'restcraft-network-log');
 	setNetworkLogSink(
@@ -33,7 +33,6 @@ export async function activate(context: vscode.ExtensionContext) {
 	const extensionVersion = readExtensionVersion(context);
 
 	const createRequestFile = vscode.commands.registerCommand('restcraft.createRequestFile', createAndOpenRequestFile);
-	await activateJsonLanguageFeatures();
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('restcraft.importBruno', importFromBruno),
@@ -41,6 +40,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		createRequestFile,
 		RequestEditorProvider.register(context, extensionVersion),
 	);
+	void activateJsonLanguageFeatures();
 }
 
 /**

@@ -32,8 +32,7 @@
 		"onCustomEditor:restcraft.requestEditor",
 		"onCommand:restcraft.createRequestFile",
 		"onUri",
-		"onLanguage:restcraft-request",
-		"workspaceContains:**/*.api.json"
+		"onLanguage:restcraft-request"
 	],
 	"capabilities": {
 		"untrustedWorkspaces": {
