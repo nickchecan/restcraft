@@ -472,6 +472,80 @@ suite('Response copy button', () => {
 		timers.advance(1300);
 		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
 	});
+
+	test('clears Copied as soon as a new request replaces the displayed response', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const timers = installFakeTimers(page.sandbox);
+		dispatchPlainResponse(page, 'hello');
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: latestCopyAttempt(page) });
+		const copy = page.element('response-copy');
+		assert.strictEqual(visibleCopyLabel(copy), 'Copied');
+
+		// Act
+		startNextRequest(page);
+
+		// Assert
+		assert.strictEqual(page.element('response-status').textContent, 'Sending...');
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+		assert.strictEqual(visibleCopyIcon(copy).querySelector('.button-icon-check'), null);
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+		timers.advance(1500);
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+	});
+
+	test('ignores a late copy acknowledgement after a new request starts', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const timers = installFakeTimers(page.sandbox);
+		dispatchPlainResponse(page, 'hello');
+		page.click('response-copy');
+		const priorAttempt = latestCopyAttempt(page);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+
+		// Act
+		startNextRequest(page);
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: priorAttempt });
+
+		// Assert
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+		timers.advance(2000);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+		assert.strictEqual(visibleCopyIcon(page.element('response-copy')).querySelector('.button-icon-check'), null);
+	});
+
+	test('a previous Copied timeout does not clear a newer copy', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const timers = installFakeTimers(page.sandbox);
+		dispatchPlainResponse(page, 'hello');
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: latestCopyAttempt(page) });
+		timers.advance(1000);
+		startNextRequest(page);
+		page.dispatch({
+			type: 'requestComplete',
+			response: {
+				status: 200,
+				statusText: 'OK',
+				headers: { 'Content-Type': 'text/plain' },
+				body: 'next',
+			},
+		});
+		page.click('body-tab');
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: latestCopyAttempt(page) });
+
+		// Act
+		timers.advance(600);
+
+		// Assert
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copied');
+		timers.advance(900);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+	});
 });
 
 function openResponseWorkbench(): ReturnType<typeof createWorkbenchPage> {
@@ -557,6 +631,15 @@ function dispatchPlainResponse(page: { dispatch: (message: unknown) => void }, b
 			body,
 		},
 	});
+}
+
+function startNextRequest(page: {
+	dispatch: (message: unknown) => void;
+	element: (id: string) => WorkbenchElement;
+}): void {
+	page.dispatch({ type: 'workspaceTrust', isTrusted: true });
+	page.element('url').value = 'https://example.com/next';
+	page.element('request-form').emit('submit');
 }
 
 function startStreamedRequest(page: {

@@ -691,6 +691,7 @@ export function workbenchScript(): string {
 				setBodyContent('(empty)');
 				responseRawCopyText = '';
 				responseBodyCopyText = '';
+				retireDisplayedResponseCopy();
 				setPreviewContent('', false);
 
 			vscode.postMessage({
@@ -1372,6 +1373,12 @@ export function workbenchScript(): string {
 					const onBody = bodyTab.getAttribute('aria-selected') === 'true';
 					const onRaw = rawTab.getAttribute('aria-selected') === 'true';
 					responseCopy.classList.toggle('hidden', !onBody && !onRaw);
+				}
+
+				function retireDisplayedResponseCopy() {
+					responseCopyAttempt += 1;
+					clearResponseCopyTimer();
+					setResponseCopyFeedback(false);
 				}
 
 				function clearResponseCopyTimer() {
