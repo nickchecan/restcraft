@@ -255,7 +255,7 @@ export function workbenchMarkup(escapedExtensionVersion: string): string {
 					<button class="response-tab" id="raw-tab" type="button" role="tab" aria-selected="false" aria-controls="raw-panel">Raw</button>
 					<button class="response-tab" id="preview-tab" type="button" role="tab" aria-selected="false" aria-controls="preview-panel">Preview</button>
 				</div>
-				<button class="response-copy" id="response-copy" type="button" aria-label="Copy response" title="Copy response">${buttonIcons.copy}</button>
+				<button class="response-copy" id="response-copy" type="button" aria-label="Copy response" title="Copy response">${buttonIcons.copy}<span>Copy</span></button>
 				<div class="response-status" aria-live="polite">
 					<span class="response-time" id="response-time"></span><span class="response-size" id="response-size"></span><span id="response-status" class="response-status-text">No response yet.</span>
 				</div>
