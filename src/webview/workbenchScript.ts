@@ -423,8 +423,8 @@ export function workbenchScript(): string {
 				let textMeasureContext;
 				let activeAuthorizationType = 'none';
 				let activeRequestBodyType = 'raw';
-				let responseBodyCopyText = '(empty)';
-				let responseRawCopyText = '(empty)';
+				let responseBodyCopyText = '';
+				let responseRawCopyText = '';
 				syncResponseCopyButton();
 				// Query rows are rendered at the end of this script, after readQueryParamsFromUrl exists.
 				renderRequestHeaders({});
@@ -620,7 +620,7 @@ export function workbenchScript(): string {
 					return;
 				}
 				const text = readResponseCopyText();
-				if (text.length === 0 || text === '(empty)') {
+				if (text.length === 0) {
 					return;
 				}
 				vscode.postMessage({ type: 'copyResponse', text: text });
@@ -681,6 +681,8 @@ export function workbenchScript(): string {
 				responseHeaders.textContent = '(none)';
 				setRawContent('(empty)');
 				setBodyContent('(empty)');
+				responseRawCopyText = '';
+				responseBodyCopyText = '';
 				setPreviewContent('', false);
 
 			vscode.postMessage({
@@ -1134,6 +1136,13 @@ export function workbenchScript(): string {
 					renderResponseHeaders(result.headers);
 					setRawContent(result.body || '(empty)');
 					setFormattedBodyContent(result.body || '(empty)', result.headers);
+					responseRawCopyText = result.body || '';
+					if (!result.body) {
+						const contentType = readHeaderValue(result.headers, 'Content-Type').split(';')[0].trim().toLowerCase();
+						if (contentType !== 'text/event-stream') {
+							responseBodyCopyText = '';
+						}
+					}
 					setPreviewContent(result.body || '', hasHtmlContentType(result.headers));
 					updateResponseAreaBounds();
 				}
@@ -2674,9 +2683,7 @@ export function workbenchScript(): string {
 				streamEventList.replaceChildren();
 				responseBodyCopyText = '';
 				function appendResponseBodyCopy(text) {
-					responseBodyCopyText = responseBodyCopyText && responseBodyCopyText !== '(empty)'
-						? responseBodyCopyText + '\\n' + text
-						: text;
+					responseBodyCopyText = responseBodyCopyText ? responseBodyCopyText + '\\n' + text : text;
 				}
 				document.getElementById('stream-count').textContent = 'Waiting for events…';
 				responseBodyContent.classList.add('events-mode');

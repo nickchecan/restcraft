@@ -331,6 +331,50 @@ suite('Response copy button', () => {
 		page.click('response-copy');
 		assert.strictEqual(copyMessages(page).length, 2);
 	});
+
+	test('copies a body that is exactly (empty) and does not copy the empty placeholder', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+
+		// Act
+		page.dispatch({
+			type: 'requestComplete',
+			response: {
+				status: 200,
+				statusText: 'OK',
+				headers: { 'Content-Type': 'text/plain' },
+				body: '(empty)',
+			},
+		});
+		page.click('body-tab');
+		page.click('response-copy');
+		page.click('raw-tab');
+		page.click('response-copy');
+
+		// Assert
+		assert.strictEqual(page.element('response-body').querySelector('.response-line-code')?.textContent, '(empty)');
+		assert.strictEqual(page.element('response-raw').querySelector('.response-line-code')?.textContent, '(empty)');
+		assert.deepStrictEqual(
+			copyMessages(page).map((message) => message.text),
+			['(empty)', '(empty)'],
+		);
+		page.dispatch({
+			type: 'requestComplete',
+			response: {
+				status: 204,
+				statusText: 'No Content',
+				headers: { 'Content-Type': 'text/plain' },
+				body: '',
+			},
+		});
+		page.click('body-tab');
+		page.click('response-copy');
+		page.click('raw-tab');
+		page.click('response-copy');
+		assert.strictEqual(page.element('response-body').querySelector('.response-line-code')?.textContent, '(empty)');
+		assert.strictEqual(page.element('response-raw').querySelector('.response-line-code')?.textContent, '(empty)');
+		assert.strictEqual(copyMessages(page).length, 2);
+	});
 });
 
 function openResponseWorkbench(): ReturnType<typeof createWorkbenchPage> {
