@@ -69,6 +69,7 @@ export type WebviewMessage =
 	| { type: 'getOAuthRedirect' }
 	| { type: 'copyOAuthToken'; token: string }
 	| { type: 'copyOAuthRedirect' }
+	| { type: 'copyResponse'; text: string }
 	| { type: 'getConfiguredOAuthToken'; requestId: number; authorization: string }
 	| { type: 'getEnvironmentFile'; requestId: number; environment?: EnvironmentFileSettings }
 	| { type: 'chooseEnvironmentFile'; requestId: number }
@@ -109,6 +110,10 @@ export function readWebviewMessage(message: unknown): WebviewMessage | undefined
 		case 'copyOAuthToken':
 			return typeof message.token === 'string' && message.token.length > 0
 				? { type: 'copyOAuthToken', token: message.token }
+				: undefined;
+		case 'copyResponse':
+			return typeof message.text === 'string' && message.text.length > 0
+				? { type: 'copyResponse', text: message.text }
 				: undefined;
 		case 'getConfiguredOAuthToken':
 			return isSafeRequestId(message.requestId) && typeof message.authorization === 'string'

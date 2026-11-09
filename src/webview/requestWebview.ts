@@ -99,6 +99,9 @@ export function initializeRequestWebview(
 			case 'copyOAuthToken':
 				void vscode.env.clipboard.writeText(command.token);
 				return;
+			case 'copyResponse':
+				void vscode.env.clipboard.writeText(command.text);
+				return;
 			case 'copyOAuthRedirect':
 				if (oauthRedirectUrl) {
 					void vscode.env.clipboard.writeText(oauthRedirectUrl);

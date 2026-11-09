@@ -242,6 +242,163 @@ suite('Response line alignment', () => {
 	});
 });
 
+suite('Response copy button', () => {
+	test('stays visible on Body and Raw, including the empty state, and hides on Headers and Preview', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const copy = page.element('response-copy');
+		const status = page.element('response-status').parentElement;
+
+		// Act
+		const hiddenByTab = ['body-tab', 'headers-tab', 'raw-tab', 'preview-tab'].map((id) => {
+			page.click(id);
+			return copy.classList.contains('hidden');
+		});
+
+		// Assert
+		assert.strictEqual(copy.disabled, false);
+		assert.strictEqual(copy.getAttribute('aria-label'), 'Copy response');
+		assert.ok(copy.querySelector('svg')?.classList.contains('button-icon'));
+		const tabs = copy.parentElement;
+		assert.ok(tabs);
+		assert.ok(status);
+		assert.strictEqual(tabs.classList.contains('response-tabs'), true);
+		assert.strictEqual(status.classList.contains('response-status'), true);
+		assert.strictEqual(tabs.children.indexOf(status) - tabs.children.indexOf(copy), 1);
+		assert.deepStrictEqual(hiddenByTab, [false, true, false, true]);
+		assert.match(
+			workbenchStyles,
+			/\.response-copy \{[\s\S]*?width: 24px;[\s\S]*?height: 24px;[\s\S]*?margin-right: 8px;/,
+		);
+		assert.match(workbenchStyles, /\.response-copy:hover \{[\s\S]*?--vscode-toolbar-hoverBackground/);
+		assert.match(
+			workbenchStyles,
+			/\.response-copy:focus-visible \{[\s\S]*?outline: 1px solid var\(--vscode-focusBorder\);/,
+		);
+		assert.match(workbenchStyles, /\.response-copy svg \{[\s\S]*?width: 16px;[\s\S]*?height: 16px;/);
+		assert.match(workbenchStyles, /\.response-copy:not\(\.hidden\) \+ \.response-status \{[\s\S]*?margin-left: 0;/);
+		page.click('body-tab');
+		page.click('response-copy');
+		assert.deepStrictEqual(copyMessages(page), []);
+	});
+
+	test('copies the formatted body on Body and the raw payload on Raw', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const payload = { id: 1, name: 'Leanne Graham', username: 'Bret', email: 'Sincere@april.biz' };
+		const raw = JSON.stringify(payload);
+		const formatted = JSON.stringify(payload, null, 2);
+
+		// Act
+		page.dispatch({
+			type: 'requestComplete',
+			response: {
+				status: 200,
+				statusText: 'OK',
+				headers: { 'Content-Type': 'application/json' },
+				body: raw,
+			},
+		});
+		page.click('body-tab');
+		page.click('response-copy');
+		page.click('raw-tab');
+		page.click('response-copy');
+
+		// Assert
+		assert.deepStrictEqual(
+			copyMessages(page).map((message) => message.text),
+			[formatted, raw],
+		);
+		assert.notStrictEqual(formatted, raw);
+		page.click('headers-tab');
+		page.click('response-copy');
+		page.click('preview-tab');
+		page.click('response-copy');
+		assert.strictEqual(copyMessages(page).length, 2);
+		page.dispatch({
+			type: 'requestComplete',
+			response: {
+				status: 204,
+				statusText: 'No Content',
+				headers: {},
+				body: '',
+			},
+		});
+		page.click('body-tab');
+		assert.strictEqual(page.element('response-copy').classList.contains('hidden'), false);
+		page.click('response-copy');
+		page.click('raw-tab');
+		page.click('response-copy');
+		assert.strictEqual(copyMessages(page).length, 2);
+	});
+
+	test('copies a body that is exactly (empty) and does not copy the empty placeholder', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+
+		// Act
+		page.dispatch({
+			type: 'requestComplete',
+			response: {
+				status: 200,
+				statusText: 'OK',
+				headers: { 'Content-Type': 'text/plain' },
+				body: '(empty)',
+			},
+		});
+		page.click('body-tab');
+		page.click('response-copy');
+		page.click('raw-tab');
+		page.click('response-copy');
+
+		// Assert
+		assert.strictEqual(page.element('response-body').querySelector('.response-line-code')?.textContent, '(empty)');
+		assert.strictEqual(page.element('response-raw').querySelector('.response-line-code')?.textContent, '(empty)');
+		assert.deepStrictEqual(
+			copyMessages(page).map((message) => message.text),
+			['(empty)', '(empty)'],
+		);
+		page.dispatch({
+			type: 'requestComplete',
+			response: {
+				status: 204,
+				statusText: 'No Content',
+				headers: { 'Content-Type': 'text/plain' },
+				body: '',
+			},
+		});
+		page.click('body-tab');
+		page.click('response-copy');
+		page.click('raw-tab');
+		page.click('response-copy');
+		assert.strictEqual(page.element('response-body').querySelector('.response-line-code')?.textContent, '(empty)');
+		assert.strictEqual(page.element('response-raw').querySelector('.response-line-code')?.textContent, '(empty)');
+		assert.strictEqual(copyMessages(page).length, 2);
+	});
+});
+
+function openResponseWorkbench(): ReturnType<typeof createWorkbenchPage> {
+	const page = createWorkbenchPage(workbenchMarkup('1.13.0'));
+	let initError: unknown;
+	try {
+		runInNewContext(workbenchScript(), page.sandbox, { filename: 'workbench.js' });
+	} catch (error) {
+		initError = error;
+	}
+	assert.ok(initError === undefined, errorText(initError));
+	return page;
+}
+
+function copyMessages(page: { messages: unknown[] }): { type: string; text: string }[] {
+	return page.messages.filter(
+		(message): message is { type: string; text: string } =>
+			typeof message === 'object' &&
+			message !== null &&
+			(message as { type?: unknown }).type === 'copyResponse' &&
+			typeof (message as { text?: unknown }).text === 'string',
+	);
+}
+
 function dispatchPlainResponse(page: { dispatch: (message: unknown) => void }, body: string): void {
 	page.dispatch({
 		type: 'requestComplete',
@@ -770,9 +927,11 @@ function createWorkbenchPage(html: string): {
 	click: (id: string) => void;
 	value: (id: string) => string;
 	element: (id: string) => WorkbenchElement;
+	messages: unknown[];
 	tab: (id: string) => { selected: string | null; hidden: boolean };
 } {
 	const doc = parseWorkbenchHtml(html);
+	const messages: unknown[] = [];
 	const windowListeners = new Map<string, Array<(event: { data?: unknown }) => void>>();
 	const listen = (type: string, handler: (event: { data?: unknown }) => void): void => {
 		const handlers = windowListeners.get(type) ?? [];
@@ -824,7 +983,9 @@ function createWorkbenchPage(html: string): {
 			public disconnect(): void {}
 		},
 		acquireVsCodeApi: () => ({
-			postMessage: () => undefined,
+			postMessage: (message: unknown) => {
+				messages.push(message);
+			},
 			getState: () => ({}),
 			setState: () => undefined,
 		}),
@@ -863,6 +1024,7 @@ function createWorkbenchPage(html: string): {
 			assert.ok(element, `Missing #${id}`);
 			return element;
 		},
+		messages,
 		value: (id) => doc.byId.get(id)?.value ?? '',
 		tab: (id) => {
 			const element = doc.byId.get(id);
