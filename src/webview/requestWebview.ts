@@ -100,7 +100,12 @@ export function initializeRequestWebview(
 				void vscode.env.clipboard.writeText(command.token);
 				return;
 			case 'copyResponse':
-				void vscode.env.clipboard.writeText(command.text);
+				void copyResponseText(
+					(value) => vscode.env.clipboard.writeText(value),
+					(message) => webview.postMessage(message),
+					command.text,
+					command.attempt,
+				);
 				return;
 			case 'copyOAuthRedirect':
 				if (oauthRedirectUrl) {
@@ -231,6 +236,22 @@ export function initializeRequestWebview(
 			activeRequests.clear();
 		}),
 	);
+}
+
+/** Copies response text and tells the webview whether that write succeeded. */
+export async function copyResponseText(
+	writeText: (value: string) => PromiseLike<void>,
+	postMessage: (message: { type: 'responseCopied'; ok: boolean; attempt?: number }) => PromiseLike<unknown>,
+	text: string,
+	attempt?: number,
+): Promise<void> {
+	let ok = true;
+	try {
+		await writeText(text);
+	} catch {
+		ok = false;
+	}
+	await postMessage(attempt === undefined ? { type: 'responseCopied', ok } : { type: 'responseCopied', ok, attempt });
 }
 
 /** Updates the preference without changing an already-open request's State. */

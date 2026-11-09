@@ -35,7 +35,7 @@ suite('Webview HTML', () => {
 		assert.ok(normalized.includes('id="oauth-redirect-note"'));
 		assert.strictEqual(
 			createHash('sha256').update(normalized).digest('hex'),
-			'4e19f3dd7f7f6d0ce2b817cdc3baf22ccb575333993dcdab267563489668f954',
+			'52d42dc54fb4cd0566141fbd52f383cea8fe824c92f83076a1267df4c9efd109',
 		);
 	});
 	test('authorization divider limits dragging, supports keyboard resizing, and resets', () => {

@@ -954,10 +954,35 @@ export const workbenchStyles = `
 			}
 
 			.response-copy svg {
-				width: 16px;
-				height: 16px;
+				display: block;
+				width: 12px;
+				height: 12px;
 				margin-right: 0;
 				pointer-events: none;
+			}
+
+			.response-copy-icons,
+			.response-copy-labels {
+				display: inline-grid;
+				align-items: center;
+			}
+
+			.response-copy-icons {
+				justify-items: center;
+			}
+
+			.response-copy-labels {
+				justify-items: start;
+			}
+
+			.response-copy-icon,
+			.response-copy-label {
+				grid-area: 1 / 1;
+			}
+
+			.response-copy-icon.is-off,
+			.response-copy-label.is-off {
+				visibility: hidden;
 			}
 
 			.response-status {
@@ -969,7 +994,7 @@ export const workbenchStyles = `
 				white-space: nowrap;
 			}
 
-			.response-copy:not(.hidden) + .response-status {
+			.response-copy:not(.hidden) ~ .response-status {
 				margin-left: 0;
 			}
 
@@ -988,6 +1013,7 @@ export const workbenchStyles = `
 				display: inline-flex;
 				align-items: center;
 				min-height: 22px;
+				margin-left: 6px;
 				padding: 2px 8px;
 				border-radius: 999px;
 				box-sizing: border-box;

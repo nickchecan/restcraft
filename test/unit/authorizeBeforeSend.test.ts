@@ -56,6 +56,7 @@ suite('Authorize before sending', () => {
 			setRawContent: () => {},
 			setBodyContent: () => {},
 			setPreviewContent: () => {},
+			retireDisplayedResponseCopy: () => {},
 			readAutomation: () => [],
 			readEnabledRequestUrl: () => 'https://example.com/',
 			method: { value: 'GET' },

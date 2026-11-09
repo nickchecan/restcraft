@@ -258,14 +258,17 @@ suite('Response copy button', () => {
 		// Assert
 		assert.strictEqual(copy.disabled, false);
 		assert.strictEqual(copy.getAttribute('aria-label'), 'Copy response');
-		assert.strictEqual(copy.querySelector('span')?.textContent, 'Copy');
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+		assert.strictEqual(visibleCopyIcon(copy).querySelector('.button-icon-check'), null);
 		assert.ok(copy.querySelector('svg')?.classList.contains('button-icon'));
 		const tabs = copy.parentElement;
 		assert.ok(tabs);
 		assert.ok(status);
 		assert.strictEqual(tabs.classList.contains('response-tabs'), true);
 		assert.strictEqual(status.classList.contains('response-status'), true);
-		assert.strictEqual(tabs.children.indexOf(status) - tabs.children.indexOf(copy), 1);
+		assert.strictEqual(tabs.children.indexOf(status) - tabs.children.indexOf(copy), 2);
+		assert.strictEqual(page.element('response-copy-live').getAttribute('aria-live'), 'polite');
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
 		assert.deepStrictEqual(hiddenByTab, [false, true, false, true]);
 		const copyRule = workbenchStyles.match(/\.response-copy \{[^}]*\}/)?.[0] ?? '';
 		assert.match(copyRule, /height: 18px;/);
@@ -288,8 +291,9 @@ suite('Response copy button', () => {
 			workbenchStyles,
 			/\.response-copy:focus-visible \{[\s\S]*?outline: 1px solid var\(--vscode-focusBorder\);/,
 		);
-		assert.match(workbenchStyles, /\.response-copy svg \{[\s\S]*?width: 16px;[\s\S]*?height: 16px;/);
-		assert.match(workbenchStyles, /\.response-copy:not\(\.hidden\) \+ \.response-status \{[\s\S]*?margin-left: 0;/);
+		assert.match(workbenchStyles, /\.response-copy svg \{[^}]*width: 12px;[^}]*height: 12px;/);
+		assert.match(workbenchStyles, /\.response-copy:not\(\.hidden\) ~ \.response-status \{[^}]*margin-left: 0;/);
+		assert.match(workbenchStyles, /\.response-status-badge \{[^}]*margin-left: 6px;/);
 		page.click('body-tab');
 		page.click('response-copy');
 		assert.deepStrictEqual(copyMessages(page), []);
@@ -388,6 +392,160 @@ suite('Response copy button', () => {
 		assert.strictEqual(page.element('response-raw').querySelector('.response-line-code')?.textContent, '(empty)');
 		assert.strictEqual(copyMessages(page).length, 2);
 	});
+
+	test('shows Copied after a successful copy and returns to Copy', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const timers = installFakeTimers(page.sandbox);
+		dispatchPlainResponse(page, 'hello');
+
+		// Act
+		page.click('response-copy');
+		const copy = page.element('response-copy');
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: latestCopyAttempt(page) });
+
+		// Assert
+		assert.strictEqual(visibleCopyLabel(copy), 'Copied');
+		assert.ok(visibleCopyIcon(copy).querySelector('.button-icon-check'));
+		assert.strictEqual(copy.getAttribute('aria-label'), 'Copied');
+		assert.strictEqual(page.element('response-copy-live').textContent, 'Copied');
+		timers.advance(1499);
+		assert.strictEqual(visibleCopyLabel(copy), 'Copied');
+		timers.advance(1);
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+		assert.strictEqual(visibleCopyIcon(copy).querySelector('.button-icon-check'), null);
+		assert.strictEqual(copy.getAttribute('aria-label'), 'Copy response');
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+	});
+
+	test('a later successful copy restarts the Copied timer', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const timers = installFakeTimers(page.sandbox);
+		dispatchPlainResponse(page, 'hello');
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: latestCopyAttempt(page) });
+		timers.advance(1000);
+
+		// Act
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: 1 });
+		timers.advance(500);
+
+		// Assert
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: latestCopyAttempt(page) });
+		timers.advance(1000);
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: latestCopyAttempt(page) });
+		timers.advance(1000);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copied');
+		timers.advance(500);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+	});
+
+	test('does not show Copied when the copy fails', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const timers = installFakeTimers(page.sandbox);
+		dispatchPlainResponse(page, 'hello');
+
+		// Act
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: false, attempt: latestCopyAttempt(page) });
+
+		// Assert
+		const copy = page.element('response-copy');
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+		assert.strictEqual(visibleCopyIcon(copy).querySelector('.button-icon-check'), null);
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+		timers.advance(2000);
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: latestCopyAttempt(page) });
+		timers.advance(200);
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: false, attempt: latestCopyAttempt(page) });
+		assert.strictEqual(visibleCopyLabel(copy), 'Copied');
+		timers.advance(1300);
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+	});
+
+	test('clears Copied as soon as a new request replaces the displayed response', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const timers = installFakeTimers(page.sandbox);
+		dispatchPlainResponse(page, 'hello');
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: latestCopyAttempt(page) });
+		const copy = page.element('response-copy');
+		assert.strictEqual(visibleCopyLabel(copy), 'Copied');
+
+		// Act
+		startNextRequest(page);
+
+		// Assert
+		assert.strictEqual(page.element('response-status').textContent, 'Sending...');
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+		assert.strictEqual(visibleCopyIcon(copy).querySelector('.button-icon-check'), null);
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+		timers.advance(1500);
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+	});
+
+	test('ignores a late copy acknowledgement after a new request starts', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const timers = installFakeTimers(page.sandbox);
+		dispatchPlainResponse(page, 'hello');
+		page.click('response-copy');
+		const priorAttempt = latestCopyAttempt(page);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+
+		// Act
+		startNextRequest(page);
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: priorAttempt });
+
+		// Assert
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+		timers.advance(2000);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+		assert.strictEqual(visibleCopyIcon(page.element('response-copy')).querySelector('.button-icon-check'), null);
+	});
+
+	test('a previous Copied timeout does not clear a newer copy', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const timers = installFakeTimers(page.sandbox);
+		dispatchPlainResponse(page, 'hello');
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: latestCopyAttempt(page) });
+		timers.advance(1000);
+		startNextRequest(page);
+		page.dispatch({
+			type: 'requestComplete',
+			response: {
+				status: 200,
+				statusText: 'OK',
+				headers: { 'Content-Type': 'text/plain' },
+				body: 'next',
+			},
+		});
+		page.click('body-tab');
+		page.click('response-copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: latestCopyAttempt(page) });
+
+		// Act
+		timers.advance(600);
+
+		// Assert
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copied');
+		timers.advance(900);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+	});
 });
 
 function openResponseWorkbench(): ReturnType<typeof createWorkbenchPage> {
@@ -402,9 +560,60 @@ function openResponseWorkbench(): ReturnType<typeof createWorkbenchPage> {
 	return page;
 }
 
-function copyMessages(page: { messages: unknown[] }): { type: string; text: string }[] {
+function visibleCopyLabel(copy: WorkbenchElement): string {
+	const label = copy.querySelectorAll('.response-copy-label').find((element) => !element.classList.contains('is-off'));
+	assert.ok(label);
+	return label.textContent;
+}
+
+function visibleCopyIcon(copy: WorkbenchElement): WorkbenchElement {
+	const icon = copy.querySelectorAll('.response-copy-icon').find((element) => !element.classList.contains('is-off'));
+	assert.ok(icon);
+	return icon;
+}
+
+function latestCopyAttempt(page: { messages: unknown[] }): number {
+	const attempt = copyMessages(page).at(-1)?.attempt;
+	assert.ok(typeof attempt === 'number');
+	return attempt;
+}
+
+function installFakeTimers(sandbox: Record<string, unknown>): { advance: (ms: number) => void } {
+	type PendingTimer = { at: number; fn: () => void };
+	let now = 0;
+	let nextId = 1;
+	const pending = new Map<number, PendingTimer>();
+	sandbox.setTimeout = (fn: () => void, ms?: number) => {
+		const id = nextId;
+		nextId += 1;
+		pending.set(id, { at: now + (typeof ms === 'number' ? ms : 0), fn });
+		return id;
+	};
+	sandbox.clearTimeout = (id?: number) => {
+		if (typeof id === 'number') {
+			pending.delete(id);
+		}
+	};
+	return {
+		advance(ms: number) {
+			now += ms;
+			const due = [...pending.entries()]
+				.filter(([, timer]) => timer.at <= now)
+				.sort((left, right) => left[1].at - right[1].at || left[0] - right[0]);
+			for (const [id, timer] of due) {
+				if (!pending.has(id)) {
+					continue;
+				}
+				pending.delete(id);
+				timer.fn();
+			}
+		},
+	};
+}
+
+function copyMessages(page: { messages: unknown[] }): { type: string; text: string; attempt?: number }[] {
 	return page.messages.filter(
-		(message): message is { type: string; text: string } =>
+		(message): message is { type: string; text: string; attempt?: number } =>
 			typeof message === 'object' &&
 			message !== null &&
 			(message as { type?: unknown }).type === 'copyResponse' &&
@@ -422,6 +631,15 @@ function dispatchPlainResponse(page: { dispatch: (message: unknown) => void }, b
 			body,
 		},
 	});
+}
+
+function startNextRequest(page: {
+	dispatch: (message: unknown) => void;
+	element: (id: string) => WorkbenchElement;
+}): void {
+	page.dispatch({ type: 'workspaceTrust', isTrusted: true });
+	page.element('url').value = 'https://example.com/next';
+	page.element('request-form').emit('submit');
 }
 
 function startStreamedRequest(page: {
