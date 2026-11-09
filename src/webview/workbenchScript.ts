@@ -619,7 +619,7 @@ export function workbenchScript(): string {
 			});
 
 			responseCopy.addEventListener('click', () => {
-				if (responseCopy.classList.contains('hidden')) {
+				if (responseCopy.disabled || responseCopy.classList.contains('hidden')) {
 					return;
 				}
 				const text = readResponseCopyText();
@@ -687,10 +687,10 @@ export function workbenchScript(): string {
 				setResponseStatus('Sending...');
 				responseSize.textContent = '';
 				responseHeaders.textContent = '(none)';
-				setRawContent('(empty)');
-				setBodyContent('(empty)');
 				responseRawCopyText = '';
 				responseBodyCopyText = '';
+				setRawContent('(empty)');
+				setBodyContent('(empty)');
 				retireDisplayedResponseCopy();
 				setPreviewContent('', false);
 
@@ -709,6 +709,9 @@ export function workbenchScript(): string {
 			const message = event.data;
 				if (message.type === 'responseCopied') {
 					if (message.attempt !== responseCopyAttempt || message.ok !== true) {
+						return;
+					}
+					if (responseCopy.disabled || readResponseCopyText().length === 0) {
 						return;
 					}
 					showResponseCopyFeedback();
@@ -796,6 +799,7 @@ export function workbenchScript(): string {
                 }
                 if (message.type === 'requestStream') {
 					if (message.requestId !== activeRequestId || !requestInProgress) { return; }
+					const publishCopyPayload = noteResponseCopyPayload();
 					const chunk = typeof message.update.chunk === 'string' ? message.update.chunk : '';
 					if (!streamParser) {
 						beginEventStream();
@@ -811,7 +815,7 @@ export function workbenchScript(): string {
 					responseSize.textContent = formatResponseSize(streamBody);
 					renderResponseHeaders(message.update.headers);
 					setResponseStatus('Streaming: ' + message.update.status + ' ' + message.update.statusText);
-					syncResponseCopyButton();
+					publishCopyPayload();
 					return;
 				}
                 if (message.type === 'requestComplete') {
@@ -835,11 +839,16 @@ export function workbenchScript(): string {
 					stopRequestTimer();
 				setResponseStatus(message.cancelled ? 'Request cancelled' : (message.message || 'Request failed'), message.cancelled ? '' : 'error');
 					if (!streamParser) {
+						const publishCopyPayload = noteResponseCopyPayload();
+						const errorText = typeof message.message === 'string' ? message.message : '';
 						responseSize.textContent = '';
 						responseHeaders.textContent = '(none)';
-						setRawContent(message.message);
-						setBodyContent(message.message);
+						responseRawCopyText = errorText;
+						responseBodyCopyText = errorText;
+						setRawContent(errorText.length === 0 ? '(empty)' : errorText);
+						setBodyContent(errorText.length === 0 ? '(empty)' : errorText);
 						setPreviewContent('', false);
+						publishCopyPayload();
 					} else {
 						streamParser('', true);
 					}
@@ -1144,22 +1153,31 @@ export function workbenchScript(): string {
 
 				// Renders response metadata, body, headers, raw text, and preview.
 				function renderResponse(result) {
+					const raw = typeof result.body === 'string' ? result.body : '';
+					const headers = result.headers;
+					const publishCopyPayload = noteResponseCopyPayload();
+					const eventStream = readHeaderValue(headers, 'Content-Type').split(';')[0].trim().toLowerCase() === 'text/event-stream';
 					setResponseStatus(
 						'Status: ' + result.status + ' ' + result.statusText,
 						isSuccessStatus(result.status) ? 'success' : 'error',
 					);
-					responseSize.textContent = formatResponseSize(result.body || '');
-					renderResponseHeaders(result.headers);
-					setRawContent(result.body || '(empty)');
-					setFormattedBodyContent(result.body || '(empty)', result.headers);
-					responseRawCopyText = result.body || '';
-					if (!result.body) {
-						const contentType = readHeaderValue(result.headers, 'Content-Type').split(';')[0].trim().toLowerCase();
-						if (contentType !== 'text/event-stream') {
-							responseBodyCopyText = '';
-						}
+					responseSize.textContent = formatResponseSize(raw);
+					renderResponseHeaders(headers);
+					responseRawCopyText = raw;
+					if (!eventStream) {
+						responseBodyCopyText = raw.length === 0 ? '' : formatResponseBody(raw, headers).content;
 					}
-					setPreviewContent(result.body || '', hasHtmlContentType(result.headers));
+					setRawContent(raw.length === 0 ? '(empty)' : raw);
+					if (eventStream) {
+						setFormattedBodyContent(raw.length === 0 ? '(empty)' : raw, headers);
+					} else if (raw.length === 0) {
+						setBodyContent('(empty)', false);
+					} else {
+						const formatted = formatResponseBody(raw, headers);
+						setBodyContent(formatted.content, formatted.highlightJson);
+					}
+					publishCopyPayload();
+					setPreviewContent(raw, hasHtmlContentType(headers));
 					updateResponseAreaBounds();
 				}
 
@@ -1344,6 +1362,7 @@ export function workbenchScript(): string {
 
 				// Switches between response display tabs.
 				function showResponseTab(tabName) {
+					const previousTab = selectedResponseTab();
 					const showBody = tabName === 'body';
 					const showHeaders = tabName === 'headers';
 					const showRaw = tabName === 'raw';
@@ -1361,24 +1380,59 @@ export function workbenchScript(): string {
 					headersPanel.classList.toggle('hidden', !showHeaders);
 					rawPanel.classList.toggle('hidden', !showRaw);
 					previewPanel.classList.toggle('hidden', !showPreview);
+					if (previousTab !== tabName) {
+						retireDisplayedResponseCopy();
+					}
 					syncResponseCopyButton();
 					updateResponseAreaBounds();
 				}
 
+				function selectedResponseTab() {
+					if (rawTab.getAttribute('aria-selected') === 'true') {
+						return 'raw';
+					}
+					if (headersTab.getAttribute('aria-selected') === 'true') {
+						return 'headers';
+					}
+					if (previewTab.getAttribute('aria-selected') === 'true') {
+						return 'preview';
+					}
+					return 'body';
+				}
+
 				function readResponseCopyText() {
-					return rawTab.getAttribute('aria-selected') === 'true' ? responseRawCopyText : responseBodyCopyText;
+					return selectedResponseTab() === 'raw' ? responseRawCopyText : responseBodyCopyText;
+				}
+
+				function noteResponseCopyPayload() {
+					const body = responseBodyCopyText;
+					const raw = responseRawCopyText;
+					return function publishResponseCopyPayload() {
+						if (body !== responseBodyCopyText || raw !== responseRawCopyText) {
+							retireDisplayedResponseCopy();
+						}
+						syncResponseCopyButton();
+					};
 				}
 
 				function syncResponseCopyButton() {
-					const onBody = bodyTab.getAttribute('aria-selected') === 'true';
-					const onRaw = rawTab.getAttribute('aria-selected') === 'true';
-					responseCopy.classList.toggle('hidden', !onBody && !onRaw);
+					const onBody = selectedResponseTab() === 'body';
+					const onRaw = selectedResponseTab() === 'raw';
+					const visible = onBody || onRaw;
+					responseCopy.classList.toggle('hidden', !visible);
+					const enabled = visible && readResponseCopyText().length > 0;
+					responseCopy.disabled = !enabled;
+					if (!enabled) {
+						clearResponseCopyTimer();
+						setResponseCopyFeedback(false);
+					}
 				}
 
 				function retireDisplayedResponseCopy() {
 					responseCopyAttempt += 1;
 					clearResponseCopyTimer();
 					setResponseCopyFeedback(false);
+					syncResponseCopyButton();
 				}
 
 				function clearResponseCopyTimer() {
@@ -1396,8 +1450,9 @@ export function workbenchScript(): string {
 						const active = name === state;
 						for (const part of responseCopy.querySelectorAll('[data-copy-state="' + name + '"]')) {
 							part.classList.toggle('is-off', !active);
-							if (part.classList.contains('response-copy-label')) {
-								part.setAttribute('aria-hidden', active ? 'false' : 'true');
+							const label = part.querySelector('.response-copy-label');
+							if (label) {
+								label.setAttribute('aria-hidden', active ? 'false' : 'true');
 							}
 						}
 					}
@@ -2702,14 +2757,12 @@ export function workbenchScript(): string {
 				streamEvents.classList.add('hidden');
 				responseBodyContent.classList.remove('events-mode');
 				streamEventList.replaceChildren();
-				responseBodyCopyText = content;
 				renderResponseLines(responseBody, content, highlightJson);
 				syncResponseCopyButton();
 			}
 
 			// Sets raw response body text and line numbers.
 			function setRawContent(content) {
-				responseRawCopyText = content;
 				renderResponseLines(responseRaw, content, false);
 				syncResponseCopyButton();
 			}

@@ -256,10 +256,11 @@ suite('Response copy button', () => {
 		});
 
 		// Assert
-		assert.strictEqual(copy.disabled, false);
+		assert.strictEqual(copy.disabled, true);
 		assert.strictEqual(copy.getAttribute('aria-label'), 'Copy response');
 		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
 		assert.strictEqual(visibleCopyIcon(copy).querySelector('.button-icon-check'), null);
+		assert.strictEqual(page.element('response-body').querySelector('.response-line-code')?.textContent, '(empty)');
 		assert.ok(copy.querySelector('svg')?.classList.contains('button-icon'));
 		const tabs = copy.parentElement;
 		assert.ok(tabs);
@@ -274,7 +275,10 @@ suite('Response copy button', () => {
 		assert.match(copyRule, /height: 18px;/);
 		assert.match(copyRule, /margin-left: auto;/);
 		assert.match(copyRule, /margin-right: 8px;/);
-		assert.match(copyRule, /padding: 0 8px 0 6px;/);
+		assert.match(copyRule, /display: inline-grid;/);
+		assert.match(copyRule, /place-items: center;/);
+		assert.match(copyRule, /padding: 0 8px;/);
+		assert.doesNotMatch(copyRule, /padding: 0 8px 0 6px/);
 		assert.match(
 			copyRule,
 			/border: 1px solid var\(--vscode-dropdown-border, var\(--vscode-input-border, var\(--vscode-panel-border\)\)\);/,
@@ -292,11 +296,23 @@ suite('Response copy button', () => {
 			/\.response-copy:focus-visible \{[\s\S]*?outline: 1px solid var\(--vscode-focusBorder\);/,
 		);
 		assert.match(workbenchStyles, /\.response-copy svg \{[^}]*width: 12px;[^}]*height: 12px;/);
+		assert.match(
+			workbenchStyles,
+			/\.response-copy-group \{[^}]*grid-area: 1 \/ 1;[^}]*display: inline-flex;[^}]*align-items: center;[^}]*gap: 4px;/,
+		);
+		assert.match(workbenchStyles, /\.response-copy:disabled,[\s\S]*?cursor: default;/);
+		assert.doesNotMatch(workbenchStyles, /\.response-copy:disabled[\s\S]*?cursor: wait;/);
 		assert.match(workbenchStyles, /\.response-copy:not\(\.hidden\) ~ \.response-status \{[^}]*margin-left: 0;/);
 		assert.match(workbenchStyles, /\.response-status-badge \{[^}]*margin-left: 6px;/);
 		page.click('body-tab');
 		page.click('response-copy');
+		page.element('response-copy').emit('keydown', { key: 'Enter' });
+		page.element('response-copy').emit('keydown', { key: ' ' });
 		assert.deepStrictEqual(copyMessages(page), []);
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: 1 });
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
 	});
 
 	test('copies the formatted body on Body and the raw payload on Raw', () => {
@@ -342,11 +358,19 @@ suite('Response copy button', () => {
 			},
 		});
 		page.click('body-tab');
-		assert.strictEqual(page.element('response-copy').classList.contains('hidden'), false);
+		const emptyCopy = page.element('response-copy');
+		assert.strictEqual(emptyCopy.classList.contains('hidden'), false);
+		assert.strictEqual(emptyCopy.disabled, true);
+		assert.strictEqual(page.element('response-body').querySelector('.response-line-code')?.textContent, '(empty)');
 		page.click('response-copy');
+		page.element('response-copy').emit('keydown', { key: 'Enter' });
 		page.click('raw-tab');
+		assert.strictEqual(page.element('response-copy').disabled, true);
+		assert.strictEqual(page.element('response-raw').querySelector('.response-line-code')?.textContent, '(empty)');
 		page.click('response-copy');
+		page.element('response-copy').emit('keydown', { key: ' ' });
 		assert.strictEqual(copyMessages(page).length, 2);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
 	});
 
 	test('copies a body that is exactly (empty) and does not copy the empty placeholder', () => {
@@ -364,8 +388,10 @@ suite('Response copy button', () => {
 			},
 		});
 		page.click('body-tab');
+		assert.strictEqual(page.element('response-copy').disabled, false);
 		page.click('response-copy');
 		page.click('raw-tab');
+		assert.strictEqual(page.element('response-copy').disabled, false);
 		page.click('response-copy');
 
 		// Assert
@@ -488,11 +514,14 @@ suite('Response copy button', () => {
 
 		// Assert
 		assert.strictEqual(page.element('response-status').textContent, 'Sending...');
+		assert.strictEqual(copy.disabled, true);
 		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
 		assert.strictEqual(visibleCopyIcon(copy).querySelector('.button-icon-check'), null);
 		assert.strictEqual(page.element('response-copy-live').textContent, '');
+		page.click('response-copy');
 		timers.advance(1500);
 		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+		assert.strictEqual(copyMessages(page).length, 1);
 	});
 
 	test('ignores a late copy acknowledgement after a new request starts', () => {
@@ -546,6 +575,73 @@ suite('Response copy button', () => {
 		timers.advance(900);
 		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
 	});
+
+	test('keeps whitespace as a real payload and does not trim it', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const payload = ' \n\t ';
+
+		// Act
+		dispatchPlainResponse(page, payload);
+		page.click('body-tab');
+		page.click('response-copy');
+		page.click('raw-tab');
+		page.click('response-copy');
+
+		// Assert
+		assert.strictEqual(page.element('response-copy').disabled, false);
+		assert.deepStrictEqual(
+			copyMessages(page).map((message) => message.text),
+			[payload, payload],
+		);
+	});
+
+	test('does not leave Copied up or accept an old acknowledgement after a tab change or a new empty response', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const timers = installFakeTimers(page.sandbox);
+		dispatchPlainResponse(page, 'hello');
+		page.click('body-tab');
+		page.click('response-copy');
+		const priorAttempt = latestCopyAttempt(page);
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: priorAttempt });
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copied');
+
+		// Act
+		page.click('raw-tab');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: priorAttempt });
+
+		// Assert
+		assert.strictEqual(page.element('response-copy').disabled, false);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+		page.click('response-copy');
+		const rawAttempt = latestCopyAttempt(page);
+		page.click('headers-tab');
+		assert.strictEqual(page.element('response-copy').classList.contains('hidden'), true);
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: rawAttempt });
+		page.click('body-tab');
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+		page.dispatch({
+			type: 'requestComplete',
+			response: {
+				status: 204,
+				statusText: 'No Content',
+				headers: {},
+				body: '',
+			},
+		});
+		assert.strictEqual(page.element('response-copy').disabled, true);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+		page.click('response-copy');
+		page.element('response-copy').emit('keydown', { key: 'Enter' });
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: rawAttempt });
+		timers.advance(2000);
+		assert.strictEqual(copyMessages(page).length, 2);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+	});
 });
 
 function openResponseWorkbench(): ReturnType<typeof createWorkbenchPage> {
@@ -560,14 +656,20 @@ function openResponseWorkbench(): ReturnType<typeof createWorkbenchPage> {
 	return page;
 }
 
+function visibleCopyGroup(copy: WorkbenchElement): WorkbenchElement {
+	const group = copy.querySelectorAll('.response-copy-group').find((element) => !element.classList.contains('is-off'));
+	assert.ok(group);
+	return group;
+}
+
 function visibleCopyLabel(copy: WorkbenchElement): string {
-	const label = copy.querySelectorAll('.response-copy-label').find((element) => !element.classList.contains('is-off'));
+	const label = visibleCopyGroup(copy).querySelector('.response-copy-label');
 	assert.ok(label);
 	return label.textContent;
 }
 
 function visibleCopyIcon(copy: WorkbenchElement): WorkbenchElement {
-	const icon = copy.querySelectorAll('.response-copy-icon').find((element) => !element.classList.contains('is-off'));
+	const icon = visibleCopyGroup(copy).querySelector('.response-copy-icon');
 	assert.ok(icon);
 	return icon;
 }
