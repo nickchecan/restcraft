@@ -379,6 +379,7 @@ export function workbenchScript(): string {
 			const rawPanel = document.getElementById('raw-panel');
 			const previewPanel = document.getElementById('preview-panel');
 			const responseCopy = document.getElementById('response-copy');
+			const responseCopyLive = document.getElementById('response-copy-live');
 			const responseStatus = document.getElementById('response-status');
 			const responseTime = document.getElementById('response-time');
 			const responseSize = document.getElementById('response-size');
@@ -425,6 +426,8 @@ export function workbenchScript(): string {
 				let activeRequestBodyType = 'raw';
 				let responseBodyCopyText = '';
 				let responseRawCopyText = '';
+				let responseCopyAttempt = 0;
+				let responseCopyTimer;
 				syncResponseCopyButton();
 				// Query rows are rendered at the end of this script, after readQueryParamsFromUrl exists.
 				renderRequestHeaders({});
@@ -623,7 +626,12 @@ export function workbenchScript(): string {
 				if (text.length === 0) {
 					return;
 				}
-				vscode.postMessage({ type: 'copyResponse', text: text });
+				responseCopyAttempt += 1;
+				vscode.postMessage({ type: 'copyResponse', text: text, attempt: responseCopyAttempt });
+			});
+
+			window.addEventListener('pagehide', () => {
+				clearResponseCopyTimer();
 			});
 
             // Wait for the existing token result handler to update output and header rows.
@@ -698,6 +706,13 @@ export function workbenchScript(): string {
 
 		window.addEventListener('message', (event) => {
 			const message = event.data;
+				if (message.type === 'responseCopied') {
+					if (message.attempt !== responseCopyAttempt || message.ok !== true) {
+						return;
+					}
+					showResponseCopyFeedback();
+					return;
+				}
                 if (message.type === 'oauthRedirect') {
                         document.getElementById('oauth-redirect-url').value = message.url || '';
                         document.getElementById('oauth-redirect-url').placeholder = message.error || 'Callback URL unavailable';
@@ -1357,6 +1372,38 @@ export function workbenchScript(): string {
 					const onBody = bodyTab.getAttribute('aria-selected') === 'true';
 					const onRaw = rawTab.getAttribute('aria-selected') === 'true';
 					responseCopy.classList.toggle('hidden', !onBody && !onRaw);
+				}
+
+				function clearResponseCopyTimer() {
+					if (responseCopyTimer !== undefined) {
+						window.clearTimeout(responseCopyTimer);
+						responseCopyTimer = undefined;
+					}
+				}
+
+				function setResponseCopyFeedback(copied) {
+					const state = copied ? 'copied' : 'copy';
+					responseCopy.setAttribute('aria-label', copied ? 'Copied' : 'Copy response');
+					responseCopy.title = copied ? 'Copied' : 'Copy response';
+					for (const name of ['copy', 'copied']) {
+						const active = name === state;
+						for (const part of responseCopy.querySelectorAll('[data-copy-state="' + name + '"]')) {
+							part.classList.toggle('is-off', !active);
+							if (part.classList.contains('response-copy-label')) {
+								part.setAttribute('aria-hidden', active ? 'false' : 'true');
+							}
+						}
+					}
+					responseCopyLive.textContent = copied ? 'Copied' : '';
+				}
+
+				function showResponseCopyFeedback() {
+					clearResponseCopyTimer();
+					setResponseCopyFeedback(true);
+					responseCopyTimer = window.setTimeout(() => {
+						responseCopyTimer = undefined;
+						setResponseCopyFeedback(false);
+					}, 1500);
 				}
 
 				// Rebuilds request parameter rows from the current URL query string.

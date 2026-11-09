@@ -69,7 +69,7 @@ export type WebviewMessage =
 	| { type: 'getOAuthRedirect' }
 	| { type: 'copyOAuthToken'; token: string }
 	| { type: 'copyOAuthRedirect' }
-	| { type: 'copyResponse'; text: string }
+	| { type: 'copyResponse'; text: string; attempt?: number }
 	| { type: 'getConfiguredOAuthToken'; requestId: number; authorization: string }
 	| { type: 'getEnvironmentFile'; requestId: number; environment?: EnvironmentFileSettings }
 	| { type: 'chooseEnvironmentFile'; requestId: number }
@@ -112,9 +112,7 @@ export function readWebviewMessage(message: unknown): WebviewMessage | undefined
 				? { type: 'copyOAuthToken', token: message.token }
 				: undefined;
 		case 'copyResponse':
-			return typeof message.text === 'string' && message.text.length > 0
-				? { type: 'copyResponse', text: message.text }
-				: undefined;
+			return readCopyResponseMessage(message);
 		case 'getConfiguredOAuthToken':
 			return isSafeRequestId(message.requestId) && typeof message.authorization === 'string'
 				? { type: 'getConfiguredOAuthToken', requestId: message.requestId, authorization: message.authorization }
@@ -149,6 +147,24 @@ export function readWebviewMessage(message: unknown): WebviewMessage | undefined
 
 function isSafeRequestId(value: unknown): value is number {
 	return typeof value === 'number' && Number.isSafeInteger(value);
+}
+
+function isCopyAttempt(value: unknown): value is number {
+	return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+function readCopyResponseMessage(
+	message: Record<string, unknown>,
+): { type: 'copyResponse'; text: string; attempt?: number } | undefined {
+	if (typeof message.text !== 'string' || message.text.length === 0) {
+		return undefined;
+	}
+	if (message.attempt === undefined) {
+		return { type: 'copyResponse', text: message.text };
+	}
+	return isCopyAttempt(message.attempt)
+		? { type: 'copyResponse', text: message.text, attempt: message.attempt }
+		: undefined;
 }
 
 function isOptionalEnvironment(value: unknown): value is EnvironmentFileSettings | undefined {

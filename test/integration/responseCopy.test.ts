@@ -9,11 +9,15 @@ suite('Response copy', () => {
 		// Arrange
 		const previous = await vscode.env.clipboard.readText();
 		const events = new vscode.EventEmitter<unknown>();
+		const posted: unknown[] = [];
 		const webview = {
 			html: '',
 			cspSource: 'vscode-webview:',
 			onDidReceiveMessage: events.event,
-			postMessage: async () => true,
+			postMessage: async (message: unknown) => {
+				posted.push(message);
+				return true;
+			},
 		} as unknown as vscode.Webview;
 		const subscription = initializeRequestWebview(webview);
 		const formatted = '{\n  "id": 1,\n  "name": "Leanne Graham"\n}';
@@ -30,15 +34,18 @@ suite('Response copy', () => {
 			assert.ok(statusAt > copyAt);
 			assert.match(header, /class="response-copy"/);
 			assert.doesNotMatch(header, /response-copy hidden|disabled/);
-			assert.match(header, /<span>Copy<\/span>/);
+			assert.match(header, /data-copy-state="copy">Copy<\/span>/);
+			assert.match(header, /id="response-copy-live" class="sr-only" aria-live="polite"/);
 			assert.ok(header.includes(buttonIcons.copy));
 			assert.match(webview.html, /\.response-copy \{[\s\S]*?border-radius: 9px;[\s\S]*?background: transparent;/);
 			assert.match(webview.html, /\.response-copy:hover,[\s\S]*?background: transparent;/);
 			assert.match(webview.html, /\.response-copy:focus-visible \{[\s\S]*?--vscode-focusBorder/);
-			events.fire({ type: 'copyResponse', text: formatted });
+			events.fire({ type: 'copyResponse', text: formatted, attempt: 1 });
 			await waitForClipboard(formatted);
-			events.fire({ type: 'copyResponse', text: raw });
+			assert.deepStrictEqual(posted.at(-1), { type: 'responseCopied', ok: true, attempt: 1 });
+			events.fire({ type: 'copyResponse', text: raw, attempt: 2 });
 			await waitForClipboard(raw);
+			assert.deepStrictEqual(posted.at(-1), { type: 'responseCopied', ok: true, attempt: 2 });
 			events.fire({ type: 'copyResponse', text: '' });
 			events.fire({ type: 'copyResponse' });
 			await waitForClipboard(raw);
