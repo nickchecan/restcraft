@@ -921,27 +921,36 @@ export const workbenchStyles = `
 			.response-copy {
 				display: inline-flex;
 				align-items: center;
-				justify-content: center;
-				width: 24px;
-				height: 24px;
+				gap: 4px;
+				box-sizing: border-box;
+				height: 18px;
 				margin-left: auto;
 				margin-right: 8px;
-				padding: 4px;
-				border: 0;
-				border-radius: 3px;
+				padding: 0 8px 0 6px;
+				border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, var(--vscode-panel-border)));
+				border-radius: 9px;
 				color: var(--vscode-descriptionForeground);
 				background: transparent;
+				font-family: inherit;
+				font-size: 11px;
+				font-weight: 400;
+				line-height: 16px;
+				white-space: nowrap;
 				cursor: pointer;
 				flex-shrink: 0;
 			}
 
-			.response-copy:hover {
-				background: var(--vscode-toolbar-hoverBackground);
+			.response-copy:hover,
+			.response-copy:active {
+				background: transparent;
+				color: var(--vscode-descriptionForeground);
+				border-color: var(--vscode-descriptionForeground);
 			}
 
 			.response-copy:focus-visible {
 				outline: 1px solid var(--vscode-focusBorder);
 				outline-offset: 1px;
+				background: transparent;
 			}
 
 			.response-copy svg {

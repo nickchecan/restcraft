@@ -30,8 +30,10 @@ suite('Response copy', () => {
 			assert.ok(statusAt > copyAt);
 			assert.match(header, /class="response-copy"/);
 			assert.doesNotMatch(header, /response-copy hidden|disabled/);
+			assert.match(header, /<span>Copy<\/span>/);
 			assert.ok(header.includes(buttonIcons.copy));
-			assert.match(webview.html, /\.response-copy:hover \{[\s\S]*?--vscode-toolbar-hoverBackground/);
+			assert.match(webview.html, /\.response-copy \{[\s\S]*?border-radius: 9px;[\s\S]*?background: transparent;/);
+			assert.match(webview.html, /\.response-copy:hover,[\s\S]*?background: transparent;/);
 			assert.match(webview.html, /\.response-copy:focus-visible \{[\s\S]*?--vscode-focusBorder/);
 			events.fire({ type: 'copyResponse', text: formatted });
 			await waitForClipboard(formatted);

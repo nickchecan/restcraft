@@ -258,6 +258,7 @@ suite('Response copy button', () => {
 		// Assert
 		assert.strictEqual(copy.disabled, false);
 		assert.strictEqual(copy.getAttribute('aria-label'), 'Copy response');
+		assert.strictEqual(copy.querySelector('span')?.textContent, 'Copy');
 		assert.ok(copy.querySelector('svg')?.classList.contains('button-icon'));
 		const tabs = copy.parentElement;
 		assert.ok(tabs);
@@ -266,11 +267,23 @@ suite('Response copy button', () => {
 		assert.strictEqual(status.classList.contains('response-status'), true);
 		assert.strictEqual(tabs.children.indexOf(status) - tabs.children.indexOf(copy), 1);
 		assert.deepStrictEqual(hiddenByTab, [false, true, false, true]);
+		const copyRule = workbenchStyles.match(/\.response-copy \{[^}]*\}/)?.[0] ?? '';
+		assert.match(copyRule, /height: 18px;/);
+		assert.match(copyRule, /margin-left: auto;/);
+		assert.match(copyRule, /margin-right: 8px;/);
+		assert.match(copyRule, /padding: 0 8px 0 6px;/);
+		assert.match(
+			copyRule,
+			/border: 1px solid var\(--vscode-dropdown-border, var\(--vscode-input-border, var\(--vscode-panel-border\)\)\);/,
+		);
+		assert.match(copyRule, /border-radius: 9px;/);
+		assert.match(copyRule, /background: transparent;/);
+		assert.match(copyRule, /font-size: 11px;/);
+		assert.doesNotMatch(copyRule, /width: 24px|border-radius: 3px|border: 0/);
 		assert.match(
 			workbenchStyles,
-			/\.response-copy \{[\s\S]*?width: 24px;[\s\S]*?height: 24px;[\s\S]*?margin-right: 8px;/,
+			/\.response-copy:hover,[\s\S]*?\.response-copy:active \{[\s\S]*?background: transparent;/,
 		);
-		assert.match(workbenchStyles, /\.response-copy:hover \{[\s\S]*?--vscode-toolbar-hoverBackground/);
 		assert.match(
 			workbenchStyles,
 			/\.response-copy:focus-visible \{[\s\S]*?outline: 1px solid var\(--vscode-focusBorder\);/,
