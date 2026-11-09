@@ -918,11 +918,50 @@ export const workbenchStyles = `
 				box-shadow: inset 0 -2px 0 var(--vscode-focusBorder);
 			}
 
+			.response-copy {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				width: 24px;
+				height: 24px;
+				margin-left: auto;
+				margin-right: 8px;
+				padding: 4px;
+				border: 0;
+				border-radius: 3px;
+				color: var(--vscode-descriptionForeground);
+				background: transparent;
+				cursor: pointer;
+				flex-shrink: 0;
+			}
+
+			.response-copy:hover {
+				background: var(--vscode-toolbar-hoverBackground);
+			}
+
+			.response-copy:focus-visible {
+				outline: 1px solid var(--vscode-focusBorder);
+				outline-offset: 1px;
+			}
+
+			.response-copy svg {
+				width: 16px;
+				height: 16px;
+				margin-right: 0;
+				pointer-events: none;
+			}
+
 			.response-status {
+				display: flex;
+				align-items: center;
 				margin-left: auto;
 				padding: 0 12px;
 				color: var(--vscode-descriptionForeground);
 				white-space: nowrap;
+			}
+
+			.response-copy:not(.hidden) + .response-status {
+				margin-left: 0;
 			}
 
 			.response-time,

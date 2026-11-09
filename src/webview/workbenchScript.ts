@@ -378,6 +378,7 @@ export function workbenchScript(): string {
 			const headersPanel = document.getElementById('headers-panel');
 			const rawPanel = document.getElementById('raw-panel');
 			const previewPanel = document.getElementById('preview-panel');
+			const responseCopy = document.getElementById('response-copy');
 			const responseStatus = document.getElementById('response-status');
 			const responseTime = document.getElementById('response-time');
 			const responseSize = document.getElementById('response-size');
@@ -422,6 +423,9 @@ export function workbenchScript(): string {
 				let textMeasureContext;
 				let activeAuthorizationType = 'none';
 				let activeRequestBodyType = 'raw';
+				let responseBodyCopyText = '(empty)';
+				let responseRawCopyText = '(empty)';
+				syncResponseCopyButton();
 				// Query rows are rendered at the end of this script, after readQueryParamsFromUrl exists.
 				renderRequestHeaders({});
 				updateResponseAreaBounds();
@@ -611,6 +615,17 @@ export function workbenchScript(): string {
 				showResponseTab('preview');
 			});
 
+			responseCopy.addEventListener('click', () => {
+				if (responseCopy.classList.contains('hidden')) {
+					return;
+				}
+				const text = readResponseCopyText();
+				if (text.length === 0 || text === '(empty)') {
+					return;
+				}
+				vscode.postMessage({ type: 'copyResponse', text: text });
+			});
+
             // Wait for the existing token result handler to update output and header rows.
             function authorizeForSend() {
                 return new Promise(resolve => {
@@ -774,9 +789,11 @@ export function workbenchScript(): string {
 						streamParser(chunk);
 						appendResponseLines(responseRaw, chunk);
 					}
+					responseRawCopyText = streamBody;
 					responseSize.textContent = formatResponseSize(streamBody);
 					renderResponseHeaders(message.update.headers);
 					setResponseStatus('Streaming: ' + message.update.status + ' ' + message.update.statusText);
+					syncResponseCopyButton();
 					return;
 				}
                 if (message.type === 'requestComplete') {
@@ -1319,7 +1336,18 @@ export function workbenchScript(): string {
 					headersPanel.classList.toggle('hidden', !showHeaders);
 					rawPanel.classList.toggle('hidden', !showRaw);
 					previewPanel.classList.toggle('hidden', !showPreview);
+					syncResponseCopyButton();
 					updateResponseAreaBounds();
+				}
+
+				function readResponseCopyText() {
+					return rawTab.getAttribute('aria-selected') === 'true' ? responseRawCopyText : responseBodyCopyText;
+				}
+
+				function syncResponseCopyButton() {
+					const onBody = bodyTab.getAttribute('aria-selected') === 'true';
+					const onRaw = rawTab.getAttribute('aria-selected') === 'true';
+					responseCopy.classList.toggle('hidden', !onBody && !onRaw);
 				}
 
 				// Rebuilds request parameter rows from the current URL query string.
@@ -2611,12 +2639,16 @@ export function workbenchScript(): string {
 				streamEvents.classList.add('hidden');
 				responseBodyContent.classList.remove('events-mode');
 				streamEventList.replaceChildren();
+				responseBodyCopyText = content;
 				renderResponseLines(responseBody, content, highlightJson);
+				syncResponseCopyButton();
 			}
 
 			// Sets raw response body text and line numbers.
 			function setRawContent(content) {
+				responseRawCopyText = content;
 				renderResponseLines(responseRaw, content, false);
+				syncResponseCopyButton();
 			}
 
 			// Formats and renders response body content based on headers.
@@ -2640,6 +2672,12 @@ export function workbenchScript(): string {
 				streamCount = 0;
 				streamExpanded = true;
 				streamEventList.replaceChildren();
+				responseBodyCopyText = '';
+				function appendResponseBodyCopy(text) {
+					responseBodyCopyText = responseBodyCopyText && responseBodyCopyText !== '(empty)'
+						? responseBodyCopyText + '\\n' + text
+						: text;
+				}
 				document.getElementById('stream-count').textContent = 'Waiting for events…';
 				responseBodyContent.classList.add('events-mode');
 				streamEvents.classList.remove('hidden');
@@ -2650,11 +2688,14 @@ export function workbenchScript(): string {
 					const summary = document.createElement('summary');
 					summary.textContent = 'Event ' + (++streamCount) + ' · ' + event.type + (event.id ? ' · ID: ' + event.id : '');
 					const payload = document.createElement('pre');
+					let formatted = event.data;
 					try {
-						payload.innerHTML = formatJsonHighlight(JSON.stringify(JSON.parse(event.data), null, 2));
+						formatted = JSON.stringify(JSON.parse(event.data), null, 2);
+						payload.innerHTML = formatJsonHighlight(formatted);
 					} catch {
 						payload.textContent = event.data;
 					}
+					appendResponseBodyCopy(formatted);
 					card.append(summary, payload);
 					streamEventList.append(card);
 					document.getElementById('stream-count').textContent = streamCount + (streamCount === 1 ? ' event' : ' events');
