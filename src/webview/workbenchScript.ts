@@ -799,7 +799,6 @@ export function workbenchScript(): string {
                 }
                 if (message.type === 'requestStream') {
 					if (message.requestId !== activeRequestId || !requestInProgress) { return; }
-					const publishCopyPayload = noteResponseCopyPayload();
 					const chunk = typeof message.update.chunk === 'string' ? message.update.chunk : '';
 					if (!streamParser) {
 						beginEventStream();
@@ -815,7 +814,7 @@ export function workbenchScript(): string {
 					responseSize.textContent = formatResponseSize(streamBody);
 					renderResponseHeaders(message.update.headers);
 					setResponseStatus('Streaming: ' + message.update.status + ' ' + message.update.statusText);
-					publishCopyPayload();
+					syncResponseCopyButton();
 					return;
 				}
                 if (message.type === 'requestComplete') {

@@ -642,6 +642,84 @@ suite('Response copy button', () => {
 		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
 		assert.strictEqual(page.element('response-copy-live').textContent, '');
 	});
+
+	test('announces Copied for the streamed snapshot when a later chunk arrives before the acknowledgement', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		const timers = installFakeTimers(page.sandbox);
+		startStreamedRequest(page);
+		dispatchStreamChunk(page, 'alpha');
+		page.click('raw-tab');
+		page.click('response-copy');
+		const snapshot = copyMessages(page).at(-1);
+
+		// Act
+		dispatchStreamChunk(page, 'beta');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: snapshot?.attempt });
+
+		// Assert
+		const copy = page.element('response-copy');
+		assert.strictEqual(snapshot?.text, 'alpha');
+		assert.deepStrictEqual(
+			copyMessages(page).map((message) => message.text),
+			['alpha'],
+		);
+		assert.strictEqual(visibleCopyLabel(copy), 'Copied');
+		assert.strictEqual(copy.getAttribute('aria-label'), 'Copied');
+		assert.strictEqual(page.element('response-copy-live').textContent, 'Copied');
+		dispatchStreamChunk(page, 'gamma');
+		assert.strictEqual(visibleCopyLabel(copy), 'Copied');
+		assert.strictEqual(page.element('response-copy-live').textContent, 'Copied');
+		assert.deepStrictEqual(
+			copyMessages(page).map((message) => message.text),
+			['alpha'],
+		);
+		timers.advance(1499);
+		assert.strictEqual(visibleCopyLabel(copy), 'Copied');
+		timers.advance(1);
+		assert.strictEqual(visibleCopyLabel(copy), 'Copy');
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+	});
+
+	test('a new send or tab change still ignores a streamed copy acknowledgement', () => {
+		// Arrange
+		const page = openResponseWorkbench();
+		startStreamedRequest(page);
+		dispatchStreamChunk(page, 'alpha');
+		page.click('raw-tab');
+		page.click('response-copy');
+		const attempt = latestCopyAttempt(page);
+
+		// Act
+		page.click('body-tab');
+		page.dispatch({ type: 'responseCopied', ok: true, attempt });
+
+		// Assert
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+		page.click('raw-tab');
+		page.click('response-copy');
+		const secondAttempt = latestCopyAttempt(page);
+		page.dispatch({
+			type: 'requestComplete',
+			requestId: 1,
+			response: {
+				status: 200,
+				statusText: 'OK',
+				headers: { 'Content-Type': 'text/event-stream' },
+				body: 'alpha',
+			},
+		});
+		startNextRequest(page);
+		page.dispatch({ type: 'responseCopied', ok: true, attempt: secondAttempt });
+		assert.strictEqual(page.element('response-copy').disabled, true);
+		assert.strictEqual(visibleCopyLabel(page.element('response-copy')), 'Copy');
+		assert.strictEqual(page.element('response-copy-live').textContent, '');
+		assert.deepStrictEqual(
+			copyMessages(page).map((message) => message.text),
+			['alpha', 'alpha'],
+		);
+	});
 });
 
 function openResponseWorkbench(): ReturnType<typeof createWorkbenchPage> {
