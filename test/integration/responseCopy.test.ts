@@ -5,7 +5,7 @@ import { buttonIcons } from '../../src/webview/buttonIcons';
 import { initializeRequestWebview } from '../../src/webview/requestWebview';
 
 suite('Response copy', () => {
-	test('places an enabled empty-state copy button on Body and copies text from the extension host', async () => {
+	test('places a disabled empty-state copy button on Body and copies text from the extension host', async () => {
 		// Arrange
 		const previous = await vscode.env.clipboard.readText();
 		const events = new vscode.EventEmitter<unknown>();
@@ -33,8 +33,10 @@ suite('Response copy', () => {
 			assert.ok(copyAt > webview.html.indexOf('id="body-tab"'));
 			assert.ok(statusAt > copyAt);
 			assert.match(header, /class="response-copy"/);
-			assert.doesNotMatch(header, /response-copy hidden|disabled/);
-			assert.match(header, /data-copy-state="copy">Copy<\/span>/);
+			assert.doesNotMatch(header, /response-copy hidden/);
+			assert.match(header, /<button class="response-copy"[^>]* disabled/);
+			assert.match(header, /data-copy-state="copy">/);
+			assert.match(header, /class="response-copy-label">Copy<\/span>/);
 			assert.match(header, /id="response-copy-live" class="sr-only" aria-live="polite"/);
 			assert.ok(header.includes(buttonIcons.copy));
 			assert.match(webview.html, /\.response-copy \{[\s\S]*?border-radius: 9px;[\s\S]*?background: transparent;/);
